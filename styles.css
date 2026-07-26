@@ -1,5 +1,29 @@
-/* Template and annotation-type text areas in the plugin settings tab. */
+/* Template text areas in the plugin settings tab. */
 .pdf-annotations-template-input {
 	width: 100%;
 	height: 10em;
+}
+
+/* Grid of annotation type checkboxes. Columns are laid out by available width,
+   so it collapses to a single column on narrow screens and on mobile. */
+.pdf-annotations-annotation-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(11em, 1fr));
+	gap: 0.15em 1em;
+	margin-bottom: 0.75em;
+}
+
+.pdf-annotations-annotation-option {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.15em 0;
+	cursor: pointer;
+}
+
+/* Obsidian sizes checkboxes for full-width setting rows; in the grid they sit
+   next to their label, so drop the trailing margin. */
+.pdf-annotations-annotation-option input[type="checkbox"] {
+	margin: 0;
+	flex-shrink: 0;
 }

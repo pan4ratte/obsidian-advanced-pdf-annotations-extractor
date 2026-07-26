@@ -4,6 +4,7 @@ import {
 	DropdownComponent,
 	PluginSettingTab,
 	Setting,
+	setTooltip,
 } from "obsidian";
 import PDFAnnotationPlugin from "src/main";
 import { IIndexable } from "src/types";
@@ -19,19 +20,68 @@ export const TEMPLATE_VARIABLES = {
 	body: "Body of annotation",
 };
 
-export const SUPPORTED_ANNOTS = {
-	Text: "Text-Annotation (Note)",
-	Highlight: "Highlighted text",
-	Underline: "Underlined text",
-	Squiggly: "Squiggly underlined text",
-	FreeText: "Free text added to the pdf",
-};
+export interface SupportedAnnotation {
+	/** PDF annotation subtype, as reported by pdf.js. */
+	subtype: string;
+	description: string;
+	/**
+	 * True for the text markup annotations, which carry QuadPoints: the PDF text
+	 * underneath them is extracted into {{highlightedText}} and they are rendered
+	 * with the highlight templates. The rest only contribute their own comment
+	 * and are rendered with the note templates.
+	 */
+	marksUpText?: boolean;
+	/** Part of the default selection. */
+	desiredByDefault?: boolean;
+}
 
-export const ANNOTS_TREATED_AS_HIGHLIGHTS = [
-	"Highlight",
-	"Underline",
-	"Squiggly",
+// The annotation types that carry text an exported note can actually show:
+// either the PDF text they mark up, or text the reader typed themselves.
+//
+// Deliberately absent are the graphical markup types — Ink, Square, Circle,
+// Line, Polygon, PolyLine, Stamp, Caret and FileAttachment. Their content is a
+// drawing, a stamp or an attached file, none of which survives a conversion to
+// markdown, and their Contents entry is empty unless a comment happens to be
+// attached. Extracting them yields mostly blank entries. Link, Widget and Popup
+// are absent too: they are not annotations the reader made.
+export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
+	{
+		subtype: "Highlight",
+		description: "Highlighted text",
+		marksUpText: true,
+		desiredByDefault: true,
+	},
+	{
+		subtype: "Underline",
+		description: "Underlined text",
+		marksUpText: true,
+		desiredByDefault: true,
+	},
+	{
+		subtype: "Squiggly",
+		description: "Squiggly underlined text",
+		marksUpText: true,
+	},
+	{
+		subtype: "StrikeOut",
+		description: "Struck out text",
+		marksUpText: true,
+	},
+	{
+		subtype: "Text",
+		description: "Sticky note comment",
+		desiredByDefault: true,
+	},
+	{ subtype: "FreeText", description: "Free text typed onto the page" },
 ];
+
+export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
+	(annotation) => annotation.marksUpText
+).map((annotation) => annotation.subtype);
+
+export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
+	(annotation) => annotation.desiredByDefault
+).map((annotation) => annotation.subtype);
 
 export class PDFAnnotationPluginSetting {
 	public useStructuringHeadlines: boolean;
@@ -39,7 +89,7 @@ export class PDFAnnotationPluginSetting {
 	public sortByTopic: boolean;
 	public exportPath: string;
 	public exportName: string;
-	public desiredAnnotations: string;
+	public desiredAnnotations: string[];
 	public noteTemplateExternalPDFs: string;
 	public noteTemplateInternalPDFs: string;
 	public highlightTemplateExternalPDFs: string;
@@ -49,9 +99,6 @@ export class PDFAnnotationPluginSetting {
 	public overwriteExistingNote: boolean;
 	public extractTagsFromAnnotationsAsObsidianTags: boolean;
 	public exportClipboardExtraction: boolean;
-	public parsedSettings: {
-		desiredAnnotations: string[];
-	};
 
 	constructor() {
 		this.useStructuringHeadlines = true;
@@ -59,7 +106,7 @@ export class PDFAnnotationPluginSetting {
 		this.sortByTopic = true;
 		this.exportPath = "";
 		this.exportName = "Annotations for {{filename}}";
-		this.desiredAnnotations = "Text, Highlight, Underline";
+		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
 		this.noteTemplateExternalPDFs =
 			"{{body}}\n" +
 			"\n" +
@@ -89,17 +136,54 @@ export class PDFAnnotationPluginSetting {
 		this.overwriteExistingNote = false;
 		this.extractTagsFromAnnotationsAsObsidianTags = false;
 		this.exportClipboardExtraction = false;
-		this.parsedSettings = {
-			desiredAnnotations: this.parseCommaSeparatedStringToArray(
-				this.desiredAnnotations
-			),
-		};
 	}
 
-	public parseCommaSeparatedStringToArray(
-		desiredAnnotations: string
-	): string[] {
-		return desiredAnnotations.split(",").map((item) => item.trim());
+	public isAnnotationDesired(annotationType: string): boolean {
+		return this.desiredAnnotations.includes(annotationType);
+	}
+
+	public setAnnotationDesired(
+		annotationType: string,
+		desired: boolean
+	): void {
+		const selected = new Set(this.desiredAnnotations);
+		if (desired) {
+			selected.add(annotationType);
+		} else {
+			selected.delete(annotationType);
+		}
+
+		// Keep the order the types are listed in, then any subtype added to
+		// data.json by hand that this version does not offer a checkbox for.
+		const known = new Set(SUPPORTED_ANNOTS.map((a) => a.subtype));
+		this.desiredAnnotations = [
+			...SUPPORTED_ANNOTS.map((a) => a.subtype).filter((type) =>
+				selected.has(type)
+			),
+			...[...selected].filter((type) => !known.has(type)),
+		];
+	}
+
+	/**
+	 * data.json is written by users and by older versions of this plugin, which
+	 * stored the selection as a comma separated string. Accept both, and drop
+	 * anything that is not a list of subtypes.
+	 */
+	public static normalizeDesiredAnnotations(value: unknown): string[] | null {
+		if (typeof value === "string") {
+			return value
+				.split(",")
+				.map((subtype) => subtype.trim())
+				.filter((subtype) => subtype.length > 0);
+		}
+		if (Array.isArray(value)) {
+			const entries: unknown[] = value;
+			const subtypes = entries.filter(
+				(subtype): subtype is string => typeof subtype === "string"
+			);
+			return subtypes.length === entries.length ? subtypes : null;
+		}
+		return null;
 	}
 }
 
@@ -119,10 +203,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		component.onChange(async (value) => {
 			(this.plugin.settings as IIndexable)[settingsKey] = value;
 			await this.plugin.saveSettings();
-			if (settingsKey === "desiredAnnotations") {
-				this.plugin.settings.parsedSettings.desiredAnnotations =
-					this.plugin.settings.parseCommaSeparatedStringToArray(value);
-			}
 			if (cb) {
 				cb(value);
 			}
@@ -143,39 +223,36 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl).setName("Desired annotations").setHeading();
-		const desiredAnnotationsInstructionsEl = containerEl.createEl("p");
-		desiredAnnotationsInstructionsEl.append(
-			createSpan({
-				text:
-					"You can specify which types of annotations should be extracted by the plugin. " +
-					"List the types exactly as listed here, separated by commas. " +
-					"The plugin supports the following types of annotations: ",
-			})
-		);
+		new Setting(containerEl)
+			.setName("Desired annotations")
+			.setDesc(
+				"The annotation types to extract. Highlight, Underline, Squiggly and StrikeOut also capture the PDF text underneath them; the others contribute their own comment only."
+			)
+			.setHeading();
 
-		const desiredAnnotationsVariableUl = containerEl.createEl("ul");
-		Object.entries(SUPPORTED_ANNOTS).forEach((variableData) => {
-			const [key, description] = variableData,
-				desiredAnnotationsVariableItem =
-					desiredAnnotationsVariableUl.createEl("li");
-
-			desiredAnnotationsVariableItem.createSpan({
-				cls: "text-monospace",
-				text: key,
+		const annotationGrid = containerEl.createDiv({
+			cls: "pdf-annotations-annotation-grid",
+		});
+		SUPPORTED_ANNOTS.forEach(({ subtype, description }) => {
+			const option = annotationGrid.createEl("label", {
+				cls: "pdf-annotations-annotation-option",
 			});
+			const checkbox = option.createEl("input", { type: "checkbox" });
+			checkbox.checked =
+				this.plugin.settings.isAnnotationDesired(subtype);
+			option.createSpan({ text: subtype });
+			setTooltip(option, description);
 
-			desiredAnnotationsVariableItem.createSpan({
-				text: description ? ` — ${description}` : "",
+			checkbox.addEventListener("change", () => {
+				this.plugin.settings.setAnnotationDesired(
+					subtype,
+					checkbox.checked
+				);
+				this.plugin
+					.saveSettings()
+					.catch((error) => console.error(error));
 			});
 		});
-
-		new Setting(containerEl)
-			.setName("The following types of annotations should be extracted:")
-			.addTextArea((input) => {
-				input.inputEl.addClass("pdf-annotations-template-input");
-				this.buildValueInput(input, "desiredAnnotations");
-			});
 
 		new Setting(containerEl).setName("Styling").setHeading();
 		new Setting(containerEl).setName("Templates").setHeading();

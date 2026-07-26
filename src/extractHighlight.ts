@@ -27,6 +27,11 @@ function searchQuad(
 
 // iterate over all QuadPoints and join retrieved lines
 export function extractHighlight(annot: any, items: any) {
+	// pdf.js reports null when a text markup annotation carries no usable
+	// QuadPoints. There is no text to pick up then, only the comment on the
+	// annotation itself, so don't let one malformed annotation fail the file.
+	if (!annot.quadPoints) return "";
+
 	const legacyQuadPoints = [];
 	// Recreate legacy quadPoints array, with the form [[{x: 1, y: 2}, {x: 3, y: 4}, {x: 5, y: 6}, {x: 7, y: 8}], ...]
 	// One quad is 4 points (x,y) in the order tL, tR, bL, bR, multiple quads for multiple lines

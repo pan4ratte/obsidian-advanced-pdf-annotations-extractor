@@ -15,6 +15,7 @@ import {
 } from "obsidian";
 import { loadPDFFile } from "src/extractHighlight";
 import {
+	DEFAULT_DESIRED_ANNOTATIONS,
 	PDFAnnotationPluginSetting,
 	PDFAnnotationPluginSettingTab,
 } from "src/settings";
@@ -75,8 +76,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const pdfjsLib = await loadPdfJs();
 		const containingFolder = pdfFile.parent.name;
 		const grandtotal = [];
-		const desiredAnnotations =
-			this.settings.parsedSettings.desiredAnnotations;
+		const desiredAnnotations = this.settings.desiredAnnotations;
 		const content = await this.app.vault.readBinary(pdfFile);
 		await loadPDFFile(
 			PDFFile.convertTFileToPDFFile(pdfFile, content),
@@ -194,8 +194,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 					0,
 					filePathWithSlashs.lastIndexOf("/")
 				);
-				const desiredAnnotations =
-					this.settings.parsedSettings.desiredAnnotations;
+				const desiredAnnotations = this.settings.desiredAnnotations;
 				await loadPDFFile(
 					pdfFile,
 					pdfjsLib,
@@ -266,8 +265,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				if (file == null) return;
 				const folder = file.parent;
 				const grandtotal = []; // array that will contain all fetched Annotations
-				const desiredAnnotations =
-					this.settings.parsedSettings.desiredAnnotations;
+				const desiredAnnotations = this.settings.desiredAnnotations;
 
 				const pdfjsLib = await loadPdfJs();
 
@@ -332,12 +330,16 @@ export default class PDFAnnotationPlugin extends Plugin {
 						loadedSettings[setting];
 				}
 			});
-			this.settings.parsedSettings = {
-				desiredAnnotations:
-					this.settings.parseCommaSeparatedStringToArray(
-						this.settings.desiredAnnotations
-					),
-			};
+
+			// The selection is a list of subtypes. Keep whatever data.json holds
+			// usable, and fall back to the defaults if it is neither a list nor
+			// the comma separated string an older version wrote.
+			const desiredAnnotations =
+				PDFAnnotationPluginSetting.normalizeDesiredAnnotations(
+					this.settings.desiredAnnotations
+				);
+			this.settings.desiredAnnotations =
+				desiredAnnotations ?? [...DEFAULT_DESIRED_ANNOTATIONS];
 		}
 	}
 

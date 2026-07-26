@@ -125,3 +125,9 @@ describe('extractHighlight - simple text', () => {
     expect(result).toBe('die');
   });
 });
+describe('extractHighlight - malformed annotations', () => {
+  test('returns no text when pdf.js reports no usable quadPoints', () => {
+    expect(extractHighlight({quadPoints: null}, [])).toBe('');
+    expect(extractHighlight({}, [])).toBe('');
+  });
+});

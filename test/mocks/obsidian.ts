@@ -1,4 +1,18 @@
-import { Workspace, Vault, MetadataCache, FileManager, UserEvent, PluginSettingTab } from "obsidian";
+import { Workspace, Vault, MetadataCache, FileManager, UserEvent } from "obsidian";
+
+/**
+ * Enough of the base class for `src/settings.ts` to be imported: its setting tab
+ * extends this, which is evaluated at import time. The tab's `display()` is not
+ * exercised by the tests, so no DOM or `Setting` stub is needed.
+ */
+export class PluginSettingTab {
+
+	/** @public */
+	app: App;
+
+	/** @public */
+	containerEl: HTMLElement;
+}
 
 export class App {
 

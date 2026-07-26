@@ -7,8 +7,20 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ## Unreleased
 
+### Added
+
+- `StrikeOut` annotations can now be extracted. It is the fourth text markup
+  type, so it captures the struck out text the way highlights, underlines and
+  squigglies do. Not enabled by default — tick it in the settings.
+
 ### Changed
 
+- The desired annotation types are picked from a grid of checkboxes instead of
+  being typed into a text field, so the type names can no longer be misspelled.
+  Hover a type for what it means.
+- **Breaking:** `desiredAnnotations` in `data.json` is now a list of subtypes
+  (`["Highlight", "Underline", "Text"]`) rather than a comma separated string.
+  A string left over from an earlier version is converted on load.
 - Commands no longer repeat the plugin name, following the Obsidian plugin
   guidelines. The command IDs are unchanged, so existing hotkeys keep working:
   - `Extract PDF Annotations` → `Extract from every PDF in the current folder`
@@ -32,6 +44,8 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Fixed
 
+- A text markup annotation whose `QuadPoints` pdf.js cannot use no longer fails
+  the extraction of the whole file.
 - Highlights covering only one or two characters returned the neighbouring
   letter (`Word,` highlighted on `o` yielded `r`). Glyph positions inside a text
   item are now estimated from per-letter widths instead of splitting the item

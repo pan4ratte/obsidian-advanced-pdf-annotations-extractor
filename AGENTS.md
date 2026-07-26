@@ -23,7 +23,8 @@
 ## Testing
 
 - Jest with `ts-jest` preset; `obsidian` module mapped to `test/mocks/obsidian.ts`.
-- Tests only the `extractHighlight` function from `src/extractHighlight.ts`.
+  The mock only stubs what importing the code under test evaluates — extend it
+  when a test needs more, rather than faking Obsidian behaviour.
 - `ANNOTS_TREATED_AS_HIGHLIGHTS` is mocked in test setup.
 - Run `npm test` (no watch by default).
 - The fixtures are real pdf.js text items and real PDF highlight rectangles for
@@ -31,6 +32,31 @@
   (`W`, `o`, `r`, `d`, `,` of `Word,`) are what pin down the glyph-width
   estimation in `glyphBorders` — if you retune `WIDE_LETTER_WEIGHT` or
   `SLIM_LETTER_WEIGHT`, those are the tests that will tell you.
+
+## Annotation types
+
+`SUPPORTED_ANNOTS` in `src/settings.ts` is the single list of what can be
+extracted. The bar for being on it is **carrying text a markdown note can show**:
+either PDF text the annotation marks up, or text the reader typed.
+
+pdf.js reports `titleObj`/`contentsObj` for every `MarkupAnnotation` subclass, so
+`Ink`, `Square`, `Circle`, `Line`, `Polygon`, `PolyLine`, `Stamp`, `Caret` and
+`FileAttachment` are technically readable — they are left out on purpose, because
+their content is a drawing, stamp or attached file and their `Contents` is empty
+unless a comment happens to be attached, so extracting them produces blank
+entries. Don't add them back without a story for what the note would contain.
+
+Two flags drive everything else, so nothing needs updating in parallel:
+
+- `marksUpText` — the four subtypes carrying `QuadPoints` (`Highlight`,
+  `Underline`, `Squiggly`, `StrikeOut`, matching pdf.js's own
+  `overlaysTextContent`). `ANNOTS_TREATED_AS_HIGHLIGHTS` is derived from it, and
+  it decides both whether the PDF text underneath is extracted and whether the
+  highlight or the note template is used.
+- `desiredByDefault` — derives `DEFAULT_DESIRED_ANNOTATIONS`.
+
+The settings tab renders one checkbox per entry, so adding a subtype is a
+one-line change. `desiredAnnotations` is persisted as a list of subtype strings.
 
 ## Source layout (flat, not a monorepo)
 
@@ -43,6 +69,7 @@ src/
   types.ts            — PDFFile type, IIndexable helper
 test/
   extractHighlight.test.ts
+  settings.test.ts     — desired-annotation toggle round-trip
   mocks/obsidian.ts
 styles.css            — settings tab CSS (release asset)
 CHANGELOG.md          — release notes source for the workflow

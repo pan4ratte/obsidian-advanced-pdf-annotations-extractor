@@ -10,7 +10,11 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 
 ## Plugin Settings
 * Desired annotations
-	* Select your desired annotation types that should be extracted from the PDF, if it includes other types that you don't need
+	* A grid of checkboxes, one per annotation type, so you can pick exactly what gets extracted:
+		- Text markup, which also captures the PDF text underneath it: `Highlight`, `Underline`, `Squiggly`, `StrikeOut`
+		- Typed text: `Text` (sticky note), `FreeText`
+	* `Highlight`, `Underline` and `Text` are enabled by default
+	* Purely graphical annotations (drawings, shapes, stamps, attachments) are not offered — there is nothing in them a markdown note could show
 * Styling
 	* Templates for different types of notes: notes from internal or external PDFs and highlights from internal or external PDFs. The distinction between internal and external exists, if one wants to use different links (internal `[[]]` links vs. external `file://` links). The following template variables are available and can be used by following the [Handlebars]('https://handlebarsjs.com/guide/expressions.html') syntax: 
 		- {{highlightedText}}: 'Highlighted text from PDF',
