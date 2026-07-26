@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-extract-pdf-annotations",
+	"name": "obsidian-advanced-pdf-annotations-extractor",
 	"version": "1.9.5",
-	"description": "Extract notes and highlights from PDF Files in Obsidian (https://obsidian.md)",
+	"description": "Extract annotations from PDFs with advanced settings and user-friendly features.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
