@@ -5,18 +5,17 @@
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | esbuild watch mode (no typecheck) |
-| `npm test` | Jest (ts-jest, covers only `extractHighlight`) — 3 tests currently fail, see Testing |
+| `npm test` | Jest (ts-jest, covers only `extractHighlight`) — 13 tests, all passing |
 | `npm run lint` / `npm run lint:fix` | ESLint flat config with the official Obsidian ruleset |
 | `npm run build` | `tsc -noEmit -skipLibCheck && node esbuild.config.mjs production` |
-| `npm version <patch\|minor\|major>` then `npm run version` | Bump version in manifest.json + versions.json (no "v" prefix, set via `.npmrc`) |
 
 ## Build quirks
 
 - **Two-phase build**: `tsc` (type-check only) then esbuild (bundle to `main.js`).
 - `obsidian`, `electron`, `@codemirror/*`, and node builtins (`node:module`'s
   `builtinModules`) are **externed** — not bundled.
-- Output `main.js` is **gitignored**; attach to GitHub releases together with
-  `manifest.json`, `versions.json` and `styles.css`.
+- Output `main.js` is **gitignored**; the release workflow ships it with
+  `manifest.json` and `styles.css` — those three files are the plugin.
 - Plugin entrypoint: `src/main.ts` → default export `PDFAnnotationPlugin`.
 - `obsidian` is pinned to exactly `1.8.7` — it matches `minAppVersion` and is a
   hard peer requirement of `eslint-plugin-obsidianmd`.
@@ -27,9 +26,11 @@
 - Tests only the `extractHighlight` function from `src/extractHighlight.ts`.
 - `ANNOTS_TREATED_AS_HIGHLIGHTS` is mocked in test setup.
 - Run `npm test` (no watch by default).
-- **Known failures**: 3 of the single-letter `extractHighlight` cases are off by
-  one letter (`o`→`r`, `r`→`d`, `d`→`d,`). Pre-existing, in the letter-width
-  rounding of `roundBasedOnLetterWidths`; not caused by the tooling update.
+- The fixtures are real pdf.js text items and real PDF highlight rectangles for
+  the words `diese`, `(S. 1)`, `Word,` and `Lesen`. The single-character cases
+  (`W`, `o`, `r`, `d`, `,` of `Word,`) are what pin down the glyph-width
+  estimation in `glyphBorders` — if you retune `WIDE_LETTER_WEIGHT` or
+  `SLIM_LETTER_WEIGHT`, those are the tests that will tell you.
 
 ## Source layout (flat, not a monorepo)
 
@@ -43,17 +44,32 @@ src/
 test/
   extractHighlight.test.ts
   mocks/obsidian.ts
+styles.css            — settings tab CSS (release asset)
+CHANGELOG.md          — release notes source for the workflow
 ```
 
 ## Release
 
-1. `npm version <bump>` — updates `package.json` version
-2. `npm run version` — syncs `manifest.json` + `versions.json`
-3. `npm run build` — produces `main.js`
-4. Attach `main.js`, `manifest.json`, `versions.json`, `styles.css` to GitHub release
+`manifest.json` is the source of truth. `.github/workflows/main.yml` releases
+automatically when its `version` changes on the release branch — **no manual
+tagging and no `npm version`**; the release creates the tag.
 
-`.github/workflows/main.yml` does this automatically on a pushed tag (`npm ci`,
-`npm run lint`, `npm run build`, then a draft release).
+To cut a release, in one commit:
+
+1. Bump `version` in **`manifest.json` and `package.json`** to the same value —
+   the workflow fails the run if they disagree
+2. Rename `## Unreleased` in `CHANGELOG.md` to that version — the workflow greps
+   `## <version>` for the release notes, so a missing section means an empty
+   release body
+3. Push
+
+The workflow then runs `npm ci` and `npm run build`, attests build provenance for
+`main.js` / `manifest.json` / `styles.css`, creates the release with those three
+assets, and verifies the attestations. It skips if that version is already
+released, so unrelated `manifest.json` edits are harmless.
+
+Lint and tests are **not** gated by the workflow — run `npm run lint` and
+`npm test` before pushing.
 
 ## Style
 

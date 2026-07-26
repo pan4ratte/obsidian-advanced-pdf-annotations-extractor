@@ -50,47 +50,8 @@ In the editor (e.g. \_Extract) we run the plugin's command  `Extract from every 
 As such, you can relate comments for your topics (here 'Hello World') from several PDF files.
 
 ## Versions
-1.9.5 add setting to export clipboard path extraction to file, enabling one-note-per-annotation and tag extraction for external PDFs
 
-1.9.4 extract from file path on clipboard can handle single quotes
-
-1.9.3 use pdfjs-dist like Obsidian does
-
-1.9.2 add new template attribute for page labels
-
-1.9.1 avoid duplicate tags, when using option to extract tags from annotation body
-
-1.9.0 update packages
-
-1.8.2 remove placeholder text `Extracting PDF Comments from...` for `Extract PDF Annotations`
-
-1.8.1 add option to extract tags from annotation body and setting to overwrite existing export note
-
-1.8.0 add option to export each extracted annotation to a separate note
-
-1.7.0 add settings for dynamic export path (next to PDF) and export name
-
-1.6.0 fix bug after pdfjs api change
-
-1.5.0 add setting for export path
-
-1.4.0 add support for squiggle annotations
-
-1.3.2 bugfix for free text, which is now treated in the same way as a note 
-
-1.3.1 bugfix for desired annotations setting
-
-1.3.0 add support for free text annotations
-
-1.2.1 improved annotation extraction
-
-1.2.0 added template settings
-
-1.1.0 add new function `Extract PDF Annotations from single file from path in clipboard` to extract annotations from PDFs outside Obsidian vault
-
-1.0.4 clean up hyphenation https://github.com/munach/obsidian-extract-pdf-annotations/issues/5
-
-1.0.3 updated highlight fetching to use QuadPoints instead of Rectangles
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation / Build
 
@@ -109,10 +70,10 @@ Transpile `main.ts`:
 $ npm run build
 ```
 
-Then create the plugin directory and copy the files `main.js` and `manifest.json`, e.g.; 
+Then create the plugin directory and copy the files `main.js`, `manifest.json` and `styles.css`, e.g.; 
 ```
 $ mkdir ~/MyVault/.obsidian/plugins/obsidian-extract-pdf-annotations
-$ cp main.js manifest.json ~/MyVault/.obsidian/plugins/obsidian-extract-pdf-annotations/
+$ cp main.js manifest.json styles.css ~/MyVault/.obsidian/plugins/obsidian-extract-pdf-annotations/
 ```
 
 Enable the plugin in Obsidan's setting. 
