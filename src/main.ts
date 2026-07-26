@@ -7,6 +7,7 @@ import {
 	FileSystemAdapter,
 	loadPdfJs,
 	MarkdownView,
+	Platform,
 	Plugin,
 	TFile,
 	Vault,
@@ -14,13 +15,11 @@ import {
 } from "obsidian";
 import { loadPDFFile } from "src/extractHighlight";
 import {
-	ANNOTS_TREATED_AS_HIGHLIGHTS,
 	PDFAnnotationPluginSetting,
 	PDFAnnotationPluginSettingTab,
 } from "src/settings";
 import { FileMeta, IIndexable, PDFFile } from "src/types";
 
-import * as fs from "fs";
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
 export default class PDFAnnotationPlugin extends Plugin {
@@ -78,7 +77,6 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const grandtotal = [];
 		const desiredAnnotations =
 			this.settings.parsedSettings.desiredAnnotations;
-		console.log("loading from file ", pdfFile);
 		const content = await this.app.vault.readBinary(pdfFile);
 		await loadPDFFile(
 			PDFFile.convertTFileToPDFFile(pdfFile, content),
@@ -94,7 +92,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		// Use Set instead of Array to eliminate duplicates
 		const extractedTagsFromAnnotations = new Set<string>();
 		annotations.forEach((annotation) => {
-			const tagPattern = /#([\wöäü_\/-]*[A-Za-zöäü][\wöäü_\/-]*)/g;
+			const tagPattern = /#([\wöäü_/-]*[A-Za-zöäü][\wöäü_/-]*)/g;
 			let match;
 			while ((match = tagPattern.exec(annotation.body)) !== null) {
 				extractedTagsFromAnnotations.add(match[1]);
@@ -115,7 +113,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 		isExternalFile: boolean
 	): Promise<void> {
 		if (this.settings.oneNotePerAnnotation) {
-			grandtotal.forEach((anno, index) => {
+			// Written one after another: concurrent writes to the same note (when
+			// the export name lacks {{counter}}) would race each other.
+			for (const [index, anno] of grandtotal.entries()) {
 				let note = this.formatter.format([anno], isExternalFile);
 				const fileNameOfExportNote =
 					this.getResolvedOneNotePerAnnotationExportName(fileMeta, index + 1) + ".md";
@@ -123,8 +123,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 				if (this.settings.extractTagsFromAnnotationsAsObsidianTags) {
 					note = this.extractTagsFromAnnotationsAndAddHeaderToNote(note, [anno]);
 				}
-				this.saveHighlightsToFileAndOpenIt(filePathOfExportNote, note, this.settings.overwriteExistingNote);
-			});
+				await this.saveHighlightsToFileAndOpenIt(filePathOfExportNote, note, this.settings.overwriteExistingNote);
+			}
 		} else {
 			let finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
 			const fileNameOfExportNote =
@@ -137,12 +137,35 @@ export default class PDFAnnotationPlugin extends Plugin {
 		}
 	}
 
+	private noticeClipboardPathIsDesktopOnly(): {
+		grandtotal: any[];
+		pdfFile: PDFFile | null;
+	} {
+		new Notice(
+			"Reading a PDF from a path outside the vault is only available in the desktop app."
+		);
+		return { grandtotal: [], pdfFile: null };
+	}
+
 	async loadAnnotationsFromSinglePDFFileFromClipboardPath(
 		filePathFromClipboard: string
 	): Promise<{ grandtotal: any[]; pdfFile: PDFFile | null }> {
+		if (!Platform.isDesktop) {
+			return this.noticeClipboardPathIsDesktopOnly();
+		}
+		// isDesktop only means the UI is in desktop mode; Node's fs exists solely
+		// in the Electron app.
+		if (!Platform.isDesktopApp) {
+			return this.noticeClipboardPathIsDesktopOnly();
+		}
 		const grandtotal = [];
 		let pdfFile: PDFFile | null = null;
 		try {
+			// Node's fs is unavailable on mobile, so it is loaded behind the
+			// desktop guard above. require() rather than import(), because
+			// esbuild leaves a bare import() in the CJS bundle, which Obsidian's
+			// plugin loader cannot always resolve.
+			const fs = require("fs") as typeof import("fs");
 			const filePathWithoutBeginningAndEndQuotes = filePathFromClipboard.replace(
 				/^["']|["']$/g,
 				""
@@ -181,30 +204,35 @@ export default class PDFAnnotationPlugin extends Plugin {
 					desiredAnnotations
 				);
 			} else {
-				console.log("Data in clipboard is no file.");
+				new Notice("The path in the clipboard is not a file.");
 			}
 		} catch (error) {
-			console.log("Data in clipboard could not be read as filepath.");
+			new Notice("The clipboard does not contain a readable file path.");
 			console.error(error);
 		}
 		return { grandtotal, pdfFile };
 	}
 
 	async onload() {
-		this.loadSettings();
+		await this.loadSettings();
 		this.addSettingTab(new PDFAnnotationPluginSettingTab(this.app, this));
 
 		this.formatter = new PDFAnnotationPluginFormatter(this.settings);
 
 		this.addCommand({
 			id: "extract-annotations-single",
-			name: "Extract PDF Annotations on single file",
+			name: "Extract from the current file",
 			checkCallback: (checking: boolean) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file != null && file.extension === "pdf") {
 					if (!checking) {
 						// load file if (not only checking) && conditions are valid
-						this.loadSinglePDFFile(file);
+						this.loadSinglePDFFile(file).catch((error) => {
+							console.error(error);
+							new Notice(
+								"Could not extract the annotations of this PDF."
+							);
+						});
 					}
 					return true;
 				} else {
@@ -215,7 +243,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations-single-from-clipboard-path",
-			name: "Extract PDF Annotations on single file from path in clipboard",
+			name: "Extract from the file path in the clipboard",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const clipText = await navigator.clipboard.readText();
 				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
@@ -232,7 +260,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations",
-			name: "Extract PDF Annotations",
+			name: "Extract from every PDF in the current folder",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file == null) return;
@@ -277,42 +305,40 @@ export default class PDFAnnotationPlugin extends Plugin {
 		});
 	}
 
-	loadSettings() {
+	async loadSettings(): Promise<void> {
 		this.settings = new PDFAnnotationPluginSetting();
-		(async () => {
-			const loadedSettings = await this.loadData();
-			if (loadedSettings) {
-				const toLoad = [
-					"useStructuringHeadlines",
-					"useFolderNames",
-					"sortByTopic",
-					"exportPath",
-					"exportName",
-					"desiredAnnotations",
-					"noteTemplateExternalPDFs",
-					"noteTemplateInternalPDFs",
-					"highlightTemplateExternalPDFs",
-					"highlightTemplateInternalPDFs",
-					"oneNotePerAnnotation",
-					"oneNotePerAnnotationExportName",
-					"overwriteExistingNote",
+		const loadedSettings = await this.loadData();
+		if (loadedSettings) {
+			const toLoad = [
+				"useStructuringHeadlines",
+				"useFolderNames",
+				"sortByTopic",
+				"exportPath",
+				"exportName",
+				"desiredAnnotations",
+				"noteTemplateExternalPDFs",
+				"noteTemplateInternalPDFs",
+				"highlightTemplateExternalPDFs",
+				"highlightTemplateInternalPDFs",
+				"oneNotePerAnnotation",
+				"oneNotePerAnnotationExportName",
+				"overwriteExistingNote",
 				"extractTagsFromAnnotationsAsObsidianTags",
 				"exportClipboardExtraction",
 			];
-				toLoad.forEach((setting) => {
-					if (setting in loadedSettings) {
-						(this.settings as IIndexable)[setting] =
-							loadedSettings[setting];
-					}
-				});
-				this.settings.parsedSettings = {
-					desiredAnnotations:
-						this.settings.parseCommaSeparatedStringToArray(
-							this.settings.desiredAnnotations
-						),
-				};
-			}
-		})();
+			toLoad.forEach((setting) => {
+				if (setting in loadedSettings) {
+					(this.settings as IIndexable)[setting] =
+						loadedSettings[setting];
+				}
+			});
+			this.settings.parsedSettings = {
+				desiredAnnotations:
+					this.settings.parseCommaSeparatedStringToArray(
+						this.settings.desiredAnnotations
+					),
+			};
+		}
 	}
 
 	async saveSettings(): Promise<void> {

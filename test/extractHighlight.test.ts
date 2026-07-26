@@ -1,6 +1,5 @@
-import {describe, expect, test, jest} from '@jest/globals';
+import {describe, expect, test, jest, beforeEach} from '@jest/globals';
 import {extractHighlight} from '../src/extractHighlight';
-import {beforeEach } from 'node:test';
 
 jest.mock('src/settings', () => {
   return {

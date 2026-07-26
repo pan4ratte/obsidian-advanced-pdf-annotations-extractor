@@ -118,17 +118,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	): void {
 		component.onChange(async (value) => {
 			(this.plugin.settings as IIndexable)[settingsKey] = value;
-			this.plugin.saveSettings().then(() => {
-				if (settingsKey === "desiredAnnotations") {
-					this.plugin.settings.parsedSettings.desiredAnnotations =
-						this.plugin.settings.parseCommaSeparatedStringToArray(
-							value
-						);
-				}
-				if (cb) {
-					cb(value);
-				}
-			});
+			await this.plugin.saveSettings();
+			if (settingsKey === "desiredAnnotations") {
+				this.plugin.settings.parsedSettings.desiredAnnotations =
+					this.plugin.settings.parseCommaSeparatedStringToArray(value);
+			}
+			if (cb) {
+				cb(value);
+			}
 		});
 	}
 
@@ -146,7 +143,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl("h3", { text: "Desired annotations" });
+		new Setting(containerEl).setName("Desired annotations").setHeading();
 		const desiredAnnotationsInstructionsEl = containerEl.createEl("p");
 		desiredAnnotationsInstructionsEl.append(
 			createSpan({
@@ -163,12 +160,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				desiredAnnotationsVariableItem =
 					desiredAnnotationsVariableUl.createEl("li");
 
-			desiredAnnotationsVariableItem.createEl("span", {
+			desiredAnnotationsVariableItem.createSpan({
 				cls: "text-monospace",
 				text: key,
 			});
 
-			desiredAnnotationsVariableItem.createEl("span", {
+			desiredAnnotationsVariableItem.createSpan({
 				text: description ? ` — ${description}` : "",
 			});
 		});
@@ -176,13 +173,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("The following types of annotations should be extracted:")
 			.addTextArea((input) => {
-				input.inputEl.style.width = "100%";
-				input.inputEl.style.height = "10em";
+				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "desiredAnnotations");
 			});
 
-		containerEl.createEl("h3", { text: "Styling settings" });
-		containerEl.createEl("h4", { text: "Template settings" });
+		new Setting(containerEl).setName("Styling").setHeading();
+		new Setting(containerEl).setName("Templates").setHeading();
 		const templateInstructionsEl = containerEl.createEl("p");
 		templateInstructionsEl.append(
 			createSpan({
@@ -210,12 +206,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			const [key, description] = variableData,
 				templateVariableItem = templateVariableUl.createEl("li");
 
-			templateVariableItem.createEl("span", {
+			templateVariableItem.createSpan({
 				cls: "text-monospace",
 				text: "{{" + key + "}}",
 			});
 
-			templateVariableItem.createEl("span", {
+			templateVariableItem.createSpan({
 				text: description ? ` — ${description}` : "",
 			});
 		});
@@ -223,33 +219,29 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Template for notes of PDFs outside Obsidian:")
 			.addTextArea((input) => {
-				input.inputEl.style.width = "100%";
-				input.inputEl.style.height = "10em";
+				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "noteTemplateExternalPDFs");
 			});
 		new Setting(containerEl)
 			.setName("Template for notes of PDFs inside Obsidian:")
 			.addTextArea((input) => {
-				input.inputEl.style.width = "100%";
-				input.inputEl.style.height = "10em";
+				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "noteTemplateInternalPDFs");
 			});
 		new Setting(containerEl)
 			.setName("Template for highlights of PDFs outside Obsidian:")
 			.addTextArea((input) => {
-				input.inputEl.style.width = "100%";
-				input.inputEl.style.height = "10em";
+				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "highlightTemplateExternalPDFs");
 			});
 		new Setting(containerEl)
 			.setName("Template for highlights of PDFs inside Obsidian:")
 			.addTextArea((input) => {
-				input.inputEl.style.width = "100%";
-				input.inputEl.style.height = "10em";
+				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "highlightTemplateInternalPDFs");
 			});
 
-		containerEl.createEl("h4", { text: "Structure settings" });
+		new Setting(containerEl).setName("Structure").setHeading();
 		new Setting(containerEl)
 			.setName("Use structuring headlines")
 			.setDesc(
@@ -258,43 +250,41 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useStructuringHeadlines)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.useStructuringHeadlines = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
-			.setName("Use Folder Name")
+			.setName("Use folder name")
 			.setDesc(
-				"If enabled, uses the PDF's folder name (instead of the PDF-Filename) for sorting"
+				"If enabled, uses the PDF's folder name (instead of the PDF-filename) for sorting"
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useFolderNames)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.useFolderNames = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
-			.setName("Sort by Topic")
+			.setName("Sort by topic")
 			.setDesc(
-				"If enabled, uses the notes first line as Topic for primary sorting"
+				"If enabled, uses the notes first line as topic for primary sorting"
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.sortByTopic)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.sortByTopic = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 
-		containerEl.createEl("h3", {
-			text: "Settings for `Extract PDF Annotations on single file`",
-		});
+		new Setting(containerEl).setName("Note export").setHeading();
 		new Setting(containerEl)
 			.setName("Notes export path")
 			.setDesc(
@@ -315,10 +305,10 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.oneNotePerAnnotation)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.oneNotePerAnnotation = value;
-						oneNotePerAnnotationExportName.settingEl.style.display = value ? "flex" : "none";
-						this.plugin.saveData(this.plugin.settings);
+						oneNotePerAnnotationExportName.settingEl.toggleVisibility(value);
+						await this.plugin.saveSettings();
 					})
 			);
 		const oneNotePerAnnotationExportName = new Setting(containerEl)
@@ -327,7 +317,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				"The name of the notes to which each extracted annotation will be exported. You can use the variable '{{filename}}' to use the PDF's filename and combine it with prefix or suffix. Additionally you should use the variable '{{counter}}' to add the index of the exported annotation."
 			)
 			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationExportName"));
-		oneNotePerAnnotationExportName.settingEl.style.display = this.plugin.settings.oneNotePerAnnotation ? "flex" : "none";
+		oneNotePerAnnotationExportName.settingEl.toggleVisibility(
+			this.plugin.settings.oneNotePerAnnotation
+		);
 		new Setting(containerEl)
 			.setName("Overwrite existing note")
 			.setDesc(
@@ -336,9 +328,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.overwriteExistingNote)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.overwriteExistingNote = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 			new Setting(containerEl)
@@ -349,22 +341,22 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 		new Setting(containerEl)
 			.setName("Export annotations from clipboard path to file")
 			.setDesc(
-				"When enabled, the clipboard path command saves annotations to a file using the export settings above, instead of inserting them at the cursor."
+				"When enabled, the clipboard path command saves annotations to a file using the export settings above, instead of inserting them into the note you are editing."
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.exportClipboardExtraction)
-					.onChange((value) => {
+					.onChange(async (value) => {
 						this.plugin.settings.exportClipboardExtraction = value;
-						this.plugin.saveData(this.plugin.settings);
+						await this.plugin.saveSettings();
 					})
 			);
 	}

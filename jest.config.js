@@ -3,8 +3,6 @@
  * https://jestjs.io/docs/configuration
  */
 
-const ts = require('typescript');
-
 /** @type {import('jest').Config} */
 const config = {
   // All imported modules in your tests should be mocked automatically

@@ -42,6 +42,5 @@ export class PDFFile implements FileMeta {
 }
 
 export interface IIndexable {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+	[key: string]: any;
 }
