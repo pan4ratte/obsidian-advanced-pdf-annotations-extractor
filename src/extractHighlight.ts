@@ -16,23 +16,11 @@ function searchQuad(
 		if (x.transform[4] + x.width < minx) return txt; // end of txt before highlight starts
 		if (x.transform[4] > maxx) return txt; // start of text after highlight ends
 
-		const start =
-			x.transform[4] >= minx
-				? 0 // start at pos 0, when text starts after hightlight start
-				: Math.round(
-						(x.str.length * (minx - x.transform[4])) / x.width
-				  ); // otherwise, rule of three: start proportional
-		if (x.transform[4] + x.width <= maxx) {
-			// end of txt ends before highlight ends
-			return txt + x.str.substr(start); //
-		} else {
-			// else, calculate proporation end to get the expected length
-			const exactLength = (x.str.length * (maxx - x.transform[4])) / x.width;
-			const lenc =
-				roundBasedOnLetterWidths(x, start, exactLength) -
-				start;
-			return txt + x.str.substr(start, lenc);
-		}
+		// snap both edges of the highlight to the nearest estimated glyph border
+		const borders = glyphBorders(x.str, x.transform[4], x.width);
+		const start = nearestBorder(borders, minx);
+		const end = nearestBorder(borders, maxx);
+		return txt + x.str.substring(start, end);
 	}, "");
 	return mycontent.trim();
 }
@@ -165,30 +153,53 @@ export async function loadPDFFile(
 	}
 }
 
-function countWideLetters(str: string): number {
-	const wideLetters = ['w', 'm', 'W', 'M', 'D', 'O', 'Q', 'G', 'S', 'B', 'C', 'P', 'E', 'R', 'A', 'N', 'U', 'V', 'X', 'Y', 'Z', 'K', 'H'];
-	return str.split('').filter(char => wideLetters.includes(char)).length;
+const WIDE_LETTERS = ['w', 'm', 'W', 'M', 'D', 'O', 'Q', 'G', 'S', 'B', 'C', 'P', 'E', 'R', 'A', 'N', 'U', 'V', 'X', 'Y', 'Z', 'K', 'H'];
+const SLIM_LETTERS = ['i', 'r', 'l', 't', 'f', 'j', 'I', '1', '.', ',', '(', ')', '"', '\''];
+
+// Width of a glyph relative to the average character width of its text item.
+// The values approximate what the PDF highlight rectangles of a proportional
+// font imply: wide letters run about 1.75x the average, slim ones about 0.6x.
+const WIDE_LETTER_WEIGHT = 1.75;
+const SLIM_LETTER_WEIGHT = 0.6;
+const NORMAL_LETTER_WEIGHT = 1;
+
+function letterWeight(letter: string): number {
+	if (WIDE_LETTERS.includes(letter)) return WIDE_LETTER_WEIGHT;
+	if (SLIM_LETTERS.includes(letter)) return SLIM_LETTER_WEIGHT;
+	return NORMAL_LETTER_WEIGHT;
 }
 
-function countSlimLetters(str: string): number {
-	const slimLetters = ['i', 'r', 'l', 't', 'f', 'j', 'I', '1', '.', ',', '(', ')', '"', '\''];
-	return str.split('').filter(char => slimLetters.includes(char)).length;
-}
+// pdf.js reports one width for a whole text item, not per glyph. Estimate where
+// every character begins by splitting that width up according to the letter
+// weights above: borders[i] is the x position where character i starts, and the
+// last entry is where the item ends. Distributing the width evenly instead makes
+// highlights of a single character land on the neighbouring letter.
+function glyphBorders(
+	str: string,
+	itemStartX: number,
+	itemWidth: number
+): number[] {
+	const weights = str.split("").map(letterWeight);
+	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+	const borders = [itemStartX];
+	if (totalWeight === 0) return borders;
 
-
-function roundBasedOnLetterWidths(x: any, start: number, exactLength: number): number {
-	const mathRounding = Math.round(exactLength);
-	const substrWithMathRounding = x.str.substr(start, mathRounding);
-	let correctRounding = mathRounding;
-
-	if (countWideLetters(substrWithMathRounding) > countSlimLetters(substrWithMathRounding)) {
-		correctRounding = Math.floor(exactLength);
-	} else if (countWideLetters(substrWithMathRounding) < countSlimLetters(substrWithMathRounding)) {
-		correctRounding = Math.ceil(exactLength);
-	} else {
-		correctRounding = mathRounding;
+	let position = itemStartX;
+	for (const weight of weights) {
+		position += (weight * itemWidth) / totalWeight;
+		borders.push(position);
 	}
+	return borders;
+}
 
-	return correctRounding;
+// index of the glyph border closest to the given x position
+function nearestBorder(borders: number[], x: number): number {
+	let nearest = 0;
+	for (let i = 1; i < borders.length; i++) {
+		if (Math.abs(borders[i] - x) < Math.abs(borders[nearest] - x)) {
+			nearest = i;
+		}
+	}
+	return nearest;
 }
 

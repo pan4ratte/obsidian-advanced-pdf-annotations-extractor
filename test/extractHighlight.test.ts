@@ -20,21 +20,21 @@ describe('extractHighlight - simple text', () => {
 		{ str: 'Lesen', transform: [12.000000267999969, 0, 0, 12.000000267999969, 71.50000108483317, 595.2499961179171], width: 32.69529673019486 },
 		{ str: '(S. 1)', transform: [12.000000267999969, 0, 0, 12.000000267999969, 52.00000064933322, 565.2499954479173], width: 29.33788865521276 },
 	];
-	test('should extract highlighted text', () => {
+	test('should extract the trailing part of a partly highlighted item', () => {
     const annot = {
       quadPoints: [70.636, 634.118, 81.304, 634.118, 70.636, 622.742, 81.304, 622.742],
     };
 		const result = extractHighlight(annot, items);
 		expect(result).toBe('1)');
 	});
-  test('should extract highlighted text', () => {
+  test('should extract a fully highlighted word', () => {
     const annot = {
       quadPoints: [71.5, 603.974, 104.188, 603.974, 71.5, 595.118, 104.188, 595.118],
     };
     const result = extractHighlight(annot, items);
     expect(result).toBe('Lesen');
   });
-  test('should extract highlighted text', () => { 
+  test('should extract a fully highlighted item containing spaces', () => {
     const annot = {
       quadPoints: [52, 694.118, 81.304, 694.118, 52, 682.742, 81.304, 682.742],
     };
@@ -51,7 +51,7 @@ describe('extractHighlight - simple text', () => {
     expect(result).toBe('e (S');
   });
 
-  test('should extract highlighted letter', () => {
+  test('should extract the highlighted wide letter W', () => {
     const annot = {
       quadPoints: [71.5, 663.974, 82.816, 663.974, 71.5, 653.558, 82.816, 653.558],
     };
@@ -59,7 +59,7 @@ describe('extractHighlight - simple text', () => {
     expect(result).toBe('W');
   });
 
-  test('should extract highlighted letter', () => {
+  test('should extract the highlighted letter o', () => {
     const annot = {
       quadPoints: [82.609, 663.974, 89.281, 663.974, 82.609, 653.558, 89.281, 653.558],
     };
@@ -67,7 +67,7 @@ describe('extractHighlight - simple text', () => {
     expect(result).toBe('o');
   });
   
-  test('should extract highlighted letter', () => {
+  test('should extract the highlighted slim letter r', () => {
     const annot = {
       quadPoints: [89.281, 663.974, 93.445, 663.974, 89.281, 653.558, 93.445, 653.558],
     };
@@ -76,7 +76,7 @@ describe('extractHighlight - simple text', () => {
   });
 
   
-  test('should extract highlighted letter', () => {
+  test('should extract the highlighted letter d', () => {
     const annot = {
       quadPoints: [93.277, 663.974, 99.949, 663.974, 93.277, 653.558, 99.949, 653.558],
     };
@@ -85,7 +85,7 @@ describe('extractHighlight - simple text', () => {
   });
 
   
-  test('should extract highlighted letter', () => {
+  test('should extract the highlighted trailing comma', () => {
     const annot = {
       quadPoints: [99.949, 663.974, 103.273, 663.974, 99.949, 653.558, 103.273, 653.558],
     };
