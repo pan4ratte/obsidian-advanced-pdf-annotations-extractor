@@ -4,7 +4,6 @@ import {
 	DropdownComponent,
 	PluginSettingTab,
 	Setting,
-	setTooltip,
 } from "obsidian";
 import PDFAnnotationPlugin from "src/main";
 import { asIndexable } from "src/types";
@@ -75,7 +74,7 @@ export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 		description: "Sticky note comment",
 		desiredByDefault: true,
 	},
-	{ subtype: "FreeText", description: "Free text typed onto the page" },
+	{ subtype: "FreeText", description: "Free text on the page" },
 ];
 
 export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
@@ -228,14 +227,26 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName("Desired annotations")
+		const header = new Setting(containerEl)
+			.setName(this.plugin.manifest.name)
+			.setDesc(this.plugin.manifest.description)
+			.setHeading();
+		header.settingEl.addClass("pdf-annotations-settings-header");
+
+		// Name, description and checkboxes form one card, stacked: the grid
+		// goes into the setting's control element, which styles.css widens to
+		// the full row underneath the text.
+		const annotationSetting = new Setting(containerEl)
+			.setName("Annotations to extract")
 			.setDesc(
-				"The annotation types to extract. Highlight, Underline, Squiggly and StrikeOut also capture the PDF text underneath them; the others contribute their own comment only."
+				"Choose whichannotation types that will be extracted. Highlight, Underline, Squiggly and Strikeout also capture the PDF text underneath them, others contribute their own comment only."
 			)
 			.setHeading();
+		annotationSetting.settingEl.addClass(
+			"pdf-annotations-annotation-setting"
+		);
 
-		const annotationGrid = containerEl.createDiv({
+		const annotationGrid = annotationSetting.controlEl.createDiv({
 			cls: "pdf-annotations-annotation-grid",
 		});
 		SUPPORTED_ANNOTS.forEach(({ subtype, description }) => {
@@ -245,8 +256,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			const checkbox = option.createEl("input", { type: "checkbox" });
 			checkbox.checked =
 				this.plugin.settings.isAnnotationDesired(subtype);
-			option.createSpan({ text: subtype });
-			setTooltip(option, description);
+			option.createSpan({ text: description });
 
 			checkbox.addEventListener("change", () => {
 				this.plugin.settings.setAnnotationDesired(
@@ -259,7 +269,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			});
 		});
 
-		new Setting(containerEl).setName("Styling").setHeading();
 		new Setting(containerEl).setName("Templates").setHeading();
 		const templateInstructionsEl = containerEl.createEl("p");
 		templateInstructionsEl.append(

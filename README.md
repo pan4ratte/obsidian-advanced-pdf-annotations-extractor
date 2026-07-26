@@ -9,7 +9,7 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 * `Extract from the file path in the clipboard` Works when editing a markdown note. Looks for a file path of a PDF in clipboard, extracts annotations from it and inserts them at the current position of the open note. This command can be used for external PDF files, which are not part of the Obsidian Vault. Helpful, if you do not want to copy your PDFs inside your vault. Desktop only, since it reads a file from outside the vault.
 
 ## Plugin Settings
-* Desired annotations
+* Annotations to extract
 	* A grid of checkboxes, one per annotation type, so you can pick exactly what gets extracted:
 		- Text markup, which also captures the PDF text underneath it: `Highlight`, `Underline`, `Squiggly`, `StrikeOut`
 		- Typed text: `Text` (sticky note), `FreeText`

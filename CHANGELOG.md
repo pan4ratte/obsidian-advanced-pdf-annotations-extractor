@@ -17,9 +17,10 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Changed
 
-- The desired annotation types are picked from a grid of checkboxes instead of
-  being typed into a text field, so the type names can no longer be misspelled.
-  Hover a type for what it means.
+- The annotation types to extract are picked from a grid of checkboxes instead
+  of being typed into a text field, so the type names can no longer be
+  misspelled. Each checkbox is labelled with what the type means
+  (`Highlighted text`, `Sticky note comment`, …) rather than its PDF subtype.
 - **Breaking:** `desiredAnnotations` in `data.json` is now a list of subtypes
   (`["Highlight", "Underline", "Text"]`) rather than a comma separated string.
   A string left over from an earlier version is converted on load.
@@ -30,7 +31,12 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   - `Extract PDF Annotations on single file from path in clipboard` →
     `Extract from the file path in the clipboard`
 - Settings tab uses Obsidian's own heading style, and its section names are now
-  `Desired annotations`, `Styling`, `Templates`, `Structure` and `Note export`.
+  `Annotations to extract`, `Styling`, `Templates`, `Structure` and
+  `Note export`. It opens with the plugin name and description, taken from
+  `manifest.json`.
+- The `Annotations to extract` heading, its description and the checkbox grid
+  are one card now, stacked: the text above, the checkboxes below it in up to
+  three columns, dropping to two and then one on a narrow settings tab.
 - Text area sizing moved out of inline styles into `styles.css`, so themes can
   restyle it. `styles.css` is a new release asset.
 - Failures of the clipboard path command are reported with a notice instead of a

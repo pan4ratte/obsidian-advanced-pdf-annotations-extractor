@@ -4,25 +4,54 @@
 	height: 10em;
 }
 
-/* Grid of annotation type checkboxes. Columns are laid out by available width,
-   so it collapses to a single column on narrow screens and on mobile. */
+/* Plugin name and description at the top of the settings tab, a step above the
+   section headings below it. */
+.pdf-annotations-settings-header .setting-item-name {
+	font-size: var(--h3-size);
+}
+
+/* "Annotations to extract": heading, description and checkbox grid form a
+   single card, stacked — the text always above, the checkboxes across the full
+   width below it. */
+.pdf-annotations-annotation-setting {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 12px;
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--setting-items-background);
+	border-radius: var(--setting-items-radius);
+	padding: 24px;
+}
+
+.pdf-annotations-annotation-setting .setting-item-info {
+	margin-right: 0;
+}
+
+.pdf-annotations-annotation-setting .setting-item-control {
+	width: 100%;
+}
+
+/* Grid of annotation type checkboxes: three columns, dropping to two and then
+   one as the card narrows. The column minimum is whichever is larger, a third
+   of the row or the 14em that fits the longest label on one line — so three
+   columns is also the maximum, however wide the settings tab gets. The 16px is
+   the two gaps between the three columns. */
 .pdf-annotations-annotation-grid {
 	display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11em, 1fr));
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(max(14em, calc((100% - 16px) / 3 - 0.01px)), 1fr)
+    );
     gap: 8px;
-    margin-bottom: 16px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--setting-items-background);
-    border-radius: var(--setting-items-radius);
-    padding: 24px;
+    width: 100%;
 }
 
 .pdf-annotations-annotation-option {
 	display: flex;
-	align-items: center;
-	gap: 0.5em;
-	padding: 0.15em 0;
-	cursor: pointer;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
 }
 
 /* Obsidian sizes checkboxes for full-width setting rows; in the grid they sit
@@ -30,4 +59,12 @@
 .pdf-annotations-annotation-option input[type="checkbox"] {
 	margin: 0;
 	flex-shrink: 0;
+}
+
+/* Obsidian's heading rows are not meant to carry a description, so it sits
+   tight under the name — the two here need the gap. Scoped to this plugin's own
+   rows, since styles.css is loaded app-wide. */
+.pdf-annotations-settings-header .setting-item-description,
+.pdf-annotations-annotation-setting .setting-item-description {
+    padding-top: 8px;
 }
