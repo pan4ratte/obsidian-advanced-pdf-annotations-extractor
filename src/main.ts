@@ -19,7 +19,13 @@ import {
 	PDFAnnotationPluginSetting,
 	PDFAnnotationPluginSettingTab,
 } from "src/settings";
-import { FileMeta, IIndexable, PDFFile } from "src/types";
+import {
+	asIndexable,
+	FileMeta,
+	PDFAnnotation,
+	PDFFile,
+	PDFJsLib,
+} from "src/types";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
@@ -32,7 +38,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		noEscape: true,
 	};
 
-	sort(grandtotal) {
+	sort(grandtotal: PDFAnnotation[]) {
 		const settings = this.settings;
 
 		if (settings.sortByTopic && settings.useStructuringHeadlines) {
@@ -73,9 +79,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	async loadSinglePDFFile(pdfFile: TFile) {
-		const pdfjsLib = await loadPdfJs();
+		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 		const containingFolder = pdfFile.parent.name;
-		const grandtotal = [];
+		const grandtotal: PDFAnnotation[] = [];
 		const desiredAnnotations = this.settings.desiredAnnotations;
 		const content = await this.app.vault.readBinary(pdfFile);
 		await loadPDFFile(
@@ -88,12 +94,12 @@ export default class PDFAnnotationPlugin extends Plugin {
 		this.sort(grandtotal);
 		await this.exportAnnotations(pdfFile, grandtotal, false);
 	}
-	private extractTagsFromAnnotationsAndAddHeaderToNote(note: string, annotations: any[]): string {
+	private extractTagsFromAnnotationsAndAddHeaderToNote(note: string, annotations: PDFAnnotation[]): string {
 		// Use Set instead of Array to eliminate duplicates
 		const extractedTagsFromAnnotations = new Set<string>();
 		annotations.forEach((annotation) => {
 			const tagPattern = /#([\wöäü_/-]*[A-Za-zöäü][\wöäü_/-]*)/g;
-			let match;
+			let match: RegExpExecArray | null;
 			while ((match = tagPattern.exec(annotation.body)) !== null) {
 				extractedTagsFromAnnotations.add(match[1]);
 			}
@@ -109,7 +115,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	private async exportAnnotations(
 		fileMeta: FileMeta,
-		grandtotal: any[],
+		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean
 	): Promise<void> {
 		if (this.settings.oneNotePerAnnotation) {
@@ -138,7 +144,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	private noticeClipboardPathIsDesktopOnly(): {
-		grandtotal: any[];
+		grandtotal: PDFAnnotation[];
 		pdfFile: PDFFile | null;
 	} {
 		new Notice(
@@ -149,7 +155,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	async loadAnnotationsFromSinglePDFFileFromClipboardPath(
 		filePathFromClipboard: string
-	): Promise<{ grandtotal: any[]; pdfFile: PDFFile | null }> {
+	): Promise<{ grandtotal: PDFAnnotation[]; pdfFile: PDFFile | null }> {
 		if (!Platform.isDesktop) {
 			return this.noticeClipboardPathIsDesktopOnly();
 		}
@@ -158,7 +164,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		if (!Platform.isDesktopApp) {
 			return this.noticeClipboardPathIsDesktopOnly();
 		}
-		const grandtotal = [];
+		const grandtotal: PDFAnnotation[] = [];
 		let pdfFile: PDFFile | null = null;
 		try {
 			// Node's fs is unavailable on mobile, so it is loaded behind the
@@ -172,7 +178,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			);
 			const stats = fs.statSync(filePathWithoutBeginningAndEndQuotes);
 			if (stats.isFile()) {
-				const pdfjsLib = await loadPdfJs();
+				const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 				const binaryContent = await FileSystemAdapter.readLocalFile(
 					filePathWithoutBeginningAndEndQuotes
 				);
@@ -264,12 +270,12 @@ export default class PDFAnnotationPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (file == null) return;
 				const folder = file.parent;
-				const grandtotal = []; // array that will contain all fetched Annotations
+				const grandtotal: PDFAnnotation[] = []; // array that will contain all fetched Annotations
 				const desiredAnnotations = this.settings.desiredAnnotations;
 
-				const pdfjsLib = await loadPdfJs();
+				const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 
-				const promises = []; // when all Promises will be resolved.
+				const promises: Promise<void>[] = []; // when all Promises will be resolved.
 
 				Vault.recurseChildren(folder, async (file) => {
 					// visit all Childern of parent folder of current active File
@@ -305,29 +311,15 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		this.settings = new PDFAnnotationPluginSetting();
-		const loadedSettings = await this.loadData();
+		const loadedSettings = (await this.loadData()) as
+			| Record<string, unknown>
+			| null;
 		if (loadedSettings) {
-			const toLoad = [
-				"useStructuringHeadlines",
-				"useFolderNames",
-				"sortByTopic",
-				"exportPath",
-				"exportName",
-				"desiredAnnotations",
-				"noteTemplateExternalPDFs",
-				"noteTemplateInternalPDFs",
-				"highlightTemplateExternalPDFs",
-				"highlightTemplateInternalPDFs",
-				"oneNotePerAnnotation",
-				"oneNotePerAnnotationExportName",
-				"overwriteExistingNote",
-				"extractTagsFromAnnotationsAsObsidianTags",
-				"exportClipboardExtraction",
-			];
-			toLoad.forEach((setting) => {
+			// Every field the settings object declares, so a new setting cannot be
+			// forgotten here and silently never load.
+			Object.keys(this.settings).forEach((setting) => {
 				if (setting in loadedSettings) {
-					(this.settings as IIndexable)[setting] =
-						loadedSettings[setting];
+					asIndexable(this.settings)[setting] = loadedSettings[setting];
 				}
 			});
 
@@ -359,7 +351,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	getTemplateVariablesForExportName(
 		file: FileMeta
-	): Record<string, any> {
+	): Record<string, unknown> {
 		const shortcuts = {
 			filename: file.basename
 		};
@@ -370,7 +362,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 	getTemplateVariablesForOneNotePerAnnotationExportName(
 		file: FileMeta,
 		counter: number
-	): Record<string, any> {
+	): Record<string, unknown> {
 		const shortcuts = {
 			filename: file.basename,
 			counter: counter,
@@ -385,7 +377,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
-	getResolvedOneNotePerAnnotationExportName(file: FileMeta, counter): string {
+	getResolvedOneNotePerAnnotationExportName(
+		file: FileMeta,
+		counter: number
+	): string {
 		return this.oneNotePerAnnotationExportNameTemplate(
 			this.getTemplateVariablesForOneNotePerAnnotationExportName(file, counter)
 		);

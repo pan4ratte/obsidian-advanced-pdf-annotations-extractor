@@ -7,17 +7,20 @@ import {
 	setTooltip,
 } from "obsidian";
 import PDFAnnotationPlugin from "src/main";
-import { IIndexable } from "src/types";
+import { asIndexable } from "src/types";
 
+// The whole annotation is available as {{annotation}} too, for fields that have
+// no shortcut of their own.
 export const TEMPLATE_VARIABLES = {
 	highlightedText: "Highlighted text from PDF",
 	folder: "Folder of PDF file",
-	file: "Binary content of file",
+	filename: "File name of the PDF, without the extension",
 	filepath: "Path of PDF file",
 	pageNumber: "Page number of annotation with reference to PDF pages",
 	pageLabel: "Page label (page number defined by author) of annotation with reference to PDF pages",
 	author: "Author of annotation",
 	body: "Body of annotation",
+	topic: "First line of the body, when sorting by topic is enabled",
 };
 
 export interface SupportedAnnotation {
@@ -201,7 +204,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		cb?: (value: string) => void
 	): void {
 		component.onChange(async (value) => {
-			(this.plugin.settings as IIndexable)[settingsKey] = value;
+			asIndexable(this.plugin.settings)[settingsKey] = value;
 			await this.plugin.saveSettings();
 			if (cb) {
 				cb(value);
@@ -214,7 +217,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		settingsKey: string,
 		cb?: (value: string) => void
 	): void {
-		component.setValue((this.plugin.settings as IIndexable)[settingsKey]);
+		component.setValue(
+			asIndexable(this.plugin.settings)[settingsKey] as string
+		);
 		this.addValueChangeCallback(component, settingsKey, cb);
 	}
 

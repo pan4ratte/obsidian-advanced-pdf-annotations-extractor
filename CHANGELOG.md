@@ -9,6 +9,8 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Added
 
+- `{{topic}}` template variable, holding the first line of the annotation body
+  when sorting by topic is enabled. It was already reachable but undocumented.
 - `StrikeOut` annotations can now be extracted. It is the fourth text markup
   type, so it captures the struck out text the way highlights, underlines and
   squigglies do. Not enabled by default — tick it in the settings.
@@ -44,8 +46,16 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Fixed
 
+- The `{{file}}` template variable was documented as the file's binary content
+  but rendered `[object Object]`. Replaced by `{{filename}}`, the PDF's name
+  without its extension. `{{annotation.file}}` still holds the file itself.
+- Annotations with nothing to show — no comment, and no text marked up — are no
+  longer exported as blank entries.
 - A text markup annotation whose `QuadPoints` pdf.js cannot use no longer fails
   the extraction of the whole file.
+- `getTextContent` was still being passed `normalizeWhitespace`, an option pdf.js
+  removed in v3. Whitespace normalization is its default, so behaviour is
+  unchanged.
 - Highlights covering only one or two characters returned the neighbouring
   letter (`Word,` highlighted on `o` yielded `r`). Glyph positions inside a text
   item are now estimated from per-letter widths instead of splitting the item
@@ -62,7 +72,12 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 ### Internal
 
 - ESLint migrated to flat config (`eslint.config.mjs`) with the official
-  `eslint-plugin-obsidianmd` ruleset; `npm run lint` reports no errors.
+  `eslint-plugin-obsidianmd` ruleset; `npm run lint` is clean.
+- The pdf.js annotation shape is typed (`RawPDFAnnotation` / `PDFAnnotation` in
+  `src/types.ts`) instead of being passed around as `any`, which took the lint
+  warnings from 215 to 1.
+- `loadSettings` derives the settings it loads from the settings object, so a new
+  setting can no longer be forgotten and silently never load.
 - Dependencies updated; no known vulnerabilities in the shipped dependencies.
 
 ## 1.9.5

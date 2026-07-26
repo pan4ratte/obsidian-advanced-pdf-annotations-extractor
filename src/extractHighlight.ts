@@ -1,6 +1,29 @@
-import { PDFFile } from "src/types";
+import { PDFAnnotation, PDFFile, PDFJsLib, RawPDFAnnotation } from "src/types";
 import { ANNOTS_TREATED_AS_HIGHLIGHTS } from "src/settings";
-import { PDFDocumentProxy, TextContent, TextItem } from "pdfjs-dist/types/src/display/api";
+import {
+	PDFDocumentProxy,
+	PDFPageProxy,
+	TextContent,
+	TextItem,
+} from "pdfjs-dist/types/src/display/api";
+
+/** A corner of a quad, in PDF user space. */
+interface QuadPoint {
+	x: number;
+	y: number;
+}
+
+/**
+ * The fields of a pdf.js text item the extraction reads. A full `TextItem`
+ * satisfies this; it types `transform` as `any[]`, which is why the matrix is
+ * restated here.
+ */
+export interface PositionedText {
+	str: string;
+	width: number;
+	/** pdf.js transform matrix; [4] and [5] are the item's x and y. */
+	transform: number[];
+}
 
 // return text between min and max, x and y
 function searchQuad(
@@ -8,9 +31,9 @@ function searchQuad(
 	maxx: number,
 	miny: number,
 	maxy: number,
-	items: any
+	items: PositionedText[]
 ) {
-	const mycontent = items.reduce(function (txt: string, x: any) {
+	const mycontent = items.reduce(function (txt: string, x: PositionedText) {
 		if (x.width == 0) return txt; // eliminate empty stuff
 		if (!(miny <= x.transform[5] && x.transform[5] <= maxy)) return txt; // y coordinate not in box
 		if (x.transform[4] + x.width < minx) return txt; // end of txt before highlight starts
@@ -26,40 +49,44 @@ function searchQuad(
 }
 
 // iterate over all QuadPoints and join retrieved lines
-export function extractHighlight(annot: any, items: any) {
+export function extractHighlight(
+	annot: Pick<RawPDFAnnotation, "quadPoints">,
+	items: PositionedText[]
+): string {
 	// pdf.js reports null when a text markup annotation carries no usable
 	// QuadPoints. There is no text to pick up then, only the comment on the
 	// annotation itself, so don't let one malformed annotation fail the file.
 	if (!annot.quadPoints) return "";
 
-	const legacyQuadPoints = [];
+	const quadPoints = annot.quadPoints;
+	const legacyQuadPoints: QuadPoint[][] = [];
 	// Recreate legacy quadPoints array, with the form [[{x: 1, y: 2}, {x: 3, y: 4}, {x: 5, y: 6}, {x: 7, y: 8}], ...]
 	// One quad is 4 points (x,y) in the order tL, tR, bL, bR, multiple quads for multiple lines
-	for (let i = 0; i < annot.quadPoints.length / 8; i++) {
-		const oneQuad = [];
+	for (let i = 0; i < quadPoints.length / 8; i++) {
+		const oneQuad: QuadPoint[] = [];
 		for (let j = 0; j < 8; j = j + 2) {
 			oneQuad.push({
-				x: annot.quadPoints[j + i * 8],
-				y: annot.quadPoints[j + 1 + i * 8],
+				x: quadPoints[j + i * 8],
+				y: quadPoints[j + 1 + i * 8],
 			});
 		}
 		legacyQuadPoints.push(oneQuad);
 	}
-	const highlight = legacyQuadPoints.reduce((txt: string, quad: any) => {
+	const highlight = legacyQuadPoints.reduce((txt: string, quad: QuadPoint[]) => {
 		const minx = quad.reduce(
-			(prev: number, curr: any) => Math.min(prev, curr.x),
+			(prev: number, curr: QuadPoint) => Math.min(prev, curr.x),
 			quad[0].x
 		);
 		const maxx = quad.reduce(
-			(prev: number, curr: any) => Math.max(prev, curr.x),
+			(prev: number, curr: QuadPoint) => Math.max(prev, curr.x),
 			quad[0].x
 		);
 		const miny = quad.reduce(
-			(prev: number, curr: any) => Math.min(prev, curr.y),
+			(prev: number, curr: QuadPoint) => Math.min(prev, curr.y),
 			quad[0].y
 		);
 		const maxy = quad.reduce(
-			(prev: number, curr: any) => Math.max(prev, curr.y),
+			(prev: number, curr: QuadPoint) => Math.max(prev, curr.y),
 			quad[0].y
 		);
 		const res = searchQuad(minx, maxx, miny, maxy, items);
@@ -85,26 +112,31 @@ export function extractHighlight(annot: any, items: any) {
 // if its a underline, squiggle or highlight, extract Highlight of the Annotation
 // accumulate all annotations in the array total
 async function loadPage(
-	page,
+	page: PDFPageProxy,
 	pagenum: number,
 	pageLabel: string,
 	file: PDFFile,
 	containingFolder: string,
-	total: object[],
+	total: PDFAnnotation[],
 	desiredAnnotations: string[]
 ) {
-	let annotations = await page.getAnnotations();
+	const rawAnnotations = (await page.getAnnotations()) as RawPDFAnnotation[];
 
-	annotations = annotations.filter(function (anno) {
-		return desiredAnnotations.indexOf(anno.subtype) >= 0;
-	});
+	const annotations = rawAnnotations.filter(
+		(anno) => desiredAnnotations.indexOf(anno.subtype) >= 0
+	);
 
-	const content: TextContent = await page.getTextContent({
-		normalizeWhitespace: true,
-	});
+	// pdf.js normalizes whitespace by default since v3; the normalizeWhitespace
+	// option this used to pass was removed from its API.
+	const content: TextContent = await page.getTextContent();
+
+	// TextContent also carries marked-content markers, which have no position
+	const textItems = content.items.filter(
+		(item): item is TextItem => "str" in item
+	);
 
 	// sort text elements
-	content.items.sort(function (a1: TextItem, a2: TextItem) {
+	textItems.sort(function (a1: TextItem, a2: TextItem) {
 		if (a1.transform[5] > a2.transform[5]) return -1; // y coord. descending
 		if (a1.transform[5] < a2.transform[5]) return 1;
 		if (a1.transform[4] > a2.transform[4]) return 1; // x coord. ascending
@@ -112,26 +144,35 @@ async function loadPage(
 		return 0;
 	});
 
-	annotations.map(async function (anno) {
+	for (const raw of annotations) {
+		const anno: PDFAnnotation = {
+			...raw,
+			folder: containingFolder,
+			file: file,
+			filepath: file.path, // we need a direct string property in the templates
+			pageNumber: pagenum,
+			pageLabel: pageLabel, // Real page number defined by author
+			author: raw.titleObj.str,
+			body: raw.contentsObj.str,
+		};
+
 		if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {
-			anno.highlightedText = extractHighlight(anno, content.items);
+			anno.highlightedText = extractHighlight(anno, textItems);
 		}
-		anno.folder = containingFolder;
-		anno.file = file;
-		anno.filepath = file.path; // we need a direct string property in the templates
-		anno.pageNumber = pagenum;
-		anno.pageLabel = pageLabel; // Real page number defined by author
-		anno.author = anno.titleObj.str;
-		anno.body = anno.contentsObj.str;
+
+		// Nothing a note could show: no comment, and no text marked up. Skip it
+		// rather than exporting a blank entry.
+		if (!anno.body.trim() && !anno.highlightedText?.trim()) continue;
+
 		total.push(anno);
-	});
+	}
 }
 
 export async function loadPDFFile(
 	file: PDFFile,
-	pdfjsLib,
+	pdfjsLib: PDFJsLib,
 	containingFolder: string,
-	total: object[],
+	total: PDFAnnotation[],
 	desiredAnnotations: string[]
 ) {
 	const pdf: PDFDocumentProxy = await pdfjsLib.getDocument(file.content)

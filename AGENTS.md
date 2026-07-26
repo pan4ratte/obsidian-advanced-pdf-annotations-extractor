@@ -5,7 +5,7 @@
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | esbuild watch mode (no typecheck) |
-| `npm test` | Jest (ts-jest, covers only `extractHighlight`) — 13 tests, all passing |
+| `npm test` | Jest (ts-jest) — 41 tests, all passing |
 | `npm run lint` / `npm run lint:fix` | ESLint flat config with the official Obsidian ruleset |
 | `npm run build` | `tsc -noEmit -skipLibCheck && node esbuild.config.mjs production` |
 
@@ -25,9 +25,11 @@
 - Jest with `ts-jest` preset; `obsidian` module mapped to `test/mocks/obsidian.ts`.
   The mock only stubs what importing the code under test evaluates — extend it
   when a test needs more, rather than faking Obsidian behaviour.
-- `ANNOTS_TREATED_AS_HIGHLIGHTS` is mocked in test setup.
+- `ANNOTS_TREATED_AS_HIGHLIGHTS` is mocked in `extractHighlight.test.ts`.
 - Run `npm test` (no watch by default).
-- The fixtures are real pdf.js text items and real PDF highlight rectangles for
+- `loadPDFFile.test.ts` drives the pipeline through a hand-rolled pdf.js stub
+  cast to `PDFJsLib`; that interface is small on purpose so this stays possible.
+- The glyph fixtures are real pdf.js text items and real PDF highlight rectangles for
   the words `diese`, `(S. 1)`, `Word,` and `Lesen`. The single-character cases
   (`W`, `o`, `r`, `d`, `,` of `Word,`) are what pin down the glyph-width
   estimation in `glyphBorders` — if you retune `WIDE_LETTER_WEIGHT` or
@@ -66,10 +68,12 @@ src/
   extractHighlight.ts — PDF text extraction via pdfjs-dist
   formatter.ts        — Handlebars template rendering
   settings.ts         — Settings class + settings tab UI
-  types.ts            — PDFFile type, IIndexable helper
+  types.ts            — PDFFile, annotation and pdf.js boundary types
 test/
-  extractHighlight.test.ts
-  settings.test.ts     — desired-annotation toggle round-trip
+  extractHighlight.test.ts  — glyph-level text extraction
+  loadPDFFile.test.ts       — extraction pipeline, against a fake pdf.js
+  formatter.test.ts         — template variables and template selection
+  settings.test.ts          — annotation types, checkbox round-trip
   mocks/obsidian.ts
 styles.css            — settings tab CSS (release asset)
 CHANGELOG.md          — release notes source for the workflow
@@ -104,10 +108,13 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
 - `eslint.config.mjs` (flat config) extends `eslint-plugin-obsidianmd`'s
   `recommended`, which bundles `eslint:recommended`, typescript-eslint
   `recommended-type-checked`, `import`, `depend` and `no-unsanitized`.
-- Lint is **error-free**; the ~226 remaining findings are warnings. Almost all of
-  them are the `no-unsafe-*` family firing on the untyped pdfjs annotation
-  objects — deliberately warnings while those types get modelled, not accepted
-  style. Don't silence them, and don't add new ones.
+- Lint is **clean**: 0 errors, and the single remaining warning is
+  `prefer-setting-definitions`, which needs Obsidian 1.13's declarative settings
+  API and so is out of reach at `minAppVersion` 1.8.7. Keep it that way.
+- pdf.js data is typed at the boundary, not passed around as `any`:
+  `RawPDFAnnotation` (what pdf.js reports), `PDFAnnotation` (once extraction has
+  filled in the note's fields), `PositionedText` and `PDFJsLib` in `src/types.ts`.
+  `loadPdfJs()` and `getAnnotations()` return `any` — cast once, there.
 - Local overrides in `eslint.config.mjs`: `no-unused-vars` on (args: none),
   `ban-ts-comment` off, `no-explicit-any` autofix disabled (its `fixToUnknown`
   fixer rewrites `any` to `unknown` and breaks every call site).

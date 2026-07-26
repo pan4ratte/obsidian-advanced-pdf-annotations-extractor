@@ -52,11 +52,23 @@ export default defineConfig([
 
 			// The rule lowercases "PDFs"/"PDF's" because only the bare "PDF"
 			// acronym is recognised, and it capitalises "cursor" because Cursor
-			// is in its brand list. Passing `acronyms` would replace the default
-			// list, so these go through `ignoreWords` instead.
+			// is in its brand list. The rest are PDF annotation subtype names,
+			// which are spelled the way the format spells them. Passing
+			// `acronyms` would replace the default list, so these go through
+			// `ignoreWords` instead.
 			"obsidianmd/ui/sentence-case": [
 				"warn",
-				{ ignoreWords: ["PDFs", "PDF's", "cursor"] },
+				{
+					ignoreWords: [
+						"PDFs",
+						"PDF's",
+						"cursor",
+						"Underline",
+						"Squiggly",
+						"StrikeOut",
+						"FreeText",
+					],
+				},
 			],
 		},
 	},

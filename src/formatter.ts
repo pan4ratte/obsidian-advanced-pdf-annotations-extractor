@@ -6,6 +6,7 @@ import {
 	ANNOTS_TREATED_AS_HIGHLIGHTS,
 	PDFAnnotationPluginSetting,
 } from "./settings";
+import { PDFAnnotation } from "./types";
 
 export class PDFAnnotationPluginFormatter {
 	private settings: PDFAnnotationPluginSetting;
@@ -19,7 +20,7 @@ export class PDFAnnotationPluginFormatter {
 		this.settings = settings;
 	}
 
-	format(grandtotal, isExternalFile) {
+	format(grandtotal: PDFAnnotation[], isExternalFile: boolean): string {
 		// now iterate over the annotations printing topics, then folder, then comments...
 		let text = "";
 		let topic = "";
@@ -96,40 +97,43 @@ export class PDFAnnotationPluginFormatter {
 		);
 	}
 
-	getTemplateVariablesForAnnotation(annotation: any): Record<string, any> {
+	getTemplateVariablesForAnnotation(
+		annotation: PDFAnnotation
+	): Record<string, unknown> {
 		const shortcuts = {
 			highlightedText: annotation.highlightedText,
 			folder: annotation.folder,
-			file: annotation.file,
+			filename: annotation.file.basename,
 			filepath: annotation.filepath,
 			pageNumber: annotation.pageNumber,
 			pageLabel: annotation.pageLabel,
 			author: annotation.author,
 			body: annotation.body,
+			topic: annotation.topic,
 		};
 
 		return { annotation: annotation, ...shortcuts };
 	}
 
-	getContentForNoteFromExternalPDF(annotation: any): string {
+	getContentForNoteFromExternalPDF(annotation: PDFAnnotation): string {
 		return this.noteFromExternalPDFsTemplate(
 			this.getTemplateVariablesForAnnotation(annotation)
 		);
 	}
 
-	getContentForNoteFromInternalPDF(annotation: any): string {
+	getContentForNoteFromInternalPDF(annotation: PDFAnnotation): string {
 		return this.noteFromInternalPDFsTemplate(
 			this.getTemplateVariablesForAnnotation(annotation)
 		);
 	}
 
-	getContentForHighlightFromExternalPDF(annotation: any): string {
+	getContentForHighlightFromExternalPDF(annotation: PDFAnnotation): string {
 		return this.highlightFromExternalPDFsTemplate(
 			this.getTemplateVariablesForAnnotation(annotation)
 		);
 	}
 
-	getContentForHighlightFromInternalPDF(annotation: any): string {
+	getContentForHighlightFromInternalPDF(annotation: PDFAnnotation): string {
 		return this.highlightFromInternalPDFsTemplate(
 			this.getTemplateVariablesForAnnotation(annotation)
 		);
