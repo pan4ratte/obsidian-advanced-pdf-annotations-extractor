@@ -11,7 +11,7 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = (process.argv[2] === 'production');
 
-esbuild.build({
+const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
@@ -48,4 +48,22 @@ esbuild.build({
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
 	outfile: 'main.js',
-}).catch(() => process.exit(1));
+});
+
+// `production` builds main.js once and stops. Without it the build stays up and
+// writes main.js again on every save, which is what `npm run dev` is for: a
+// build that ended the moment it was run left the plugin folder holding
+// whatever the last manual build wrote, and nothing said so.
+if (prod) {
+	try {
+		await context.rebuild();
+		console.log("Built main.js.");
+	} catch {
+		process.exit(1);
+	} finally {
+		await context.dispose();
+	}
+} else {
+	await context.watch();
+	console.log("Watching for changes. Reload the plugin in Obsidian to pick each build up.");
+}
