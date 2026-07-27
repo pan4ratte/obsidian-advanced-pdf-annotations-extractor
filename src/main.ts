@@ -22,6 +22,7 @@ import {
 	PDFAnnotationPluginSettingTab,
 	resolveNotePath,
 } from "src/settings";
+import { compareAnnotations } from "src/ordering";
 import { takeTagsFromAnnotations } from "src/tags";
 import { assignTopics } from "src/topics";
 import {
@@ -58,47 +59,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		// whether it is read at all.
 		assignTopics(grandtotal, settings.sortByTopic);
 
-		grandtotal.sort(function (a1, a2) {
-			if (settings.groupByDate) {
-				// The day the annotation was made, outside every other
-				// grouping. A PDF need not date its annotations at all, and
-				// the ones it left undated belong after those it dated rather
-				// than before the earliest of them.
-				const d1 = a1.created ?? "";
-				const d2 = a2.created ?? "";
-				if (d1 != d2) {
-					if (!d1) return 1;
-					if (!d2) return -1;
-					return d1 < d2 ? -1 : 1;
-				}
-			}
-
-			if (settings.sortByTopic) {
-				// sort by topic
-				if (a1.topic > a2.topic) return 1;
-				if (a1.topic < a2.topic) return -1;
-			}
-
-			if (settings.groupByFolder) {
-				// then sort by folder
-				if (a1.folder > a2.folder) return 1;
-				if (a1.folder < a2.folder) return -1;
-			}
-
-			// then sort by file.name
-			if (a1.file.name > a2.file.name) return 1;
-			if (a1.file.name < a2.file.name) return -1;
-
-			// then sort by page
-			if (a1.pageNumber > a2.pageNumber) return 1;
-			if (a1.pageNumber < a2.pageNumber) return -1;
-
-			// they are on the same, page, sort (descending) by minY
-			// if quadPoints are undefined, use minY from the rect-angle
-			if (a1.rect[1] > a2.rect[1]) return -1;
-			if (a1.rect[1] < a2.rect[1]) return 1;
-			return 0;
-		});
+		grandtotal.sort(compareAnnotations(settings));
 	}
 
 	async loadSinglePDFFile(pdfFile: TFile, onePerAnnotation = false) {
@@ -140,6 +101,38 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 			properties.tags = [...new Set([...kept, ...tags])];
 		});
+	}
+
+	/**
+	 * Write the annotations into the note being edited, which the commands that
+	 * take an editor do instead of making a note of their own.
+	 *
+	 * The tags the annotations carried go to that note's properties: it is the
+	 * note they were extracted into, so it is the note they belong to, and the
+	 * setting means the same thing here as everywhere else. That means saving
+	 * what was just inserted first — the properties are written to the note as
+	 * it stands on disk, and text still sitting unsaved in the editor would be
+	 * written over.
+	 */
+	private async insertIntoNote(
+		editor: Editor,
+		view: MarkdownView,
+		grandtotal: PDFAnnotation[],
+		isExternalFile: boolean
+	): Promise<void> {
+		const tags = this.settings.extractTagsFromAnnotationsAsObsidianTags
+			? takeTagsFromAnnotations(grandtotal)
+			: [];
+
+		editor.replaceSelection(
+			this.formatter.format(grandtotal, isExternalFile)
+		);
+
+		const note = view.file;
+		if (tags.length === 0 || !note) return;
+
+		await view.save();
+		await this.addTagsToNoteProperties(note, tags);
 	}
 
 	private async writeNotes(
@@ -332,7 +325,12 @@ export default class PDFAnnotationPlugin extends Plugin {
 				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
 				if (result.pdfFile) {
 					this.sort(result.grandtotal);
-					editor.replaceSelection(this.formatter.format(result.grandtotal, true));
+					await this.insertIntoNote(
+						editor,
+						view,
+						result.grandtotal,
+						true
+					);
 				}
 			},
 		});
@@ -406,9 +404,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				});
 				await Promise.all(promises);
 				this.sort(grandtotal);
-				editor.replaceSelection(
-					this.formatter.format(grandtotal, false)
-				);
+				await this.insertIntoNote(editor, view, grandtotal, false);
 			},
 		});
 	}

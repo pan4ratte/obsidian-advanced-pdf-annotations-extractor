@@ -6,8 +6,11 @@ import { PDFAnnotation } from "./types";
  * tags and the dashes and underscores Obsidian allows are kept. The space in
  * front goes with the tag when it is taken out, so no gap is left where it
  * stood.
+ *
+ * A letter is any script's letter, not `\w`'s: a reader annotates in the
+ * language they read in, and `#ключевое` is as much a tag as `#key` is.
  */
-const TAG_PATTERN = /[ \t]*#([\wöäü_/-]*[A-Za-zöäü][\wöäü_/-]*)/g;
+const TAG_PATTERN = /[ \t]*#([\p{L}\p{N}_/-]*\p{L}[\p{L}\p{N}_/-]*)/gu;
 
 /** The tags in one piece of text, without their `#`, in writing order. */
 function tagsIn(text: string): string[] {

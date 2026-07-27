@@ -139,6 +139,16 @@ describe('cleanNoteName', () => {
     expect(cleaned.length).toBeLessThanOrEqual(100);
     expect(cleaned.endsWith(' ')).toBe(false);
   });
+
+  test('the cut falls between characters, never inside one', () => {
+    // Counted as they are read: 120 emoji are 240 UTF-16 units, and cutting by
+    // those would leave half of one behind — a name no file system takes.
+    expect(cleanNoteName('😀'.repeat(120))).toBe('😀'.repeat(100));
+  });
+
+  test('a name is as long in any alphabet', () => {
+    expect([...cleanNoteName('я'.repeat(120))]).toHaveLength(100);
+  });
 });
 
 describe('resolveNotePath', () => {

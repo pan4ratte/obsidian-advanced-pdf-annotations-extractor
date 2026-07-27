@@ -36,6 +36,23 @@ describe('takeTagsFromAnnotations', () => {
       .toEqual(['reading/papers']);
   });
 
+  test('a tag is read in whatever script it was written in', () => {
+    // A comment as it comes out of a PDF read in Russian: the title on the
+    // first line, the tags under it.
+    const anno = annotation(
+      '#ключевое #линдбек-джодж #методология',
+      '452 - For Lindbeck doctrine is the grammar of religion'
+    );
+    expect(takeTagsFromAnnotations([anno]))
+      .toEqual(['ключевое', 'линдбек-джодж', 'методология']);
+    expect(anno.body).toBe('');
+  });
+
+  test('a tag of one script mixed into another is read too', () => {
+    expect(takeTagsFromAnnotations([annotation('See #Grundriß and #思想')]))
+      .toEqual(['Grundriß', '思想']);
+  });
+
   test('a number is not a tag', () => {
     expect(takeTagsFromAnnotations([annotation('see #1 and #2b')]))
       .toEqual(['2b']);

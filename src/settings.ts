@@ -194,7 +194,9 @@ function cleanFolderPath(value: string): string {
 
 /**
  * Long enough for a sentence a `{{topic}}` can hold, short enough that the path
- * around it still fits what the file system will take.
+ * around it still fits what the file system will take. Counted in characters as
+ * they are read rather than in the units they are stored in, so that a cut
+ * never falls inside one.
  */
 const MAX_NOTE_NAME_LENGTH = 100;
 
@@ -212,10 +214,13 @@ export function cleanNoteName(value: string): string {
 		// else, which is what the subfolder setting is for.
 		.replace(/\//g, " ")
 		.replace(/\s+/g, " ")
-		.trim()
-		.slice(0, MAX_NOTE_NAME_LENGTH);
+		.trim();
+	// Spread rather than `slice`, which counts UTF-16 units and would cut an
+	// emoji — or anything else written outside the basic plane — in half,
+	// leaving a name no file system will take.
+	const cut = [...collapsed].slice(0, MAX_NOTE_NAME_LENGTH).join("");
 
-	return collapsed
+	return cut
 		.replace(/^\.+/, "")
 		.replace(/[. ]+$/, "")
 		.trim();

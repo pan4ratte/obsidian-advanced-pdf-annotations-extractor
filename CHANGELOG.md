@@ -52,6 +52,11 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   and `{{topic}}` and `{{body}}` in one template repeat the line — which is the
   template's business, and how a reader gets the first line as a title of their
   own making.
+- *Extract tags in annotations as Obsidian tags* is heeded by the commands that
+  insert into the note being edited, which ignored it altogether: the tags go to
+  that note's properties, since the note the annotations were extracted into is
+  the note they belong to. What was inserted is saved before the properties are
+  added, so the two do not write over one another.
 - *Extract tags in annotations as Obsidian tags* moves the tags rather than
   copying them: a tag read into the note's properties is taken out of the
   extracted text, so it stands in one place instead of two — and out of the note
@@ -180,6 +185,23 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Fixed
 
+- Topics, folders and file names are ordered as a reader would order them
+  rather than by the code points they are written from. `>` and `<` read every
+  alphabet as if it were ASCII: `ё` fell after `я` instead of beside the `е` it
+  is written from, `ä` after `z`, and every capital above every small letter, so
+  `Ясность` sorted above `апория`. Numbers in them are read as numbers while it
+  is about it, so a topic numbered 452 comes before one numbered 1200, and
+  `Chapter 2.pdf` before `Chapter 10.pdf`.
+- A note name too long to keep is cut between characters rather than inside
+  one. The cut counted the units a name is stored in, not the characters it is
+  read as, so a name of emoji — or of anything else written outside the basic
+  plane — could end in half a character that no file system would take.
+- *Extract tags in annotations as Obsidian tags* reads a tag written in any
+  script. It matched Latin letters and the three German umlauts and nothing
+  else, so `#ключевое` — or a tag in Greek, Hebrew, Arabic or Chinese — was not
+  a tag as far as the plugin was concerned, and a reader who annotates in their
+  own language got no tags at all. A tag is `#` and a word with a letter in it
+  now, whichever alphabet the letter belongs to.
 - *Extract tags in annotations as Obsidian tags* finds the tags written on a
   comment's first line. *Sort by topic* splits that line off as the topic before
   a note is written, and only what was left of the comment was searched — so a
