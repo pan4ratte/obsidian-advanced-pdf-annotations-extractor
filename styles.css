@@ -8,22 +8,18 @@
 	color: var(--text-normal);
 }
 
-/* The two template cards side by side, dropping to one column when the tab is
-   too narrow to give both a usable width. */
+/* One card per row, full width: with wrapping off, a template wants every
+   character of the row it can get before it scrolls sideways. */
 .pdf-annotations-template-columns {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(24em, 1fr));
-	gap: 16px;
+	grid-template-columns: 1fr;
+	gap: 12px;
 	margin-bottom: 16px;
-	/* Each card is as tall as its own template. Without this, grid stretches
-	   both to the taller one, and the growing text area drags its neighbour
-	   along with it. */
-	align-items: start;
 }
 
 /* Each card stacks: name and description above, the text area across the full
-   width below. min-width keeps a text area from pushing its column wider than
-   the half of the row it was given. */
+   width below. min-width stops a text area's intrinsic width from pushing the
+   card wider than the row. */
 .pdf-annotations-template-setting {
 	flex-direction: column;
 	align-items: stretch;
@@ -39,22 +35,66 @@
 	margin-right: 0;
 }
 
-/* Obsidian gives the control `flex: 1 1 auto`, which in this column layout
-   makes it soak up any height the card is given. Held to its content instead,
-   so the text area's height is only ever its own. */
 .pdf-annotations-template-setting .setting-item-control {
 	width: 100%;
-	flex-grow: 0;
 }
 
-/* Template text areas in the plugin settings tab: a fixed box, thirteen lines
-   tall and as wide as its column, scrolling once the template outgrows it. */
-.pdf-annotations-template-input {
+/* Gutter and text area share one box, which carries the input's frame so the
+   two read as a single field. Thirteen lines tall, as wide as its column. */
+.pdf-annotations-template-editor {
+	display: flex;
 	width: 100%;
 	height: 13em;
-	overflow-y: auto;
-	resize: none;
 	margin-top: 8px;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	border: var(--input-border-width) solid var(--background-modifier-border);
+	border-radius: var(--input-radius);
+}
+
+.pdf-annotations-template-editor:focus-within {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* Scrolled from the text area's scroll handler, never on its own — hence
+   hidden overflow rather than auto. */
+.pdf-annotations-template-gutter {
+	flex-shrink: 0;
+	overflow: hidden;
+	padding: 8px 6px;
+	border-right: 1px solid var(--background-modifier-border);
+	color: var(--text-faint);
+	text-align: right;
+	white-space: pre;
+	user-select: none;
+}
+
+/* The frame belongs to the box around it now, so the text area brings none of
+   its own. The numbers only line up while both share a line height. */
+.pdf-annotations-template-input {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding: 8px;
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	resize: none;
+	overflow: auto;
+}
+
+.pdf-annotations-template-input:focus,
+.pdf-annotations-template-input:hover {
+	border: none;
+	box-shadow: none;
+}
+
+.pdf-annotations-template-gutter,
+.pdf-annotations-template-input {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
 }
 
 /* "Annotations to extract": heading, description and checkbox grid form a
@@ -112,6 +152,49 @@
 .pdf-annotations-annotation-option input[type="checkbox"] {
 	margin: 0;
 	flex-shrink: 0;
+}
+
+/* The default marker is replaced by a chevron that turns with the panel, so
+   the disclosure triangle is not left pointing the other way. */
+.pdf-annotations-accordion-summary {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+	padding: 0px 16px 16px 16px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	list-style: none;
+}
+
+.pdf-annotations-accordion-summary::-webkit-details-marker {
+	display: none;
+}
+
+.pdf-annotations-accordion-summary:hover {
+	color: var(--text-normal);
+}
+
+.pdf-annotations-accordion-chevron {
+	display: flex;
+	transition: transform 180ms ease-in-out;
+}
+
+/* Set as the panel starts moving, not on [open], which lags a closing panel by
+   the length of the animation. */
+.pdf-annotations-accordion-chevron.is-open {
+	transform: rotate(90deg);
+}
+
+.pdf-annotations-accordion-chevron .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
+/* Height is animated from the script, so the panel has to clip what does not
+   fit yet. */
+.pdf-annotations-accordion-content {
+	overflow: hidden;
 }
 
 /* Table of template variables. The name column is only as wide as its longest
@@ -212,4 +295,8 @@
 .pdf-annotations-settings-header .setting-item-description,
 .pdf-annotations-annotation-setting .setting-item-description {
     padding-top: 8px;
+}
+
+.setting-item-description.pdf-annotations-template-instructions {
+    padding-top: 12px;
 }

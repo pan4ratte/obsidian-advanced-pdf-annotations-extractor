@@ -321,6 +321,116 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * A collapsible panel, closed to begin with. Returns the element its
+	 * contents go in.
+	 *
+	 * <details> has no open and close transition of its own, so it is animated
+	 * here: opening reveals the content first, so its height can be measured,
+	 * then animates up to it; closing runs the reverse and only marks the
+	 * element closed once the animation has finished, or the content would
+	 * vanish on the first frame.
+	 *
+	 * A toggle mid-animation picks up from the height currently on screen
+	 * rather than restarting, and anyone who has asked for less motion gets the
+	 * plain instant toggle the element does by itself.
+	 */
+	createAccordion(
+		parent: HTMLElement,
+		showText: string,
+		hideText: string
+	): HTMLElement {
+		const details = parent.createEl("details", {
+			cls: "pdf-annotations-accordion",
+		});
+		const summary = details.createEl("summary", {
+			cls: "pdf-annotations-accordion-summary",
+		});
+		const chevron = summary.createSpan({
+			cls: "pdf-annotations-accordion-chevron",
+		});
+		setIcon(chevron, "chevron-right");
+		const label = summary.createSpan({ text: showText });
+		const content = details.createDiv({
+			cls: "pdf-annotations-accordion-content",
+		});
+
+		let animation: Animation | null = null;
+
+		summary.addEventListener("click", (event) => {
+			const opening = !details.open;
+			chevron.toggleClass("is-open", opening);
+			label.setText(opening ? hideText : showText);
+
+			if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+				return;
+			}
+			event.preventDefault();
+
+			// Measured before cancelling, while it is still the height on
+			// screen rather than the natural one.
+			const interrupted = animation !== null;
+			const onScreen = interrupted
+				? content.getBoundingClientRect().height
+				: 0;
+			animation?.cancel();
+
+			if (opening) details.open = true;
+			const full = content.scrollHeight;
+			const from = interrupted ? onScreen : opening ? 0 : full;
+			const to = opening ? full : 0;
+
+			animation = content.animate(
+				{
+					height: [`${from}px`, `${to}px`],
+					opacity: opening ? [0, 1] : [1, 0],
+				},
+				{ duration: 180, easing: "ease-in-out" }
+			);
+			animation.onfinish = () => {
+				animation = null;
+				if (!opening) details.open = false;
+			};
+		});
+
+		return content;
+	}
+
+	/**
+	 * Put a numbered gutter beside a template's text area. The text area is
+	 * wrapped in a box it now shares with the gutter, which is redrawn as lines
+	 * come and go and scrolled in step with it.
+	 *
+	 * Soft wrapping is turned off for this: a wrapped line occupies two rows on
+	 * screen but is still one line, and there is no honest number to put beside
+	 * the second row. Long template lines scroll sideways instead.
+	 */
+	addLineNumbers(textarea: HTMLTextAreaElement): void {
+		const parent = textarea.parentElement;
+		if (!parent) return;
+
+		const editor = createDiv({ cls: "pdf-annotations-template-editor" });
+		parent.insertBefore(editor, textarea);
+		const gutter = editor.createDiv({
+			cls: "pdf-annotations-template-gutter",
+		});
+		editor.appendChild(textarea);
+		textarea.setAttr("wrap", "off");
+
+		const drawLineNumbers = () => {
+			const lines = textarea.value.split("\n").length;
+			gutter.setText(
+				Array.from({ length: lines }, (_, i) => i + 1).join("\n")
+			);
+		};
+
+		textarea.addEventListener("input", drawLineNumbers);
+		textarea.addEventListener("scroll", () => {
+			gutter.scrollTop = textarea.scrollTop;
+		});
+		drawLineNumbers();
+	}
+
+	/**
 	 * Append `text` to `parent`, turning the first occurrence of `linkText`
 	 * into a link. Keeps the paragraph one translatable sentence instead of the
 	 * fragments either side of an anchor; a translation that drops the word
@@ -435,7 +545,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			HANDLEBARS_DOCS
 		);
 
-		const templateVariableTable = containerEl.createEl("table", {
+		// Folded away by default: the table is a reference to look something up
+		// in, not something to read past on the way to the templates.
+		const variablesContent = this.createAccordion(
+			containerEl,
+			t.SHOW_VARIABLES_TABLE,
+			t.HIDE_VARIABLES_TABLE
+		);
+		const templateVariableTable = variablesContent.createEl("table", {
 			cls: "pdf-annotations-variable-table",
 		});
 		const templateVariableHead = templateVariableTable
@@ -468,9 +585,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			templateVariableRow.createEl("td", { text: description });
 		});
 
-		// The two templates are cards side by side, each with its text above
-		// its input; styles.css lays the pair out and drops them to one column
-		// when the tab is too narrow.
+		// A card per template, one above the other, each with its text above
+		// its input.
 		const templateColumns = containerEl.createDiv({
 			cls: "pdf-annotations-template-columns",
 		});
@@ -493,6 +609,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				.addTextArea((input) => {
 					input.inputEl.addClass("pdf-annotations-template-input");
 					this.buildValueInput(input, settingsKey);
+					this.addLineNumbers(input.inputEl);
 				});
 			card.settingEl.addClass("pdf-annotations-template-setting");
 		});

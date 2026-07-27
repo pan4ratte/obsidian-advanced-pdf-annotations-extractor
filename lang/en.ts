@@ -58,10 +58,12 @@ export default {
     // One sentence, not the pieces either side of the link: the link is woven in
     // by looking for HANDLEBARS_LINK inside it, so a translation can put that
     // word where its own grammar wants it.
-    SECTION_TEMPLATES: "Templates",
-    SECTION_TEMPLATES_DESC: "The following settings determine how the highlights and notes created by the plugin will be rendered. There are two, because annotations that mark up PDF text carry the text they mark up and the others do not. Both are used for PDFs inside and outside the vault alike: {{filelink}} links the PDF the way its location calls for. Templates are interpreted using Handlebars syntax. The following variables are available:",
+    SECTION_TEMPLATES: "Extraction templates",
+    SECTION_TEMPLATES_DESC: "Use templates to define the look of the extracted annotations. Variables reference table below lists available Handlebars syntax options: on extraction those variables will be replaced with their corresponding values.",
     HANDLEBARS_LINK: "Handlebars",
-    TABLE_VARIABLE: "Variable",
+    SHOW_VARIABLES_TABLE: "Show variables reference table",
+    HIDE_VARIABLES_TABLE: "Hide variables reference table",
+    TABLE_VARIABLE: "Variable (click to copy)",
     TABLE_DESCRIPTION: "Description",
     COPY_TOOLTIP: "Copy to clipboard",
     SETTING_HIGHLIGHT_TEMPLATE_NAME: "Template for highlights",

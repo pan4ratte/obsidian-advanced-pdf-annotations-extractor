@@ -19,6 +19,8 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 - The template variables in the settings tab are a table now, each with a button
   that copies the variable to the clipboard.
+- Each template field is a full-width monospaced box with a numbered gutter.
+  Lines are no longer soft wrapped, so a number always means a line.
 - Every user-facing string moved to `lang/en.ts`, so the plugin can be
   translated without touching its logic — add a language by copying that file
   and listing it in `lang/helpers.ts`. The whole file is held to the Obsidian
