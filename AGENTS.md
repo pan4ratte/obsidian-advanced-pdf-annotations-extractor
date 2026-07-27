@@ -83,8 +83,10 @@ src/
   extractHighlight.ts — PDF text extraction via pdfjs-dist
   formatter.ts        — Handlebars template rendering
   settings.ts         — Settings class + settings tab UI
-  locale/en.ts        — every user-facing string
   types.ts            — PDFFile, annotation and pdf.js boundary types
+lang/
+  en.ts               — every user-facing string, flat UPPER_SNAKE keys
+  helpers.ts          — picks the locale, exports `t`
 test/
   extractHighlight.test.ts  — glyph-level text extraction
   loadPDFFile.test.ts       — extraction pipeline, against a fake pdf.js
@@ -139,17 +141,20 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
   case for all user-facing text, no plugin name in command names.
 - **No string literals in the UI** — command names, notices, setting names and
   descriptions, the settings header, and the default templates and export names
-  (they end up in exported notes) all come from `STRINGS` in `src/locale/en.ts`.
-  Strings taking a value are functions there, so an argument cannot go missing
-  in translation. Exempt, and to stay exempt: the annotation subtypes (spelled
-  as the PDF format spells them), the `{{variable}}` names, the command IDs
-  (persisted, so hotkeys survive), markdown and YAML syntax the formatter
-  writes, and `LEGACY_TEMPLATE_PAIRS`' defaults (compared byte-exact against old
-  `data.json`).
-- `STRINGS.plugin.name`/`.description` duplicate `manifest.json`, which the
-  plugin browser reads and no translation can reach. Change both together.
+  (they end up in exported notes) all come from `lang/en.ts`, reached as
+  `t.SOME_KEY` via `import { t } from "lang/helpers"`. Flat `UPPER_SNAKE` keys
+  grouped under `// ─── Section ───` banners; values are plain strings, and
+  anything variable is interpolated at the call site
+  (`` new Notice(`${t.NOTICE_COPIED}: ${variable}`) ``). A new language is a
+  copy of `en.ts` listed in `helpers.ts`'s `localeMap`.
+  Exempt, and to stay exempt: the annotation subtypes (spelled as the PDF format
+  spells them), the `{{variable}}` names, the command IDs (persisted, so hotkeys
+  survive), markdown and YAML syntax the formatter writes, and
+  `LEGACY_TEMPLATE_PAIRS`' defaults (compared byte-exact against old `data.json`).
+- `PLUGIN_NAME`/`PLUGIN_DESCRIPTION` duplicate `manifest.json`, which the plugin
+  browser reads and no translation can reach. Change both together.
 - The lint config uses `obsidianmd.configs.recommendedWithLocalesEn`, which
-  sentence-case checks every string in `locale/en.ts` and **bans the disable
+  sentence-case checks every string in `lang/en.ts` and **bans the disable
   comment** for that rule — there is no exempting a string, so write UI text
   that passes. Two consequences worth knowing before adding a string:
   - Write each one as a **single literal**. The rule walks object properties and

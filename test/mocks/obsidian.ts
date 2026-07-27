@@ -5,6 +5,13 @@ import { Workspace, Vault, MetadataCache, FileManager, UserEvent } from "obsidia
  * extends this, which is evaluated at import time. The tab's `display()` is not
  * exercised by the tests, so no DOM or `Setting` stub is needed.
  */
+/**
+ * `lang/helpers.ts` asks for the locale as it loads, to pick a translation.
+ * The tests read English, which is what an unrecognised locale falls back to
+ * anyway.
+ */
+export const moment = { locale: () => "en" };
+
 export class PluginSettingTab {
 
 	/** @public */

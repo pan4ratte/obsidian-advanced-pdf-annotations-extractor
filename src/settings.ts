@@ -8,13 +8,26 @@ import {
 	Setting,
 	setTooltip,
 } from "obsidian";
-import { STRINGS } from "src/locale/en";
+import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
 import { asIndexable } from "src/types";
 
-// The whole annotation is available as {{annotation}} too, for fields that have
-// no shortcut of their own.
-export const TEMPLATE_VARIABLES = STRINGS.templateVariables;
+// The variable names are the interface — what a template types — so they live
+// here; only their descriptions are translated. The whole annotation is
+// available as {{annotation}} too, for fields that have no shortcut of their own.
+export const TEMPLATE_VARIABLES: Record<string, string> = {
+	highlightedText: t.VAR_HIGHLIGHTED_TEXT,
+	folder: t.VAR_FOLDER,
+	filename: t.VAR_FILENAME,
+	filepath: t.VAR_FILEPATH,
+	filelink: t.VAR_FILELINK,
+	pageNumber: t.VAR_PAGE_NUMBER,
+	pageLabel: t.VAR_PAGE_LABEL,
+	author: t.VAR_AUTHOR,
+	body: t.VAR_BODY,
+	topic: t.VAR_TOPIC,
+	isExternal: t.VAR_IS_EXTERNAL,
+};
 
 export interface SupportedAnnotation {
 	/** PDF annotation subtype, as reported by pdf.js. */
@@ -43,32 +56,32 @@ export interface SupportedAnnotation {
 export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 	{
 		subtype: "Highlight",
-		description: STRINGS.annotationTypes.Highlight,
+		description: t.ANNOT_HIGHLIGHT,
 		marksUpText: true,
 		desiredByDefault: true,
 	},
 	{
 		subtype: "Underline",
-		description: STRINGS.annotationTypes.Underline,
+		description: t.ANNOT_UNDERLINE,
 		marksUpText: true,
 		desiredByDefault: true,
 	},
 	{
 		subtype: "Squiggly",
-		description: STRINGS.annotationTypes.Squiggly,
+		description: t.ANNOT_SQUIGGLY,
 		marksUpText: true,
 	},
 	{
 		subtype: "StrikeOut",
-		description: STRINGS.annotationTypes.StrikeOut,
+		description: t.ANNOT_STRIKEOUT,
 		marksUpText: true,
 	},
 	{
 		subtype: "Text",
-		description: STRINGS.annotationTypes.Text,
+		description: t.ANNOT_TEXT,
 		desiredByDefault: true,
 	},
-	{ subtype: "FreeText", description: STRINGS.annotationTypes.FreeText },
+	{ subtype: "FreeText", description: t.ANNOT_FREE_TEXT },
 ];
 
 export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
@@ -159,14 +172,14 @@ export class PDFAnnotationPluginSetting {
 		this.useFolderNames = true;
 		this.sortByTopic = true;
 		this.exportPath = "";
-		this.exportName = STRINGS.defaults.exportName;
+		this.exportName = t.DEFAULT_EXPORT_NAME;
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
-		this.noteTemplate = STRINGS.defaults.noteTemplate;
-		this.highlightTemplate = STRINGS.defaults.highlightTemplate;
+		this.noteTemplate = t.DEFAULT_NOTE_TEMPLATE;
+		this.highlightTemplate = t.DEFAULT_HIGHLIGHT_TEMPLATE;
 		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotation = false;
 		this.oneNotePerAnnotationExportName =
-			STRINGS.defaults.oneNotePerAnnotationExportName;
+			t.DEFAULT_ONE_NOTE_EXPORT_NAME;
 		this.overwriteExistingNote = false;
 		this.extractTagsFromAnnotationsAsObsidianTags = false;
 		this.exportClipboardExtraction = false;
@@ -341,22 +354,22 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			cls: ["clickable-icon", "pdf-annotations-copy-button"],
 			attr: {
 				type: "button",
-				"aria-label": STRINGS.settings.templates.copyLabel(variable),
+				"aria-label": `${t.COPY_TOOLTIP}: ${variable}`,
 			},
 		});
 		setIcon(button, "copy");
-		setTooltip(pill, STRINGS.settings.templates.copyTooltip);
+		setTooltip(pill, t.COPY_TOOLTIP);
 
 		pill.addEventListener("click", () => {
 			navigator.clipboard
 				.writeText(variable)
 				.then(() => {
-					new Notice(STRINGS.notices.copied(variable));
+					new Notice(`${t.NOTICE_COPIED}: ${variable}`);
 					setIcon(button, "check");
 					window.setTimeout(() => setIcon(button, "copy"), 1500);
 				})
 				.catch((error) => {
-					new Notice(STRINGS.notices.copyFailed);
+					new Notice(t.NOTICE_COPY_FAILED);
 					console.error(error);
 				});
 		});
@@ -368,8 +381,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		const header = new Setting(containerEl)
-			.setName(STRINGS.plugin.name)
-			.setDesc(STRINGS.plugin.description)
+			.setName(t.PLUGIN_NAME)
+			.setDesc(t.PLUGIN_DESCRIPTION)
 			.setHeading();
 		header.settingEl.addClass("pdf-annotations-settings-header");
 
@@ -377,8 +390,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// goes into the setting's control element, which styles.css widens to
 		// the full row underneath the text.
 		const annotationSetting = new Setting(containerEl)
-			.setName(STRINGS.settings.annotations.name)
-			.setDesc(STRINGS.settings.annotations.desc)
+			.setName(t.SETTING_ANNOTATIONS_NAME)
+			.setDesc(t.SETTING_ANNOTATIONS_DESC)
 			.setHeading();
 		annotationSetting.settingEl.addClass(
 			"pdf-annotations-annotation-setting"
@@ -412,13 +425,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// through descEl because setDesc takes text, and this text has a link
 		// in the middle of it.
 		const templatesHeading = new Setting(containerEl)
-			.setName(STRINGS.settings.templates.heading)
+			.setName(t.SECTION_TEMPLATES)
 			.setHeading();
 		templatesHeading.descEl.addClass("pdf-annotations-template-instructions");
 		this.appendTextWithLink(
 			templatesHeading.descEl,
-			STRINGS.settings.templates.instructions,
-			STRINGS.settings.templates.handlebarsLink,
+			t.SECTION_TEMPLATES_DESC,
+			t.HANDLEBARS_LINK,
 			HANDLEBARS_DOCS
 		);
 
@@ -429,10 +442,10 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.createEl("thead")
 			.createEl("tr");
 		templateVariableHead.createEl("th", {
-			text: STRINGS.settings.templates.variableColumn,
+			text: t.TABLE_VARIABLE,
 		});
 		templateVariableHead.createEl("th", {
-			text: STRINGS.settings.templates.descriptionColumn,
+			text: t.TABLE_DESCRIPTION,
 		});
 
 		const templateVariableBody = templateVariableTable.createEl("tbody");
@@ -463,13 +476,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 		const templateCards = [
 			{
-				name: STRINGS.settings.templates.highlightName,
-				desc: STRINGS.settings.templates.highlightDesc,
+				name: t.SETTING_HIGHLIGHT_TEMPLATE_NAME,
+				desc: t.SETTING_HIGHLIGHT_TEMPLATE_DESC,
 				settingsKey: "highlightTemplate",
 			},
 			{
-				name: STRINGS.settings.templates.noteName,
-				desc: STRINGS.settings.templates.noteDesc,
+				name: t.SETTING_NOTE_TEMPLATE_NAME,
+				desc: t.SETTING_NOTE_TEMPLATE_DESC,
 				settingsKey: "noteTemplate",
 			},
 		];
@@ -485,11 +498,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl)
-			.setName(STRINGS.settings.structure.heading)
+			.setName(t.SECTION_STRUCTURE)
 			.setHeading();
 		new Setting(containerEl)
-			.setName(STRINGS.settings.structure.useStructuringHeadlinesName)
-			.setDesc(STRINGS.settings.structure.useStructuringHeadlinesDesc)
+			.setName(t.SETTING_HEADLINES_NAME)
+			.setDesc(t.SETTING_HEADLINES_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useStructuringHeadlines)
@@ -500,8 +513,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(STRINGS.settings.structure.useFolderNamesName)
-			.setDesc(STRINGS.settings.structure.useFolderNamesDesc)
+			.setName(t.SETTING_FOLDER_NAMES_NAME)
+			.setDesc(t.SETTING_FOLDER_NAMES_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useFolderNames)
@@ -512,8 +525,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(STRINGS.settings.structure.sortByTopicName)
-			.setDesc(STRINGS.settings.structure.sortByTopicDesc)
+			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
+			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.sortByTopic)
@@ -524,19 +537,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.heading)
+			.setName(t.SECTION_NOTE_EXPORT)
 			.setHeading();
 		new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.exportPathName)
-			.setDesc(STRINGS.settings.noteExport.exportPathDesc)
+			.setName(t.SETTING_EXPORT_PATH_NAME)
+			.setDesc(t.SETTING_EXPORT_PATH_DESC)
 			.addText((input) => this.buildValueInput(input, "exportPath"));
 		new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.exportNameName)
-			.setDesc(STRINGS.settings.noteExport.exportNameDesc)
+			.setName(t.SETTING_EXPORT_NAME_NAME)
+			.setDesc(t.SETTING_EXPORT_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "exportName"));
 		new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.oneNotePerAnnotationName)
-			.setDesc(STRINGS.settings.noteExport.oneNotePerAnnotationDesc)
+			.setName(t.SETTING_ONE_NOTE_NAME)
+			.setDesc(t.SETTING_ONE_NOTE_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.oneNotePerAnnotation)
@@ -548,18 +561,18 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 		const oneNotePerAnnotationExportName = new Setting(containerEl)
 			.setName(
-				STRINGS.settings.noteExport.oneNotePerAnnotationExportNameName
+				t.SETTING_ONE_NOTE_EXPORT_NAME_NAME
 			)
 			.setDesc(
-				STRINGS.settings.noteExport.oneNotePerAnnotationExportNameDesc
+				t.SETTING_ONE_NOTE_EXPORT_NAME_DESC
 			)
 			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationExportName"));
 		oneNotePerAnnotationExportName.settingEl.toggleVisibility(
 			this.plugin.settings.oneNotePerAnnotation
 		);
 		new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.overwriteExistingNoteName)
-			.setDesc(STRINGS.settings.noteExport.overwriteExistingNoteDesc)
+			.setName(t.SETTING_OVERWRITE_NAME)
+			.setDesc(t.SETTING_OVERWRITE_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.overwriteExistingNote)
@@ -569,8 +582,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 			new Setting(containerEl)
-			.setName(STRINGS.settings.noteExport.extractTagsName)
-			.setDesc(STRINGS.settings.noteExport.extractTagsDesc)
+			.setName(t.SETTING_EXTRACT_TAGS_NAME)
+			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags)
@@ -581,9 +594,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 		new Setting(containerEl)
 			.setName(
-				STRINGS.settings.noteExport.exportClipboardExtractionName
+				t.SETTING_CLIPBOARD_EXPORT_NAME
 			)
-			.setDesc(STRINGS.settings.noteExport.exportClipboardExtractionDesc)
+			.setDesc(t.SETTING_CLIPBOARD_EXPORT_DESC)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.exportClipboardExtraction)

@@ -13,8 +13,8 @@ import {
 	Vault,
 	Notice,
 } from "obsidian";
+import { t } from "lang/helpers";
 import { loadPDFFile } from "src/extractHighlight";
-import { STRINGS } from "src/locale/en";
 import {
 	DEFAULT_DESIRED_ANNOTATIONS,
 	PDFAnnotationPluginSetting,
@@ -148,7 +148,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal: PDFAnnotation[];
 		pdfFile: PDFFile | null;
 	} {
-		new Notice(STRINGS.notices.clipboardPathIsDesktopOnly);
+		new Notice(t.NOTICE_CLIPBOARD_DESKTOP_ONLY);
 		return { grandtotal: [], pdfFile: null };
 	}
 
@@ -208,10 +208,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 					desiredAnnotations
 				);
 			} else {
-				new Notice(STRINGS.notices.clipboardPathIsNotAFile);
+				new Notice(t.NOTICE_CLIPBOARD_NOT_A_FILE);
 			}
 		} catch (error) {
-			new Notice(STRINGS.notices.clipboardPathUnreadable);
+			new Notice(t.NOTICE_CLIPBOARD_UNREADABLE);
 			console.error(error);
 		}
 		return { grandtotal, pdfFile };
@@ -225,7 +225,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations-single",
-			name: STRINGS.commands.extractCurrentFile,
+			name: t.COMMAND_EXTRACT_CURRENT_FILE,
 			checkCallback: (checking: boolean) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file != null && file.extension === "pdf") {
@@ -233,7 +233,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 						// load file if (not only checking) && conditions are valid
 						this.loadSinglePDFFile(file).catch((error) => {
 							console.error(error);
-							new Notice(STRINGS.notices.extractionFailed);
+							new Notice(t.NOTICE_EXTRACTION_FAILED);
 						});
 					}
 					return true;
@@ -245,7 +245,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations-single-from-clipboard-path",
-			name: STRINGS.commands.extractClipboardPath,
+			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const clipText = await navigator.clipboard.readText();
 				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
@@ -262,7 +262,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations",
-			name: STRINGS.commands.extractCurrentFolder,
+			name: t.COMMAND_EXTRACT_CURRENT_FOLDER,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file == null) return;
@@ -340,14 +340,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.saveSettings();
 			}
 			if (migration.dropped.length > 0) {
-				const outcome =
-					migration.dropped.length > 1
-						? "both"
-						: migration.dropped[0];
-				new Notice(
-					STRINGS.notices.templatesCollapsed[outcome],
-					15000
-				);
+				new Notice(t.NOTICE_TEMPLATES_COLLAPSED, 15000);
 			}
 		}
 	}
@@ -436,7 +429,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.app.workspace.openLinkText(filePath, "", true);
 			} catch (error) {
 				console.error(error);
-				new Notice(STRINGS.notices.exportPathInvalid);
+				new Notice(t.NOTICE_EXPORT_PATH_INVALID);
 			}
 		}
 	}
