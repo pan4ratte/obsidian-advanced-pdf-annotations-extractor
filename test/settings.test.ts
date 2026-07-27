@@ -4,6 +4,7 @@ import {
   DEFAULT_DESIRED_ANNOTATIONS,
   FILE_HEADINGS,
   PDFAnnotationPluginSetting,
+  resolveNotePath,
   SUPPORTED_ANNOTS,
 } from '../src/settings';
 
@@ -91,6 +92,201 @@ describe('desired annotation checkboxes', () => {
     s.desiredAnnotations = ['Text', 'Redact'];
     s.setAnnotationDesired('Highlight', true);
     expect(s.desiredAnnotations).toEqual(['Highlight', 'Text', 'Redact']);
+  });
+});
+
+describe('resolveNotePath', () => {
+  const PDF = {name: 'Paper.pdf', basename: 'Paper', path: 'Papers/2024/Paper.pdf'};
+
+  const resolve = (
+    over: Partial<PDFAnnotationPluginSetting>,
+    subfolder = '',
+    pdf = PDF
+  ) => {
+    const settings = new PDFAnnotationPluginSetting();
+    Object.assign(settings, over);
+    return resolveNotePath(settings, pdf, 'Annotations for Paper.md', subfolder);
+  };
+
+  test('beside the PDF puts the note in the folder the PDF is in', () => {
+    expect(resolve({noteLocation: 'pdf'}))
+      .toBe('Papers/2024/Annotations for Paper.md');
+  });
+
+  test('beside a PDF from outside the vault falls back to the root', () => {
+    const external = {
+      name: 'Paper.pdf', basename: 'Paper', path: 'file://C:/Books/Paper.pdf',
+    };
+    expect(resolve({noteLocation: 'pdf'}, '', external))
+      .toBe('Annotations for Paper.md');
+  });
+
+  test('the note folder is ignored while writing beside the PDF', () => {
+    expect(resolve({noteLocation: 'pdf', noteFolder: 'Notes'}, 'Paper'))
+      .toBe('Papers/2024/Annotations for Paper.md');
+  });
+
+  test('an empty vault folder is the vault root', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: ''}))
+      .toBe('Annotations for Paper.md');
+  });
+
+  test('the note goes in the named vault folder', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: 'Notes/PDFs'}))
+      .toBe('Notes/PDFs/Annotations for Paper.md');
+  });
+
+  test('a rendered subfolder goes under the folder', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: 'Notes'}, 'Paper'))
+      .toBe('Notes/Paper/Annotations for Paper.md');
+  });
+
+  test('a subfolder without a folder sits at the vault root', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: ''}, 'Paper'))
+      .toBe('Paper/Annotations for Paper.md');
+  });
+
+  test('a subfolder template may render a nested path', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: 'Notes'}, '2024/Paper'))
+      .toBe('Notes/2024/Paper/Annotations for Paper.md');
+  });
+
+  test('stray slashes and spaces do not double up or dangle', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: '/Notes/'}, ' Paper '))
+      .toBe('Notes/Paper/Annotations for Paper.md');
+    expect(resolve({noteLocation: 'vault', noteFolder: 'Notes//PDFs'}))
+      .toBe('Notes/PDFs/Annotations for Paper.md');
+    // What the folder suggester offers for the vault root.
+    expect(resolve({noteLocation: 'vault', noteFolder: '/'}))
+      .toBe('Annotations for Paper.md');
+  });
+
+  test('characters a vault path cannot hold are dropped, not passed on', () => {
+    expect(resolve({noteLocation: 'vault', noteFolder: 'Notes'}, 'Paper: a study?'))
+      .toBe('Notes/Paper a study/Annotations for Paper.md');
+  });
+});
+
+describe('normalizeLegacySettings', () => {
+  const normalize = (loaded: Record<string, unknown>) =>
+    PDFAnnotationPluginSetting.normalizeLegacySettings(loaded);
+
+  test('every renamed setting is read back under its new name', () => {
+    const {data, changed} = normalize({
+      exportLocation: 'pdf',
+      exportFolder: 'Notes',
+      exportSubfolder: '{{filename}}',
+      exportName: 'Annotations for {{filename}}',
+      oneNotePerAnnotationExportName: '{{filename}}-{{counter}}',
+    });
+    expect(changed).toBe(true);
+    expect(data).toEqual({
+      noteLocation: 'pdf',
+      noteFolder: 'Notes',
+      noteSubfolder: '{{filename}}',
+      noteName: 'Annotations for {{filename}}',
+      oneNotePerAnnotationName: '{{filename}}-{{counter}}',
+    });
+  });
+
+  test('a value carries over as it is, whatever it holds', () => {
+    expect(normalize({exportName: ''}).data.noteName).toBe('');
+    expect(normalize({exportSubfolder: false}).data.noteSubfolder).toBe(false);
+  });
+
+  test('the old names are gone, so data.json stops carrying them', () => {
+    const {data} = normalize({exportName: 'x'});
+    expect('exportName' in data).toBe(false);
+  });
+
+  test('the setting the clipboard command replaced is dropped, both its names', () => {
+    expect(normalize({exportClipboardExtraction: true})).toEqual({
+      data: {}, changed: true,
+    });
+    expect(normalize({clipboardSavesToNote: true})).toEqual({
+      data: {}, changed: true,
+    });
+  });
+
+  test('settings that were not renamed are left alone', () => {
+    const {data, changed} = normalize({sortByTopic: false, noteTemplate: '{{body}}'});
+    expect(changed).toBe(false);
+    expect(data).toEqual({sortByTopic: false, noteTemplate: '{{body}}'});
+  });
+
+  test('a name this version writes wins over the one it replaced', () => {
+    // Only reachable by editing data.json by hand, but the newer name is the
+    // one this version would have written.
+    const {data} = normalize({exportName: 'old', noteName: 'new'});
+    expect(data.noteName).toBe('new');
+    expect('exportName' in data).toBe(false);
+  });
+
+  test('the data.json it was given is not changed underneath the caller', () => {
+    const loaded = {exportName: 'x'};
+    normalize(loaded);
+    expect(loaded).toEqual({exportName: 'x'});
+  });
+
+  test('the export path is left for the migration that splits it', () => {
+    const {data, changed} = normalize({exportPath: './'});
+    expect(changed).toBe(false);
+    expect(data.exportPath).toBe('./');
+  });
+});
+
+describe('migrateNotePath', () => {
+  const migrate = (loaded: Record<string, unknown>) => {
+    const settings = new PDFAnnotationPluginSetting();
+    const migrated = PDFAnnotationPluginSetting.migrateNotePath(loaded, settings);
+    return {
+      location: settings.noteLocation,
+      folder: settings.noteFolder,
+      migrated,
+    };
+  };
+
+  test('defaults to the vault root, as the empty path before it did', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    expect(defaults.noteLocation).toBe('vault');
+    expect(defaults.noteFolder).toBe('');
+    expect(defaults.noteSubfolder).toBe('');
+  });
+
+  test("the old './' becomes writing beside the PDF", () => {
+    expect(migrate({exportPath: './'})).toEqual({
+      location: 'pdf', folder: '', migrated: true,
+    });
+  });
+
+  test('an old vault path keeps its folder, without the trailing slash', () => {
+    expect(migrate({exportPath: 'Notes/PDFs/'})).toEqual({
+      location: 'vault', folder: 'Notes/PDFs', migrated: true,
+    });
+  });
+
+  test('an old empty path is the vault root', () => {
+    expect(migrate({exportPath: ''})).toEqual({
+      location: 'vault', folder: '', migrated: true,
+    });
+  });
+
+  test('a data.json that already names a location is left alone', () => {
+    expect(migrate({noteLocation: 'pdf', exportPath: 'Notes/'})).toEqual({
+      location: 'pdf', folder: '', migrated: false,
+    });
+  });
+
+  test('a location this version does not know falls back to the vault', () => {
+    expect(migrate({noteLocation: 'desktop'})).toEqual({
+      location: 'vault', folder: '', migrated: true,
+    });
+  });
+
+  test('a data.json from before either field gets the defaults', () => {
+    expect(migrate({sortByTopic: false})).toEqual({
+      location: 'vault', folder: '', migrated: false,
+    });
   });
 });
 

@@ -7,7 +7,8 @@ export default {
 
     // ─── Commands ────────────────────────────────────────────────────────────────
     COMMAND_EXTRACT_CURRENT_FILE: "Extract from the current file",
-    COMMAND_EXTRACT_CLIPBOARD_PATH: "Extract from the file path in the clipboard",
+    COMMAND_EXTRACT_CLIPBOARD_PATH: "Extract from the file path in the clipboard into the current note",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract from the file path in the clipboard into a new note",
     COMMAND_EXTRACT_CURRENT_FOLDER: "Extract from every PDF in the current folder",
 
     // ─── Notices ─────────────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ export default {
     NOTICE_CLIPBOARD_NOT_A_FILE: "The path in the clipboard is not a file.",
     NOTICE_CLIPBOARD_UNREADABLE: "The clipboard does not contain a readable file path.",
     NOTICE_EXTRACTION_FAILED: "Could not extract the annotations of this PDF.",
-    NOTICE_EXPORT_PATH_INVALID: "Error creating note with annotations, because the notes export path is invalid. Please check the file path in the settings. Folders must exist.",
+    NOTICE_NOTE_PATH_INVALID: "Could not create the note with the annotations: the vault will not take that path. Check the note folder, subfolder and name in the settings.",
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard.",
     NOTICE_TEMPLATES_COLLAPSED: "The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. A template of yours for PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.",
@@ -28,8 +29,8 @@ export default {
     NOTE_NO_DATE: "No date",
     DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
     DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
-    DEFAULT_EXPORT_NAME: "Annotations for {{filename}}",
-    DEFAULT_ONE_NOTE_EXPORT_NAME: "Annotations for {{filename}}-{{counter}}",
+    DEFAULT_NOTE_NAME: "Annotations for {{filename}}",
+    DEFAULT_ONE_NOTE_NAME: "Annotations for {{filename}}-{{counter}}",
 
     // ─── Annotation types ────────────────────────────────────────────────────────
     ANNOT_HIGHLIGHT: "Highlighted text",
@@ -50,7 +51,7 @@ export default {
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Body of the annotation",
     VAR_TOPIC: "First line of the body, when grouping by topic is enabled",
-    VAR_CREATED: "Day the annotation was made, as YYYY-MM-DD, empty when the PDF gives no date",
+    VAR_CREATED: "Day the annotation was made, like 2024-01-15, empty when the PDF gives no date",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
     // ─── Settings: annotations ───────────────────────────────────────────────────
@@ -85,7 +86,6 @@ export default {
 
     // ─── Settings: headings ──────────────────────────────────────────────────────
     SECTION_HEADINGS: "Headings",
-    SECTION_HEADINGS_DESC: "The only text written between the annotations. Each heading is written once, where its group starts, rather than above every annotation — that is all these do that a template cannot. Whichever heading encloses the other takes the first level, so the note reads as an outline. Turn both off to get nothing but your templates.",
     SETTING_DATE_HEADING_NAME: "Heading above each date",
     SETTING_DATE_HEADING_DESC: "Writes the day as a heading where it changes. Available only while grouping by creation date.",
     SETTING_TOPIC_HEADING_NAME: "Heading above each topic",
@@ -96,20 +96,26 @@ export default {
     OPTION_FILE_HEADING_FILE: "File name",
     OPTION_FILE_HEADING_NONE: "No heading",
 
-    // ─── Settings: note export ───────────────────────────────────────────────────
-    SECTION_NOTE_EXPORT: "Note export",
-    SETTING_EXPORT_PATH_NAME: "Notes export path",
-    SETTING_EXPORT_PATH_DESC: "The path to which the notes, including the extracted annotations, will be exported. The path can be dynamic './' to create a note next to the PDF or it has to be relative to the vault root. Paths must end with a '/'. Leave blank to export to the vault root.",
-    SETTING_EXPORT_NAME_NAME: "Notes export name",
-    SETTING_EXPORT_NAME_DESC: "The name of the note to which the notes, including the extracted annotations, will be exported. You can use the variable '{{filename}}' to use the PDF's filename and combine it with prefix or suffix. If you don't use the variable all notes will be exported to the same file until you change the name.",
+    // ─── Settings: notes ─────────────────────────────────────────────────────────
+    SECTION_NOTES: "Notes",
+    SETTING_NOTE_LOCATION_NAME: "Note location",
+    SETTING_NOTE_LOCATION_DESC: "Where the notes with the extracted annotations are written. A PDF opened from outside the vault has no folder in it to sit beside, so its notes go to the vault root either way.",
+    OPTION_NOTE_LOCATION_PDF: "Beside the PDF",
+    OPTION_NOTE_LOCATION_VAULT: "In a folder of the vault",
+    SETTING_NOTE_FOLDER_NAME: "Note folder",
+    SETTING_NOTE_FOLDER_DESC: "The folder in the vault the notes are written to. Start typing to pick one. Leave blank for the vault root.",
+    SETTING_NOTE_SUBFOLDER_NAME: "Note subfolder",
+    SETTING_NOTE_SUBFOLDER_DESC: "A folder inside the one above to put the notes in, named by this template — '{{filename}}' gives each PDF a folder of its own. Missing folders are created. Leave blank to write the notes straight into the folder above.",
+    PLACEHOLDER_VAULT_ROOT: "Vault root",
+    PLACEHOLDER_NO_SUBFOLDER: "No subfolder",
+    SETTING_NOTE_NAME_NAME: "Note name",
+    SETTING_NOTE_NAME_DESC: "What the note is called, as a template. '{{filename}}' is the PDF's name, so a note can be named after the PDF it came from and given a prefix or suffix. Without it every PDF writes to the same note.",
     SETTING_ONE_NOTE_NAME: "One note per annotation",
-    SETTING_ONE_NOTE_DESC: "If enabled, every annotation is exported to a separate note.",
-    SETTING_ONE_NOTE_EXPORT_NAME_NAME: "One note per annotation - export name",
-    SETTING_ONE_NOTE_EXPORT_NAME_DESC: "The name of the notes to which each extracted annotation will be exported. You can use the variable '{{filename}}' to use the PDF's filename and combine it with prefix or suffix. Additionally you should use the variable '{{counter}}' to add the index of the exported annotation.",
+    SETTING_ONE_NOTE_DESC: "If enabled, every annotation gets a note of its own.",
+    SETTING_ONE_NOTE_NAME_NAME: "One note per annotation - note name",
+    SETTING_ONE_NOTE_NAME_DESC: "What each of those notes is called, as a template. '{{filename}}' is the PDF's name; add '{{counter}}' for the annotation's number, without which they would all be the same note.",
     SETTING_OVERWRITE_NAME: "Overwrite existing note",
-    SETTING_OVERWRITE_DESC: "If enabled, the plugin will overwrite the content of an existing note with the same name.",
+    SETTING_OVERWRITE_DESC: "If enabled, a note of the same name is replaced rather than added to.",
     SETTING_EXTRACT_TAGS_NAME: "Extract tags in annotations as Obsidian tags",
     SETTING_EXTRACT_TAGS_DESC: "If enabled, the plugin will extract tags from the annotations and add them as Obsidian tags to the note's header.",
-    SETTING_CLIPBOARD_EXPORT_NAME: "Export annotations from clipboard path to file",
-    SETTING_CLIPBOARD_EXPORT_DESC: "When enabled, the clipboard path command saves annotations to a file using the export settings above, instead of inserting them into the note you are editing.",
 };

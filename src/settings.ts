@@ -1,4 +1,5 @@
 import {
+	AbstractInputSuggest,
 	AbstractTextComponent,
 	App,
 	DropdownComponent,
@@ -7,11 +8,12 @@ import {
 	setIcon,
 	Setting,
 	setTooltip,
+	TextComponent,
 	ToggleComponent,
 } from "obsidian";
 import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
-import { asIndexable } from "src/types";
+import { asIndexable, FileMeta } from "src/types";
 
 // The variable names are the interface — what a template types — so they live
 // here; only their descriptions are translated. The whole annotation is
@@ -137,6 +139,80 @@ const LEGACY_TEMPLATE_PAIRS = [
 export const FILE_HEADINGS = ["folder", "file", "none"] as const;
 export type FileHeading = (typeof FILE_HEADINGS)[number];
 
+/**
+ * Where the notes go: beside the PDF they came from, or somewhere in the vault
+ * the reader picked.
+ */
+export const NOTE_LOCATIONS = ["pdf", "vault"] as const;
+export type NoteLocation = (typeof NOTE_LOCATIONS)[number];
+
+/**
+ * Settings renamed when the ones deciding where a note goes stopped calling it
+ * an export — nothing leaves Obsidian, the notes are written into the vault.
+ * Old name to new. Only the names changed; every value carries over as it is.
+ */
+const RENAMED_SETTINGS: Record<string, string> = {
+	exportLocation: "noteLocation",
+	exportFolder: "noteFolder",
+	exportSubfolder: "noteSubfolder",
+	exportName: "noteName",
+	oneNotePerAnnotationExportName: "oneNotePerAnnotationName",
+};
+
+/**
+ * Settings this version no longer has, cleared out of data.json rather than
+ * left behind for a reader to wonder about. Whether the clipboard command
+ * wrote a note is a command of its own now, so there is nothing left to carry
+ * the old value over to.
+ */
+const REMOVED_SETTINGS = [
+	"exportClipboardExtraction",
+	"clipboardSavesToNote",
+];
+
+/** Characters Obsidian will not take in a path, whatever a template renders. */
+const ILLEGAL_PATH_CHARS = /[\\:*?"<>|]/g;
+
+/**
+ * A folder as a path can use it: no leading, trailing or doubled slashes, no
+ * characters Obsidian rejects, and every part trimmed. A nested path survives —
+ * a subfolder template is allowed to render one — an empty one comes back empty.
+ */
+function cleanFolderPath(value: string): string {
+	return value
+		.replace(ILLEGAL_PATH_CHARS, "")
+		.split("/")
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0)
+		.join("/");
+}
+
+/**
+ * Where one note is written. Kept out of the plugin class so it can be
+ * checked on its own: `subfolder` arrives already rendered, since the templates
+ * are compiled there.
+ */
+export function resolveNotePath(
+	settings: PDFAnnotationPluginSetting,
+	pdfFile: FileMeta,
+	fileNameOfNote: string,
+	subfolder = ""
+): string {
+	if (settings.noteLocation === "pdf") {
+		// A PDF outside the vault has no folder inside it to sit beside, so
+		// its notes fall back to the vault root.
+		if (pdfFile.path.startsWith("file://")) return fileNameOfNote;
+		return pdfFile.path.replace(pdfFile.name, fileNameOfNote);
+	}
+
+	const folder = [settings.noteFolder, subfolder]
+		.map(cleanFolderPath)
+		.filter((part) => part.length > 0)
+		.join("/");
+
+	return folder ? `${folder}/${fileNameOfNote}` : fileNameOfNote;
+}
+
 const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
 
 /** `[[{{filepath}}]]` as the internal templates wrote it, spacing included. */
@@ -164,8 +240,15 @@ export class PDFAnnotationPluginSetting {
 	public groupByFolder: boolean;
 	public groupByDate: boolean;
 	public sortByTopic: boolean;
-	public exportPath: string;
-	public exportName: string;
+	public noteLocation: NoteLocation;
+	/** Vault-relative folder the notes go in, empty for the vault root. */
+	public noteFolder: string;
+	/**
+	 * Template for a folder under `noteFolder` to put the notes in. Empty to
+	 * put them straight into it.
+	 */
+	public noteSubfolder: string;
+	public noteName: string;
 	public desiredAnnotations: string[];
 	public noteTemplate: string;
 	public highlightTemplate: string;
@@ -176,10 +259,9 @@ export class PDFAnnotationPluginSetting {
 	 */
 	public legacyExternalTemplates: Record<string, string>;
 	public oneNotePerAnnotation: boolean;
-	public oneNotePerAnnotationExportName: string;
+	public oneNotePerAnnotationName: string;
 	public overwriteExistingNote: boolean;
 	public extractTagsFromAnnotationsAsObsidianTags: boolean;
-	public exportClipboardExtraction: boolean;
 
 	constructor() {
 		this.topicHeading = true;
@@ -189,18 +271,19 @@ export class PDFAnnotationPluginSetting {
 		// Off, so an upgrade does not reorder notes nobody asked to reorder.
 		this.groupByDate = false;
 		this.sortByTopic = true;
-		this.exportPath = "";
-		this.exportName = t.DEFAULT_EXPORT_NAME;
+		this.noteLocation = "vault";
+		this.noteFolder = "";
+		this.noteSubfolder = "";
+		this.noteName = t.DEFAULT_NOTE_NAME;
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
 		this.noteTemplate = t.DEFAULT_NOTE_TEMPLATE;
 		this.highlightTemplate = t.DEFAULT_HIGHLIGHT_TEMPLATE;
 		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotation = false;
-		this.oneNotePerAnnotationExportName =
-			t.DEFAULT_ONE_NOTE_EXPORT_NAME;
+		this.oneNotePerAnnotationName =
+			t.DEFAULT_ONE_NOTE_NAME;
 		this.overwriteExistingNote = false;
 		this.extractTagsFromAnnotationsAsObsidianTags = false;
-		this.exportClipboardExtraction = false;
 	}
 
 	public isAnnotationDesired(annotationType: string): boolean {
@@ -351,6 +434,79 @@ export class PDFAnnotationPluginSetting {
 	}
 
 	/**
+	 * A data.json under the names those settings used to have, read back under
+	 * the ones they have now, and without the ones this version dropped.
+	 * Returns a copy, so the migrations that follow and the load itself all see
+	 * one set of names, along with whether anything was read that way — the
+	 * settings are written back if so, and the old names leave data.json for
+	 * good.
+	 *
+	 * A name this version already writes wins over the one it replaced, which
+	 * can only both be there if a data.json was edited by hand.
+	 */
+	public static normalizeLegacySettings(loaded: Record<string, unknown>): {
+		data: Record<string, unknown>;
+		changed: boolean;
+	} {
+		const data = { ...loaded };
+		let changed = false;
+
+		for (const [was, is] of Object.entries(RENAMED_SETTINGS)) {
+			if (!(was in data)) continue;
+			if (!(is in data)) {
+				data[is] = data[was];
+			}
+			delete data[was];
+			changed = true;
+		}
+
+		for (const gone of REMOVED_SETTINGS) {
+			if (!(gone in data)) continue;
+			delete data[gone];
+			changed = true;
+		}
+
+		return { data, changed };
+	}
+
+	/**
+	 * Older versions stored one `exportPath` string, where the literal `./`
+	 * meant "beside the PDF" and anything else was a vault folder that had to
+	 * end in a slash. Split it into the location it was choosing between and
+	 * the folder it named.
+	 *
+	 * `loaded` is the raw data.json, since `exportPath` no longer exists on this
+	 * class. Returns whether anything was migrated, so the caller can write the
+	 * settings back.
+	 */
+	public static migrateNotePath(
+		loaded: Record<string, unknown>,
+		settings: PDFAnnotationPluginSetting
+	): boolean {
+		const location = loaded.noteLocation;
+		if (typeof location === "string") {
+			const known = NOTE_LOCATIONS.includes(location as NoteLocation);
+			settings.noteLocation = known
+				? (location as NoteLocation)
+				: "vault";
+			return !known;
+		}
+
+		if (typeof loaded.exportPath !== "string") return false;
+
+		if (loaded.exportPath.trim() === "./") {
+			settings.noteLocation = "pdf";
+			settings.noteFolder = "";
+		} else {
+			// Anything else was a vault folder, written with the trailing
+			// slash the old setting demanded.
+			settings.noteLocation = "vault";
+			settings.noteFolder = cleanFolderPath(loaded.exportPath);
+		}
+		return true;
+	}
+
+	/**
 	 * data.json is written by users and by older versions of this plugin, which
 	 * stored the selection as a comma separated string. Accept both, and drop
 	 * anything that is not a list of subtypes.
@@ -370,6 +526,26 @@ export class PDFAnnotationPluginSetting {
 			return subtypes.length === entries.length ? subtypes : null;
 		}
 		return null;
+	}
+}
+
+/**
+ * Type-ahead over the vault's folders, for the setting that names one. Every
+ * folder is offered on an empty query, so the field can be browsed as well as
+ * typed into; the root is offered as `/`, which resolves to the vault root the
+ * same way an empty field does.
+ */
+class FolderSuggest extends AbstractInputSuggest<string> {
+	getSuggestions(query: string): string[] {
+		const wanted = query.toLowerCase();
+		return this.app.vault
+			.getAllFolders(true)
+			.map((folder) => folder.path)
+			.filter((path) => path.toLowerCase().includes(wanted));
+	}
+
+	renderSuggestion(path: string, el: HTMLElement): void {
+		el.setText(path);
 	}
 }
 
@@ -779,7 +955,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName(t.SECTION_HEADINGS)
-			.setDesc(t.SECTION_HEADINGS_DESC)
 			.setHeading();
 		new Setting(containerEl)
 			.setName(t.SETTING_DATE_HEADING_NAME)
@@ -829,16 +1004,67 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(t.SECTION_NOTE_EXPORT)
+			.setName(t.SECTION_NOTES)
 			.setHeading();
+		// The folder and the subfolder are only somewhere to put a note when
+		// the note is going into the vault rather than beside its PDF.
+		let noteFolderInput!: TextComponent;
+		let noteSubfolderInput!: TextComponent;
+		const syncNoteTarget = () => {
+			const intoVault = this.plugin.settings.noteLocation === "vault";
+			noteFolderInput.setDisabled(!intoVault);
+			noteSubfolderInput.setDisabled(!intoVault);
+		};
+
 		new Setting(containerEl)
-			.setName(t.SETTING_EXPORT_PATH_NAME)
-			.setDesc(t.SETTING_EXPORT_PATH_DESC)
-			.addText((input) => this.buildValueInput(input, "exportPath"));
+			.setName(t.SETTING_NOTE_LOCATION_NAME)
+			.setDesc(t.SETTING_NOTE_LOCATION_DESC)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						pdf: t.OPTION_NOTE_LOCATION_PDF,
+						vault: t.OPTION_NOTE_LOCATION_VAULT,
+					})
+					.setValue(this.plugin.settings.noteLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.noteLocation =
+							value as NoteLocation;
+						syncNoteTarget();
+						await this.plugin.saveSettings();
+					})
+			);
+		const noteFolderSetting = new Setting(containerEl)
+			.setName(t.SETTING_NOTE_FOLDER_NAME)
+			.setDesc(t.SETTING_NOTE_FOLDER_DESC)
+			.addText((input) => {
+				noteFolderInput = input;
+				input.setPlaceholder(t.PLACEHOLDER_VAULT_ROOT);
+				this.buildValueInput(input, "noteFolder");
+				new FolderSuggest(this.app, input.inputEl).onSelect(
+					async (folder) => {
+						input.setValue(folder);
+						this.plugin.settings.noteFolder = folder;
+						await this.plugin.saveSettings();
+					}
+				);
+			});
+		noteFolderSetting.settingEl.addClass("pdf-annotations-stacked-setting");
+		const noteSubfolderSetting = new Setting(containerEl)
+			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
+			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
+			.addText((input) => {
+				noteSubfolderInput = input;
+				input.setPlaceholder(t.PLACEHOLDER_NO_SUBFOLDER);
+				this.buildValueInput(input, "noteSubfolder");
+			});
+		noteSubfolderSetting.settingEl.addClass(
+			"pdf-annotations-stacked-setting"
+		);
+		syncNoteTarget();
 		new Setting(containerEl)
-			.setName(t.SETTING_EXPORT_NAME_NAME)
-			.setDesc(t.SETTING_EXPORT_NAME_DESC)
-			.addText((input) => this.buildValueInput(input, "exportName"));
+			.setName(t.SETTING_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_NOTE_NAME_DESC)
+			.addText((input) => this.buildValueInput(input, "noteName"));
 		new Setting(containerEl)
 			.setName(t.SETTING_ONE_NOTE_NAME)
 			.setDesc(t.SETTING_ONE_NOTE_DESC)
@@ -847,19 +1073,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.oneNotePerAnnotation)
 					.onChange(async (value) => {
 						this.plugin.settings.oneNotePerAnnotation = value;
-						oneNotePerAnnotationExportName.settingEl.toggleVisibility(value);
+						oneNotePerAnnotationName.settingEl.toggleVisibility(value);
 						await this.plugin.saveSettings();
 					})
 			);
-		const oneNotePerAnnotationExportName = new Setting(containerEl)
+		const oneNotePerAnnotationName = new Setting(containerEl)
 			.setName(
-				t.SETTING_ONE_NOTE_EXPORT_NAME_NAME
+				t.SETTING_ONE_NOTE_NAME_NAME
 			)
 			.setDesc(
-				t.SETTING_ONE_NOTE_EXPORT_NAME_DESC
+				t.SETTING_ONE_NOTE_NAME_DESC
 			)
-			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationExportName"));
-		oneNotePerAnnotationExportName.settingEl.toggleVisibility(
+			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationName"));
+		oneNotePerAnnotationName.settingEl.toggleVisibility(
 			this.plugin.settings.oneNotePerAnnotation
 		);
 		new Setting(containerEl)
@@ -881,19 +1107,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags)
 					.onChange(async (value) => {
 						this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags = value;
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName(
-				t.SETTING_CLIPBOARD_EXPORT_NAME
-			)
-			.setDesc(t.SETTING_CLIPBOARD_EXPORT_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.exportClipboardExtraction)
-					.onChange(async (value) => {
-						this.plugin.settings.exportClipboardExtraction = value;
 						await this.plugin.saveSettings();
 					})
 			);

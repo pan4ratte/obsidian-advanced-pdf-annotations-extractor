@@ -21,6 +21,25 @@ export class PluginSettingTab {
 	containerEl: HTMLElement;
 }
 
+/**
+ * The other base class `src/settings.ts` extends at import time, for the
+ * folder type-ahead. Its behaviour belongs to Obsidian's popover machinery and
+ * is not exercised here either.
+ */
+export class AbstractInputSuggest<T> {
+
+	/** @public */
+	app: App;
+
+	constructor(app: App, _textInputEl: HTMLInputElement) {
+		this.app = app;
+	}
+
+	onSelect(_callback: (value: T, evt: MouseEvent | KeyboardEvent) => unknown): this {
+		return this;
+	}
+}
+
 export class App {
 
 	/** @public */

@@ -18,6 +18,18 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   zone are deliberately not read: a zone would move an annotation to the day
   before or after depending on where the note is read.
 - `{{created}}` template variable, holding that same day.
+- A command for writing a PDF from outside the vault to a note of its own:
+  *Extract from the file path in the clipboard into a new note*. The command
+  that was there inserts into the note being edited, so it needs one open and
+  offers nothing to a reader who wants a note per PDF; this one needs no editor
+  at all. Its name says which of the two it is now, rather than leaving that to
+  a setting.
+- A subfolder for the exported notes, named by a template. With
+  *Notes export subfolder* set to `{{filename}}`, every PDF's notes go in a
+  folder of its own under the export folder. Missing folders are created, which
+  the export did not do before — a path that did not exist was reported as
+  invalid instead. A template may render a nested path; characters a vault path
+  cannot hold are dropped.
 
 - `{{topic}}` template variable, holding the first line of the annotation body
   when grouping by topic is enabled. It was already reachable but undocumented.
@@ -25,31 +37,28 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   type, so it captures the struck out text the way highlights, underlines and
   squigglies do. Not enabled by default — tick it in the settings.
 
-### Fixed
-
-- A file heading that says the same thing throughout a note is written once, at
-  the top, instead of above every annotation. Each topic started the file
-  headings over, so that a topic reading from several files says which one each
-  annotation came from — but the topics are the annotations' own first lines, so
-  as soon as the comments differ every annotation is its own topic, and a note
-  extracted from a single PDF repeated one unchanging heading all the way down.
-  Such a heading now heads the note, above the topics rather than under the
-  first of them. It is still repeated per topic when the annotations really do
-  come from more than one folder or file, which is the case it was there for.
-- A PDF in the vault root is headed `Vault root` under *Heading above each
-  file* → *Folder name*. It has no folder to name, and the empty heading it
-  produced was indistinguishable from no heading at all.
-
-- Headings are levelled by what encloses what, so a note reads as an outline
-  and the outline pane follows it. The topic heading was always a first-level
-  one and the file heading always a second-level one, which put an `h2` over the
-  `h1`s in a note headed by its file. Whichever of the two encloses the other
-  takes the first level now: the file when one unchanging heading heads the
-  note, the topic when the files vary and each topic lists the ones it reads
-  from, and whichever is on its own when only one of them is written.
-- Every heading is followed by a blank line.
-
 ### Changed
+
+- The settings that decide where a note goes and what it is called no longer
+  call it an export. Nothing leaves Obsidian: the annotations are read out of a
+  PDF and the notes are written into the vault, so *Note export* is now simply
+  *Notes*, holding *Note location*, *Note folder*, *Note subfolder* and *Note
+  name*. The descriptions that said a note would be "exported to" a note say
+  what they set instead, and the one for the clipboard command says it writes a
+  note rather than exporting to a file. The names in `data.json` follow —
+  `exportName` is `noteName`, `exportClipboardExtraction` is
+  `clipboardSavesToNote`, and so on — read back under their new names on first
+  load, with every value kept. A `data.json` edited by hand keeps whichever of
+  the two names this version writes.
+- **Breaking:** *Notes export path* is now *Note location*, a choice
+  between writing the notes beside their PDF and writing them into a folder of
+  the vault, with the folder named in a field of its own that offers the vault's
+  folders as you type. The one path field before it meant both things at once
+  through a literal `./`, needed a trailing slash to work, and gave no hint that
+  a folder had to already exist. On first load an existing path is split into
+  the two: `./` becomes *Beside the PDF*, anything else the folder it named.
+  The folder and subfolder fields are greyed out while the notes go beside their
+  PDF, which has no folder of the vault to put them in.
 
 - Grouping by topic no longer depends on the headings setting. The first line of
   a comment was only split off into `{{topic}}` while headings were enabled, so
@@ -134,12 +143,37 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Removed
 
+- *Export annotations from clipboard path to file*, which changed what the
+  clipboard command did behind its own name. The two things it chose between
+  are two commands now, each saying which it is. Its value is dropped from
+  `data.json`.
+
 - `versions.json`, `version-bump.mjs`, the `npm run version` script and `.npmrc`.
   Versions are now bumped by editing `manifest.json` and `package.json` together;
   the release workflow tags from `manifest.json`.
 
 ### Fixed
 
+- A file heading that says the same thing throughout a note is written once, at
+  the top, instead of above every annotation. Each topic started the file
+  headings over, so that a topic reading from several files says which one each
+  annotation came from — but the topics are the annotations' own first lines, so
+  as soon as the comments differ every annotation is its own topic, and a note
+  extracted from a single PDF repeated one unchanging heading all the way down.
+  Such a heading now heads the note, above the topics rather than under the
+  first of them. It is still repeated per topic when the annotations really do
+  come from more than one folder or file, which is the case it was there for.
+- A PDF in the vault root is headed `Vault root` under *Heading above each
+  file* → *Folder name*. It has no folder to name, and the empty heading it
+  produced was indistinguishable from no heading at all.
+- Headings are levelled by what encloses what, so a note reads as an outline and
+  the outline pane follows it. The topic heading was always a first-level one
+  and the file heading always a second-level one, which put an `h2` over the
+  `h1`s in a note headed by its file. Whichever of the two encloses the other
+  takes the first level now: the file when one unchanging heading heads the
+  note, the topic when the files vary and each topic lists the ones it reads
+  from, and whichever is on its own when only one of them is written.
+- Every heading is followed by a blank line.
 - The `{{file}}` template variable was documented as the file's binary content
   but rendered `[object Object]`. Replaced by `{{filename}}`, the PDF's name
   without its extension. `{{annotation.file}}` still holds the file itself.

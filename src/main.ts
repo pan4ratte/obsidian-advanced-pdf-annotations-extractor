@@ -19,6 +19,7 @@ import {
 	DEFAULT_DESIRED_ANNOTATIONS,
 	PDFAnnotationPluginSetting,
 	PDFAnnotationPluginSettingTab,
+	resolveNotePath,
 } from "src/settings";
 import {
 	asIndexable,
@@ -109,7 +110,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			desiredAnnotations
 		);
 		this.sort(grandtotal);
-		await this.exportAnnotations(pdfFile, grandtotal, false);
+		await this.writeNotes(pdfFile, grandtotal, false);
 	}
 	private extractTagsFromAnnotationsAndAddHeaderToNote(note: string, annotations: PDFAnnotation[]): string {
 		// Use Set instead of Array to eliminate duplicates
@@ -130,33 +131,33 @@ export default class PDFAnnotationPlugin extends Plugin {
 		return note;
 	}
 
-	private async exportAnnotations(
+	private async writeNotes(
 		fileMeta: FileMeta,
 		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean
 	): Promise<void> {
 		if (this.settings.oneNotePerAnnotation) {
 			// Written one after another: concurrent writes to the same note (when
-			// the export name lacks {{counter}}) would race each other.
+			// the note name lacks {{counter}}) would race each other.
 			for (const [index, anno] of grandtotal.entries()) {
 				let note = this.formatter.format([anno], isExternalFile);
-				const fileNameOfExportNote =
-					this.getResolvedOneNotePerAnnotationExportName(fileMeta, index + 1) + ".md";
-				const filePathOfExportNote = this.getResolvedExportPath(fileMeta, fileNameOfExportNote);
+				const fileNameOfNote =
+					this.getResolvedOneNotePerAnnotationName(fileMeta, index + 1) + ".md";
+				const filePathOfNote = this.getResolvedNotePath(fileMeta, fileNameOfNote);
 				if (this.settings.extractTagsFromAnnotationsAsObsidianTags) {
 					note = this.extractTagsFromAnnotationsAndAddHeaderToNote(note, [anno]);
 				}
-				await this.saveHighlightsToFileAndOpenIt(filePathOfExportNote, note, this.settings.overwriteExistingNote);
+				await this.saveHighlightsToFileAndOpenIt(filePathOfNote, note, this.settings.overwriteExistingNote);
 			}
 		} else {
 			let finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
-			const fileNameOfExportNote =
-				this.getResolvedExportName(fileMeta) + ".md";
-			const filePathOfExportNote = this.getResolvedExportPath(fileMeta, fileNameOfExportNote);
+			const fileNameOfNote =
+				this.getResolvedNoteName(fileMeta) + ".md";
+			const filePathOfNote = this.getResolvedNotePath(fileMeta, fileNameOfNote);
 			if (this.settings.extractTagsFromAnnotationsAsObsidianTags) {
 				finalMarkdown = this.extractTagsFromAnnotationsAndAddHeaderToNote(finalMarkdown, grandtotal);
 			}
-			await this.saveHighlightsToFileAndOpenIt(filePathOfExportNote, finalMarkdown, this.settings.overwriteExistingNote);
+			await this.saveHighlightsToFileAndOpenIt(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote);
 		}
 	}
 
@@ -267,11 +268,24 @@ export default class PDFAnnotationPlugin extends Plugin {
 				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
 				if (result.pdfFile) {
 					this.sort(result.grandtotal);
-					if (this.settings.exportClipboardExtraction) {
-						await this.exportAnnotations(result.pdfFile, result.grandtotal, true);
-					} else {
-						editor.replaceSelection(this.formatter.format(result.grandtotal, true));
-					}
+					editor.replaceSelection(this.formatter.format(result.grandtotal, true));
+				}
+			},
+		});
+
+		// A command of its own rather than a setting on the one above, so a PDF
+		// outside the vault can be written to a note without a note open to
+		// insert it into first — and without the other command quietly doing
+		// something else than its name says.
+		this.addCommand({
+			id: "extract-annotations-single-from-clipboard-path-to-note",
+			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE,
+			callback: async () => {
+				const clipText = await navigator.clipboard.readText();
+				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
+				if (result.pdfFile) {
+					this.sort(result.grandtotal);
+					await this.writeNotes(result.pdfFile, result.grandtotal, true);
 				}
 			},
 		});
@@ -328,11 +342,19 @@ export default class PDFAnnotationPlugin extends Plugin {
 			| Record<string, unknown>
 			| null;
 		if (loadedSettings) {
+			// Several settings were renamed and one dropped. Read them back
+			// under the names this version knows first, so the copy below and
+			// every migration after it see one set of names rather than two.
+			const { data: settingsData, changed: legacyNames } =
+				PDFAnnotationPluginSetting.normalizeLegacySettings(
+					loadedSettings
+				);
+
 			// Every field the settings object declares, so a new setting cannot be
 			// forgotten here and silently never load.
 			Object.keys(this.settings).forEach((setting) => {
-				if (setting in loadedSettings) {
-					asIndexable(this.settings)[setting] = loadedSettings[setting];
+				if (setting in settingsData) {
+					asIndexable(this.settings)[setting] = settingsData[setting];
 				}
 			});
 
@@ -351,17 +373,28 @@ export default class PDFAnnotationPlugin extends Plugin {
 			// across above.
 			const structureMigrated =
 				PDFAnnotationPluginSetting.migrateStructure(
-					loadedSettings,
+					settingsData,
 					this.settings
 				);
+
+			// Where a note goes used to be one string with a magic './' in it.
+			const pathMigrated = PDFAnnotationPluginSetting.migrateNotePath(
+				settingsData,
+				this.settings
+			);
 
 			// Written back at once, so data.json stops carrying the four
 			// template fields this version no longer reads.
 			const migration = PDFAnnotationPluginSetting.migrateTemplates(
-				loadedSettings,
+				settingsData,
 				this.settings
 			);
-			if (migration.migrated || structureMigrated) {
+			if (
+				migration.migrated ||
+				structureMigrated ||
+				pathMigrated ||
+				legacyNames
+			) {
 				await this.saveSettings();
 			}
 			if (migration.dropped.length > 0) {
@@ -376,15 +409,15 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	onunload() {}
 
-	get exportNameTemplate(): Template {
-		return compileTemplate(this.settings.exportName, this.templateSettings);
+	get noteNameTemplate(): Template {
+		return compileTemplate(this.settings.noteName, this.templateSettings);
 	}
 
-	get oneNotePerAnnotationExportNameTemplate(): Template {
-		return compileTemplate(this.settings.oneNotePerAnnotationExportName, this.templateSettings);
+	get oneNotePerAnnotationNameTemplate(): Template {
+		return compileTemplate(this.settings.oneNotePerAnnotationName, this.templateSettings);
 	}
 
-	getTemplateVariablesForExportName(
+	getTemplateVariablesForNoteName(
 		file: FileMeta
 	): Record<string, unknown> {
 		const shortcuts = {
@@ -394,7 +427,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		return { file: file, ...shortcuts };
 	}
 
-	getTemplateVariablesForOneNotePerAnnotationExportName(
+	getTemplateVariablesForOneNotePerAnnotationName(
 		file: FileMeta,
 		counter: number
 	): Record<string, unknown> {
@@ -406,40 +439,67 @@ export default class PDFAnnotationPlugin extends Plugin {
 		return { file: file, ...shortcuts };
 	}
 
-	getResolvedExportName(file: FileMeta): string {
-		return this.exportNameTemplate(
-			this.getTemplateVariablesForExportName(file)
+	getResolvedNoteName(file: FileMeta): string {
+		return this.noteNameTemplate(
+			this.getTemplateVariablesForNoteName(file)
 		);
 	}
 
-	getResolvedOneNotePerAnnotationExportName(
+	getResolvedOneNotePerAnnotationName(
 		file: FileMeta,
 		counter: number
 	): string {
-		return this.oneNotePerAnnotationExportNameTemplate(
-			this.getTemplateVariablesForOneNotePerAnnotationExportName(file, counter)
+		return this.oneNotePerAnnotationNameTemplate(
+			this.getTemplateVariablesForOneNotePerAnnotationName(file, counter)
 		);
 	}
 
-	getResolvedExportPath(pdfFile: FileMeta, fileNameOfExportNote: string): string {
-		const exportPath = this.settings.exportPath;
-		let filePathOfExportNote = "";
-		if (exportPath === "./") {
-			if (pdfFile.path.startsWith("file://")) {
-				filePathOfExportNote = fileNameOfExportNote;
-			} else {
-				filePathOfExportNote = pdfFile.path.replace(
-					pdfFile.name,
-					fileNameOfExportNote
-				);
-			}
-		} else {
-			filePathOfExportNote = exportPath + fileNameOfExportNote;
+	get noteSubfolderTemplate(): Template {
+		return compileTemplate(
+			this.settings.noteSubfolder,
+			this.templateSettings
+		);
+	}
+
+	getResolvedNoteSubfolder(file: FileMeta): string {
+		if (!this.settings.noteSubfolder.trim()) return "";
+		return this.noteSubfolderTemplate(
+			this.getTemplateVariablesForNoteName(file)
+		);
+	}
+
+	getResolvedNotePath(pdfFile: FileMeta, fileNameOfNote: string): string {
+		return resolveNotePath(
+			this.settings,
+			pdfFile,
+			fileNameOfNote,
+			this.getResolvedNoteSubfolder(pdfFile)
+		);
+	}
+
+	/**
+	 * The subfolder a template names need not exist yet, and `vault.create`
+	 * will not make it. Anything already there is left alone.
+	 */
+	private async createMissingFolders(filePath: string): Promise<void> {
+		const lastSlash = filePath.lastIndexOf("/");
+		if (lastSlash < 0) return;
+
+		const folder = filePath.slice(0, lastSlash);
+		if (!folder || this.app.vault.getFolderByPath(folder)) return;
+
+		try {
+			await this.app.vault.createFolder(folder);
+		} catch (error) {
+			// Made in the meantime by another note of the same run, or named
+			// something this vault will not take. `vault.create` reports the
+			// second case to the reader.
+			console.error(error);
 		}
-		return filePathOfExportNote;
 	}
 
 	async saveHighlightsToFileAndOpenIt(filePath: string, mdString: string, overwriteExistingNote: boolean) {
+		await this.createMissingFolders(filePath);
 		const fileExists = await this.app.vault.adapter.exists(filePath);
 		if (fileExists) {
 			if (overwriteExistingNote) {
@@ -454,7 +514,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.app.workspace.openLinkText(filePath, "", true);
 			} catch (error) {
 				console.error(error);
-				new Notice(t.NOTICE_EXPORT_PATH_INVALID);
+				new Notice(t.NOTICE_NOTE_PATH_INVALID);
 			}
 		}
 	}
