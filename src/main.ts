@@ -37,10 +37,7 @@ import { AdvancedExtractionModal } from "src/advancedExtractionModal";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
-/**
- * For when a name template and the PDF's own name both render nothing a vault
- * would take. Never seen in practice; better than writing no note at all.
- */
+/** When a name template and the PDF's own name both render nothing usable. */
 const FALLBACK_NOTE_NAME = "Annotations";
 
 export default class PDFAnnotationPlugin extends Plugin {
@@ -55,23 +52,17 @@ export default class PDFAnnotationPlugin extends Plugin {
 	sort(grandtotal: PDFAnnotation[]) {
 		const settings = this.settings;
 
-		// Independent of the headings: the topic is a sort key and a template
-		// variable in its own right, just like the folder name. Grouping by it
-		// decides whether the line it is read from is left in the body, not
-		// whether it is read at all.
+		// Independent of the headings: grouping decides whether the line stays
+		// in the body, not whether it is read.
 		assignTopics(grandtotal, settings.sortByTopic);
 
 		grandtotal.sort(compareAnnotations(settings));
 	}
 
 	/**
-	 * Reads one PDF in the vault, without writing anything: the advanced
-	 * extraction reads it to find out what days its annotations were made on,
-	 * long before it knows which of them it is going to write.
-	 *
-	 * Which types to read is asked for rather than taken from the settings, so
-	 * the advanced extraction can read them all once and answer a type being
-	 * ticked off out of what it already holds.
+	 * Reads one PDF in the vault without writing anything — the advanced
+	 * extraction needs the annotations long before it knows which to write.
+	 * It asks for every type, so ticking one off needs no second read.
 	 */
 	async loadAnnotationsFromVaultFile(
 		pdfFile: TFile,
@@ -96,10 +87,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	/**
-	 * Sorts what an extraction gathered into the note being edited, which is
-	 * what the commands taking an editor do — reached here without one, since
-	 * the advanced extraction is asked for from the palette rather than from
-	 * inside a note.
+	 * Into the note being edited, for the advanced extraction — which is asked
+	 * for from the palette and so reaches this without an editor of its own.
 	 */
 	async insertLoadedAnnotations(
 		loaded: LoadedAnnotations,
@@ -133,10 +122,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 		await this.writeLoadedAnnotations(loaded, onePerAnnotation);
 	}
 	/**
-	 * Add the tags to the note's own properties, rather than writing a block of
-	 * front matter into its text: a note the annotations were appended to
-	 * already has its properties at the top, and a second block further down is
-	 * text like any other. Existing tags are kept.
+	 * Into the note's own properties rather than a front matter block in its
+	 * text, which further down a note is text like any other. Existing tags
+	 * are kept.
 	 */
 	private async addTagsToNoteProperties(
 		note: TFile,
@@ -158,15 +146,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	/**
-	 * Write the annotations into the note being edited, which the commands that
-	 * take an editor do instead of making a note of their own.
-	 *
-	 * The tags the annotations carried go to that note's properties: it is the
-	 * note they were extracted into, so it is the note they belong to, and the
-	 * setting means the same thing here as everywhere else. That means saving
-	 * what was just inserted first — the properties are written to the note as
-	 * it stands on disk, and text still sitting unsaved in the editor would be
-	 * written over.
+	 * Inserts at the cursor instead of making a note. The tags go to that
+	 * note's properties, so what was inserted is saved first — properties are
+	 * written to the note on disk, over anything still unsaved in the editor.
 	 */
 	private async insertIntoNote(
 		editor: Editor,
@@ -197,11 +179,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 		isExternalFile: boolean,
 		onePerAnnotation = false
 	): Promise<void> {
-		// Notes that follow the file being looked at need one to follow. The
-		// commands that read a PDF from the clipboard need nothing open to run,
-		// so this is the case where there is no folder meant at all — and
-		// writing to the vault root instead would scatter notes somewhere
-		// nobody asked for, quietly.
+		// Notes following the current file need one to follow, and the
+		// clipboard commands need nothing open. Falling back to the vault root
+		// would quietly scatter notes nobody asked for.
 		if (
 			this.settings.noteLocation === "current" &&
 			!this.app.workspace.getActiveFile()
@@ -213,11 +193,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const currentFolder = this.currentFolder();
 		const extractTags = this.settings.extractsTags(onePerAnnotation);
 
-		/**
-		 * Taken out of the comments before anything is rendered from them, so
-		 * that a tag ends up in the note's properties and nowhere else — not in
-		 * the text of the note, and not in the name a `{{topic}}` gives it.
-		 */
+		/** Taken out before rendering, so a tag lands in the properties only. */
 		const takeTags = (annotations: PDFAnnotation[]) =>
 			extractTags ? takeTagsFromAnnotations(annotations) : [];
 
@@ -227,10 +203,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			for (const [index, anno] of grandtotal.entries()) {
 				const counter = index + 1;
 				const tags = takeTags([anno]);
-				// Taken out of the annotation before the note is written from
-				// it: what the note is called it need not also say inside.
-				// Grouping by topic has taken the line out of the body
-				// already, so only the other case has anything left to take.
+				// What names the note it need not also say inside. Grouping by
+				// topic has already taken the line out of the body.
 				const topic = this.settings.topicToNoteName
 					? takeTopicForNoteName(anno, !this.settings.sortByTopic)
 					: null;
@@ -272,11 +246,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		}
 	}
 
-	/**
-	 * The folder of the file being looked at, which the notes follow when they
-	 * are not going to a folder of their own. Empty for the vault root — and
-	 * for nothing open at all, which `writeNotes` turns away before it asks.
-	 */
+	/** Folder of the file being looked at; empty for the root or nothing open. */
 	private currentFolder(): string {
 		return this.app.workspace.getActiveFile()?.parent?.path ?? "";
 	}
@@ -304,10 +274,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const grandtotal: PDFAnnotation[] = [];
 		let pdfFile: PDFFile | null = null;
 		try {
-			// Node's fs is unavailable on mobile, so it is loaded behind the
-			// desktop guard above. require() rather than import(), because
-			// esbuild leaves a bare import() in the CJS bundle, which Obsidian's
-			// plugin loader cannot always resolve.
+			// Behind the desktop guard above, since mobile has no fs.
+			// require() because esbuild leaves a bare import() in the CJS
+			// bundle, which Obsidian's loader cannot always resolve.
 			const fs = require("fs") as typeof import("fs");
 			const filePathWithoutBeginningAndEndQuotes = filePathFromClipboard.replace(
 				/^["']|["']$/g,
@@ -380,9 +349,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			},
 		});
 
-		// One note per annotation is a command rather than a setting, so the
-		// choice is made where the extraction is asked for instead of somewhere
-		// else, before the fact.
+		// A command rather than a setting, so the choice is made where the
+		// extraction is asked for.
 		this.addCommand({
 			id: "extract-annotations-single-per-annotation",
 			name: t.COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION,
@@ -402,9 +370,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			},
 		});
 
-		// Nothing needs to be open for this one: which PDF to read is one of the
-		// things the modal asks about, rather than something the command had to
-		// have decided before it ran.
+		// Nothing need be open: which PDF to read is one of the modal's
+		// questions rather than something decided before the command ran.
 		this.addCommand({
 			id: "extract-annotations-advanced",
 			name: t.COMMAND_EXTRACT_ADVANCED,
@@ -431,10 +398,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			},
 		});
 
-		// A command of its own rather than a setting on the one above, so a PDF
-		// outside the vault can be written to a note without a note open to
-		// insert it into first — and without the other command quietly doing
-		// something else than its name says.
+		// A command of its own, so a PDF outside the vault reaches a new note
+		// without one open to insert into first.
 		this.addCommand({
 			id: "extract-annotations-single-from-clipboard-path-to-note",
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE,
@@ -510,87 +475,36 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const loadedSettings = (await this.loadData()) as
 			| Record<string, unknown>
 			| null;
-		if (loadedSettings) {
-			// Several settings were renamed and one dropped. Read them back
-			// under the names this version knows first, so the copy below and
-			// every migration after it see one set of names rather than two.
-			const { data: settingsData, changed: legacyNames } =
-				PDFAnnotationPluginSetting.normalizeLegacySettings(
-					loadedSettings
-				);
+		if (!loadedSettings) return;
 
-			// Every field the settings object declares, so a new setting cannot be
-			// forgotten here and silently never load.
-			Object.keys(this.settings).forEach((setting) => {
-				if (setting in settingsData) {
-					asIndexable(this.settings)[setting] = settingsData[setting];
-				}
-			});
-
-			// The selection is a list of subtypes. Keep whatever data.json holds
-			// usable, and fall back to the defaults if it is neither a list nor
-			// the comma separated string an older version wrote.
-			const desiredAnnotations =
-				PDFAnnotationPluginSetting.normalizeDesiredAnnotations(
-					this.settings.desiredAnnotations
-				);
-			this.settings.desiredAnnotations =
-				desiredAnnotations ?? [...DEFAULT_DESIRED_ANNOTATIONS];
-
-			// Grouping and heading used to be one boolean. Runs against the raw
-			// data.json, since the field it reads is not one of the keys copied
-			// across above.
-			const structureMigrated =
-				PDFAnnotationPluginSetting.migrateStructure(
-					settingsData,
-					this.settings
-				);
-
-			// Where a note goes used to be one string with a magic './' in it.
-			const pathMigrated = PDFAnnotationPluginSetting.migrateNotePath(
-				settingsData,
-				this.settings
-			);
-
-			// Extracting the tags used to be all extractions or none.
-			const tagsMigrated =
-				PDFAnnotationPluginSetting.migrateTagExtraction(
-					settingsData,
-					this.settings
-				);
-
-			// One entry per type this version knows, whatever data.json holds.
-			this.settings.annotationTemplates =
-				PDFAnnotationPluginSetting.normalizeAnnotationTemplates(
-					this.settings.annotationTemplates
-				);
-
-			// Written back at once, so data.json stops carrying the template
-			// fields this version no longer reads: first the four that became
-			// two, then the two that became one per type over a default.
-			const migration = PDFAnnotationPluginSetting.migrateTemplates(
-				settingsData,
-				this.settings
-			);
-			const typesMigrated =
-				PDFAnnotationPluginSetting.migrateTemplateTypes(
-					settingsData,
-					this.settings
-				);
-			if (
-				migration.migrated ||
-				typesMigrated ||
-				structureMigrated ||
-				pathMigrated ||
-				tagsMigrated ||
-				legacyNames
-			) {
-				await this.saveSettings();
+		// Every field the settings object declares, so a new setting cannot be
+		// forgotten here and silently never load.
+		Object.keys(this.settings).forEach((setting) => {
+			if (setting in loadedSettings) {
+				asIndexable(this.settings)[setting] = loadedSettings[setting];
 			}
-			if (migration.dropped.length > 0) {
-				new Notice(t.NOTICE_TEMPLATES_COLLAPSED, 15000);
-			}
-		}
+		});
+
+		// data.json is a file a reader may edit, so nothing loaded from it is
+		// taken on trust: a value none of these knows falls back to the default.
+		const settings = PDFAnnotationPluginSetting;
+		this.settings.desiredAnnotations =
+			settings.normalizeDesiredAnnotations(
+				this.settings.desiredAnnotations
+			) ?? [...DEFAULT_DESIRED_ANNOTATIONS];
+		this.settings.annotationTemplates =
+			settings.normalizeAnnotationTemplates(
+				this.settings.annotationTemplates
+			);
+		this.settings.fileHeading = settings.normalizeFileHeading(
+			this.settings.fileHeading
+		);
+		this.settings.noteLocation = settings.normalizeNoteLocation(
+			this.settings.noteLocation
+		);
+		this.settings.extractTags = settings.normalizeTagExtraction(
+			this.settings.extractTags
+		);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -628,10 +542,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			counter: counter,
 		};
 
-		// The note holds one annotation and nothing else, so the annotation's
-		// own variables name it as well as the PDF's do — {{topic}} above all,
-		// which is what the reader who wants the annotation's first line for a
-		// title reaches for.
+		// The note holds one annotation, so its own variables name it as well
+		// as the PDF's do — {{topic}} above all.
 		return {
 			...this.formatter.getTemplateVariablesForAnnotation(
 				annotation,
@@ -643,11 +555,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	/**
-	 * A name the vault will take, whatever the template rendered. A template can
-	 * come back empty — `{{topic}}` is empty unless the annotations were sorted
-	 * by topic, and unless the annotation has a body at all — and an empty name
-	 * writes a hidden `.md` the reader never finds, so the PDF's own name stands
-	 * in rather than the extraction quietly coming to nothing.
+	 * A name the vault will take, whatever the template rendered. An empty one
+	 * would write a hidden `.md` nobody finds, so a fallback stands in.
 	 */
 	private usableNoteName(rendered: string, fallback: string): string {
 		return (
@@ -665,11 +574,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	/**
-	 * What a note is called when the topic was to name it and the annotation
-	 * has no comment to take a topic from — a highlight marked without a word
-	 * written about it, which is a thing a reader does all the time. Numbered,
-	 * since a PDF holds as many of them as it likes and they would otherwise
-	 * all be the one note.
+	 * For an annotation with no comment to take a topic from — a highlight
+	 * marked without a word. Numbered, or they would all be the one note.
 	 */
 	getResolvedNoTopicName(file: FileMeta, counter: number): string {
 		return compileTemplate(t.NAME_NO_TOPIC, this.templateSettings)({
@@ -693,10 +599,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 					isExternalFile
 				)
 			),
-			// A name template for a note per annotation renders nothing when
-			// what it asks of the annotation is not there — `{{topic}}` for a
-			// highlight marked without a comment. Numbered, so a template that
-			// names them all the same does not collapse them into one note.
+			// Renders nothing when what it asks of the annotation is absent —
+			// `{{topic}}` for a highlight marked without a comment.
 			this.getResolvedNoTopicName(file, counter)
 		);
 	}
@@ -743,8 +647,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			await this.app.vault.createFolder(folder);
 		} catch (error) {
 			// Made in the meantime by another note of the same run, or named
-			// something this vault will not take. `vault.create` reports the
-			// second case to the reader.
+			// something the vault refuses — which `vault.create` reports.
 			console.error(error);
 		}
 	}

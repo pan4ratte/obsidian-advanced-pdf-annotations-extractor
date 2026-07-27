@@ -1,6 +1,82 @@
-/* The instructions belonging to the "Templates" heading. Sized like the rest of
-   the tab rather than like a heading's own description, and given the same gap
-   under the name as the other headings that carry one. */
+/* Ordered as the interface is: the settings tab from its header down, then the
+   advanced extraction modal from its first card down. The last section of the
+   settings tab holds the helpers both of them share. */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Settings tab — header
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Obsidian's heading rows are not meant to carry a description, so it sits
+   tight under the name. Scoped to this plugin's rows, since styles.css is
+   loaded app-wide. */
+.pdf-annotations-settings-header .setting-item-description,
+.pdf-annotations-annotation-setting .setting-item-description {
+	padding-top: 8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Settings tab — annotation types
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Heading, description and checkbox grid as one stacked card: text above, the
+   checkboxes across the full width below. */
+.pdf-annotations-annotation-setting {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 12px;
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--setting-items-background);
+	border-radius: var(--setting-items-radius);
+	padding: 24px;
+}
+
+.pdf-annotations-annotation-setting .setting-item-info {
+	margin-right: 0;
+}
+
+.pdf-annotations-annotation-setting .setting-item-control {
+	width: 100%;
+}
+
+/* Three columns, dropping to two and then one as the card narrows. The column
+   minimum is a third of the row or the 14em that fits the longest label,
+   whichever is larger — so three is also the maximum. 16px is the two gaps. */
+.pdf-annotations-annotation-grid {
+	display: grid;
+	grid-template-columns: repeat(
+		auto-fill,
+		minmax(max(14em, calc((100% - 16px) / 3 - 0.01px)), 1fr)
+	);
+	gap: 8px;
+	width: 100%;
+	margin-top: 4px;
+}
+
+/* The card is a heading row, whose type carries into everything inside it, so
+   the labels say for themselves that they are ordinary text. */
+.pdf-annotations-annotation-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-normal);
+	color: var(--text-normal);
+}
+
+/* Obsidian sizes checkboxes for full-width rows; in the grid they sit beside
+   their label. */
+.pdf-annotations-annotation-option input[type="checkbox"] {
+	margin: 0;
+	flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Settings tab — templates: instructions, variables accordion, editors
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Sized like the rest of the tab rather than like a heading's description. */
 .pdf-annotations-template-instructions {
 	padding-top: 8px;
 	font-size: var(--font-ui-small);
@@ -8,8 +84,142 @@
 	color: var(--text-normal);
 }
 
+.setting-item-description.pdf-annotations-template-instructions {
+	padding-top: 12px;
+}
+
+/* The default marker is replaced by a chevron that turns with the panel. */
+.pdf-annotations-accordion-summary {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+	padding: 0px 16px 16px 16px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	list-style: none;
+}
+
+.pdf-annotations-accordion-summary::-webkit-details-marker {
+	display: none;
+}
+
+.pdf-annotations-accordion-summary:hover {
+	color: var(--text-normal);
+}
+
+.pdf-annotations-accordion-chevron {
+	display: flex;
+	transition: transform 180ms ease-in-out;
+}
+
+/* Set as the panel starts moving, not on [open], which lags a closing panel by
+   the length of the animation. */
+.pdf-annotations-accordion-chevron.is-open {
+	transform: rotate(90deg);
+}
+
+.pdf-annotations-accordion-chevron .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
+/* Height is animated from the script, so the panel clips what does not fit. */
+.pdf-annotations-accordion-content {
+	overflow: hidden;
+}
+
+/* The name column is only as wide as its longest variable, leaving the rest of
+   the row to the description. */
+.pdf-annotations-variable-table {
+	width: 100%;
+	margin-bottom: 16px;
+	font-size: var(--font-ui-small);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--setting-items-radius);
+	padding: 0px 16px;
+	background: var(--setting-items-background);
+}
+
+.pdf-annotations-variable-table th {
+	text-align: left;
+	color: var(--text-muted);
+	font-weight: var(--font-medium);
+}
+
+.pdf-annotations-variable-table th,
+.pdf-annotations-variable-table td {
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding: 6px 12px 6px 0;
+	vertical-align: top;
+}
+
+.pdf-annotations-variable-table tr:last-child td {
+	border-bottom: none;
+}
+
+/* 1% is the shrink-to-fit idiom, and nothing in the column may wrap. */
+.pdf-annotations-variable-name {
+	width: 1%;
+	white-space: nowrap;
+}
+
+/* Variable and copy button on one line, as a pill that fills under the pointer.
+   The whole pill copies, so the whole pill takes the pointer cursor. */
+.pdf-annotations-variable {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: -8px;
+	padding: 4px 8px 4px 8px;
+	border-radius: var(--radius-l);
+	cursor: pointer;
+}
+
+.pdf-annotations-variable:hover,
+.pdf-annotations-variable:focus-within {
+	background-color: var(--tag-background-hover);
+	color: var(--tag-color-hover);
+	border-radius: 100px;
+}
+
+/* clickable-icon is sized for Obsidian's toolbars, which is bulky in a table
+   row. It keeps its space when hidden, so revealing it does not shift the pill. */
+.pdf-annotations-copy-button.clickable-icon {
+	padding: 2px;
+	height: 18px;
+	width: 18px;
+	flex-shrink: 0;
+	opacity: 0;
+}
+
+.pdf-annotations-variable:hover .pdf-annotations-copy-button,
+.pdf-annotations-variable:focus-within .pdf-annotations-copy-button {
+	opacity: 1;
+}
+
+/* Nothing hovers on a touch screen, so there the button is always on. */
+@media (hover: none) {
+	.pdf-annotations-copy-button.clickable-icon {
+		opacity: 1;
+	}
+}
+
+/* The pill is the hover surface; the button takes its colour rather than
+   painting its own background over it. */
+.pdf-annotations-copy-button.clickable-icon,
+.pdf-annotations-copy-button.clickable-icon:hover {
+	background-color: transparent;
+	color: inherit;
+}
+
+.pdf-annotations-copy-button .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
 /* One card per row, full width: with wrapping off, a template wants every
-   character of the row it can get before it scrolls sideways. */
+   character of the row before it scrolls sideways. */
 .pdf-annotations-template-columns {
 	display: grid;
 	grid-template-columns: 1fr;
@@ -17,12 +227,9 @@
 	margin-bottom: 16px;
 }
 
-/* The card is a row that wraps: the text and the picker that says which
-   template it is showing sit side by side, and the editor takes the whole width
-   under them. Too narrow for the two, and the picker wraps onto a line of its
-   own rather than squeezing the description into a column of single words.
-   min-width stops a text area's intrinsic width from pushing the card wider
-   than the row. */
+/* A row that wraps: text and picker side by side, the editor across the width
+   under them. Too narrow, and the picker takes a line of its own. min-width
+   stops a text area's intrinsic width from widening the card. */
 .pdf-annotations-template-setting {
 	flex-wrap: wrap;
 	align-items: center;
@@ -59,8 +266,7 @@
 }
 
 /* Gutter and text area share one box, which carries the input's frame so the
-   two read as a single field. Thirteen lines tall, as wide as its column; the
-   card's own row gap is what holds it off the row above. */
+   two read as a single field. */
 .pdf-annotations-template-editor {
 	display: flex;
 	width: 100%;
@@ -76,8 +282,8 @@
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-/* Scrolled from the text area's scroll handler, never on its own — hence
-   hidden overflow rather than auto. */
+/* Scrolled from the text area's handler, never on its own — hence hidden
+   overflow rather than auto. */
 .pdf-annotations-template-gutter {
 	flex-shrink: 0;
 	overflow: hidden;
@@ -89,8 +295,7 @@
 	user-select: none;
 }
 
-/* The frame belongs to the box around it now, so the text area brings none of
-   its own. The numbers only line up while both share a line height. */
+/* The frame belongs to the box around it, so the text area brings none. */
 .pdf-annotations-template-input {
 	flex: 1;
 	min-width: 0;
@@ -109,6 +314,7 @@
 	box-shadow: none;
 }
 
+/* The numbers only line up while both share a line height. */
 .pdf-annotations-template-gutter,
 .pdf-annotations-template-input {
 	font-family: var(--font-monospace);
@@ -116,10 +322,26 @@
 	line-height: 1.5;
 }
 
-/* Settings whose field wants the whole row: a vault path is long, a template for
-   one longer, and a naming pattern longer still, so all of them would be typed
-   through the sliver Obsidian leaves at the end of a row. Name and description
-   above, the field across the width below. */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shared by the settings tab and the modal
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* A panel another setting has taken the question out of. Its height is animated
+   from the script, so it has to clip what does not fit yet. */
+.pdf-annotations-collapsible {
+	overflow: hidden;
+}
+
+/* Set once the closing animation has finished, so a closed panel leaves no gap
+   and nothing for a tab key to land in. A panel must set no `display` of its
+   own, which would be read after this and win. */
+.pdf-annotations-collapsed {
+	display: none;
+}
+
+/* Settings whose field wants the whole row — a vault path, a template, a naming
+   pattern — rather than the sliver Obsidian leaves at the end of one. Name and
+   description above, the field across the width below. */
 .pdf-annotations-stacked-setting {
 	flex-direction: column;
 	align-items: stretch;
@@ -139,235 +361,19 @@
 	margin-top: 4px;
 }
 
-
-
 /* A search field is an input inside a container of its own, and Obsidian sizes
-   both for the sliver at the end of a setting row. Both take the width here. */
+   both for the end of a setting row. Both take the width here. */
 .pdf-annotations-stacked-setting .setting-item-control .search-input-container,
 .pdf-annotations-stacked-setting .setting-item-control input[type="search"] {
 	width: 100%;
 }
 
-/* Settings that another setting has taken the question out of: they open and
-   close like the accordion, their height animated from the script, so the panel
-   has to clip what does not fit yet. */
-.pdf-annotations-collapsible {
-	overflow: hidden;
-}
+/* ─────────────────────────────────────────────────────────────────────────────
+   Advanced extraction modal — cards, then the dates, then the button
+   ────────────────────────────────────────────────────────────────────────── */
 
-/* Set once the closing animation has finished, so a closed panel leaves no gap
-   between the settings around it and nothing for a tab key to land in. */
-.pdf-annotations-collapsed {
-	display: none;
-}
-
-/* "Annotations to extract": heading, description and checkbox grid form a
-   single card, stacked — the text always above, the checkboxes across the full
-   width below it. */
-.pdf-annotations-annotation-setting {
-	flex-direction: column;
-	align-items: stretch;
-	gap: 12px;
-	margin-bottom: 16px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--setting-items-background);
-	border-radius: var(--setting-items-radius);
-	padding: 24px;
-}
-
-.pdf-annotations-annotation-setting .setting-item-info {
-	margin-right: 0;
-}
-
-.pdf-annotations-annotation-setting .setting-item-control {
-	width: 100%;
-}
-
-/* Grid of annotation type checkboxes: three columns, dropping to two and then
-   one as the card narrows. The column minimum is whichever is larger, a third
-   of the row or the 14em that fits the longest label on one line — so three
-   columns is also the maximum, however wide the settings tab gets. The 16px is
-   the two gaps between the three columns. */
-.pdf-annotations-annotation-grid {
-	display: grid;
-    grid-template-columns: repeat(
-        auto-fill,
-        minmax(max(14em, calc((100% - 16px) / 3 - 0.01px)), 1fr)
-    );
-    gap: 8px;
-    width: 100%;
-	margin-top: 4px;
-}
-
-/* The card is a heading row, whose type carries into everything inside it. The
-   labels are ordinary text, so they say so themselves. */
-.pdf-annotations-annotation-option {
-	display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: var(--font-ui-small);
-    font-weight: var(--font-normal);
-    color: var(--text-normal);
-}
-
-/* Obsidian sizes checkboxes for full-width setting rows; in the grid they sit
-   next to their label, so drop the trailing margin. */
-.pdf-annotations-annotation-option input[type="checkbox"] {
-	margin: 0;
-	flex-shrink: 0;
-}
-
-/* The default marker is replaced by a chevron that turns with the panel, so
-   the disclosure triangle is not left pointing the other way. */
-.pdf-annotations-accordion-summary {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	cursor: pointer;
-	padding: 0px 16px 16px 16px;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-	list-style: none;
-}
-
-.pdf-annotations-accordion-summary::-webkit-details-marker {
-	display: none;
-}
-
-.pdf-annotations-accordion-summary:hover {
-	color: var(--text-normal);
-}
-
-.pdf-annotations-accordion-chevron {
-	display: flex;
-	transition: transform 180ms ease-in-out;
-}
-
-/* Set as the panel starts moving, not on [open], which lags a closing panel by
-   the length of the animation. */
-.pdf-annotations-accordion-chevron.is-open {
-	transform: rotate(90deg);
-}
-
-.pdf-annotations-accordion-chevron .svg-icon {
-	width: var(--icon-s);
-	height: var(--icon-s);
-}
-
-/* Height is animated from the script, so the panel has to clip what does not
-   fit yet. */
-.pdf-annotations-accordion-content {
-	overflow: hidden;
-}
-
-/* Table of template variables. The name column is only as wide as its longest
-   variable, leaving the rest of the row to the description. */
-.pdf-annotations-variable-table {
-	width: 100%;
-    margin-bottom: 16px;
-    font-size: var(--font-ui-small);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--setting-items-radius);
-    padding: 0px 16px;
-    background: var(--setting-items-background);
-}
-
-.pdf-annotations-variable-table th {
-	text-align: left;
-	color: var(--text-muted);
-	font-weight: var(--font-medium);
-}
-
-.pdf-annotations-variable-table th,
-.pdf-annotations-variable-table td {
-	border-bottom: 1px solid var(--background-modifier-border);
-	padding: 6px 12px 6px 0;
-	vertical-align: top;
-}
-
-.pdf-annotations-variable-table tr:last-child td {
-	border-bottom: none;
-}
-
-/* The name column is as narrow as its content: 1% is the shrink-to-fit idiom,
-   and nothing in it may wrap. */
-.pdf-annotations-variable-name {
-	width: 1%;
-	white-space: nowrap;
-}
-
-/* Variable and its copy button on one line, as a pill that fills with the
-   accent colour under the pointer. The whole pill copies, so the whole pill
-   takes the pointer cursor. */
-.pdf-annotations-variable {
-	display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: -8px;
-    padding: 4px 8px 4px 8px;
-    border-radius: var(--radius-l);
-    cursor: pointer;
-}
-
-.pdf-annotations-variable:hover,
-.pdf-annotations-variable:focus-within {
-	background-color: var(--tag-background-hover);
-    color: var(--tag-color-hover);
-    border-radius: 100px;
-}
-
-/* clickable-icon sizes for Obsidian's own toolbars, which is bulky in a table
-   row; shrink it to the line it sits on. It keeps its space when hidden, so
-   revealing it does not shift the pill. */
-.pdf-annotations-copy-button.clickable-icon {
-	padding: 2px;
-    height: 18px;
-    width: 18px;
-    flex-shrink: 0;
-    opacity: 0;
-}
-
-.pdf-annotations-variable:hover .pdf-annotations-copy-button,
-.pdf-annotations-variable:focus-within .pdf-annotations-copy-button {
-	opacity: 1;
-}
-
-/* Nothing hovers on a touch screen, so there the button is simply always on. */
-@media (hover: none) {
-	.pdf-annotations-copy-button.clickable-icon {
-		opacity: 1;
-	}
-}
-
-/* The pill is the hover surface; the button inside it takes the pill's colour
-   rather than painting its own background over it. */
-.pdf-annotations-copy-button.clickable-icon,
-.pdf-annotations-copy-button.clickable-icon:hover {
-	background-color: transparent;
-	color: inherit;
-}
-
-.pdf-annotations-copy-button .svg-icon {
-	width: var(--icon-s);
-	height: var(--icon-s);
-}
-
-/* Obsidian's heading rows are not meant to carry a description, so it sits
-   tight under the name — the two here need the gap. Scoped to this plugin's own
-   rows, since styles.css is loaded app-wide. */
-.pdf-annotations-settings-header .setting-item-description,
-.pdf-annotations-annotation-setting .setting-item-description {
-    padding-top: 8px;
-}
-
-.setting-item-description.pdf-annotations-template-instructions {
-    padding-top: 12px;
-}
-
-/* One question of the advanced extraction, carded like the settings tab's own
-   groups. A flex column rather than a plain box, so a part of it that is hidden
-   leaves no gap where it was. */
+/* One question of the extraction, carded like the settings tab's own groups. A
+   flex column, so a hidden part leaves no gap where it was. */
 .pdf-annotations-modal-card {
 	display: flex;
 	flex-direction: column;
@@ -381,7 +387,7 @@
 
 /* Obsidian's setting rows separate themselves with a rule and their own
    padding, which inside a card would draw a line across it and pad it twice.
-   The card's gap does that job here. */
+   The card's gap does that job. */
 .pdf-annotations-modal-card .setting-item {
 	border-top: none;
 	padding: 0;
@@ -393,25 +399,15 @@
 	margin-top: 4px;
 }
 
-/* The toggle that asks for the dates has the list of them under it, which the
-   card's own gap already holds off; the row's padding would space the two twice
-   over. Named twice to outweigh Obsidian's own padding for a toggle row. */
+/* The dates toggle has the list under it, which the card's gap already holds
+   off. Named twice to outweigh Obsidian's own padding for a toggle row. */
 .pdf-annotations-modal-card.pdf-annotations-dates-card .setting-item.mod-toggle {
 	padding-bottom: 0;
 }
 
-/* Nothing on the left of the row for the button to sit beside, so it takes the
-   whole width rather than the sliver a setting row would leave it. */
-.pdf-annotations-modal-actions button {
-	width: 100%;
-	margin: 0;
-}
-
-/* The dates, inside the panel the toggle opens. The scrolling column is here
-   rather than on the panel itself: the panel is hidden by a class, which a
-   `display` of its own would be read after and override. A date is short, and a
-   PDF read over a year has more of them than a row would hold — so the list
-   scrolls instead of pushing the extract button off the modal. */
+/* The scrolling column lives here rather than on the collapsible panel around
+   it, which must carry no `display`. A PDF read over a year has more dates than
+   a row would hold, so the list scrolls instead of pushing the button off. */
 .pdf-annotations-date-list {
 	display: flex;
 	flex-direction: column;
@@ -422,8 +418,7 @@
 	border-top: 1px solid var(--background-modifier-border);
 }
 
-/* Same row as the annotation type checkboxes of the settings tab: the box next
-   to its label, both ordinary text rather than a heading's. */
+/* The same row as the annotation type checkboxes above. */
 .pdf-annotations-date-option {
 	display: flex;
 	align-items: center;
@@ -434,16 +429,20 @@
 	color: var(--text-normal);
 }
 
-/* Obsidian sizes checkboxes for full-width setting rows; here one sits next to
-   its label. */
 .pdf-annotations-date-option input[type="checkbox"] {
 	margin: 0;
 	flex-shrink: 0;
 }
 
-/* What stands in the list while the PDF is being read, and for a PDF that had
-   nothing to list. */
+/* Stands in the list while the PDF is read, and for one with nothing to list. */
 .pdf-annotations-date-message {
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
+}
+
+/* Nothing on the left of the row for the button to sit beside, so it takes the
+   whole width rather than the sliver a setting row would leave it. */
+.pdf-annotations-modal-actions button {
+	width: 100%;
+	margin: 0;
 }

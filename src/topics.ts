@@ -4,14 +4,11 @@ import { PDFAnnotation } from "./types";
 const LINE_ENDING = /\r\n|\n\r|\n|\r/;
 
 /**
- * The topic of each annotation: the first line of its comment, which is where a
- * reader writes what the comment is about. Always read, so a template that asks
- * for `{{topic}}` is answered whether or not the annotations are grouped by it.
+ * The first line of each comment. Always read, so `{{topic}}` is answered
+ * whether or not the annotations are grouped by it.
  *
- * Grouping by topic takes that line out of the body as well, since the topic is
- * then written as a heading above the annotations sharing it and would be read
- * twice otherwise. With the grouping off nothing writes it anywhere on its own,
- * so the comment is left whole and a template may write the line itself.
+ * `takeFromBody` when grouping: the topic is then written as a heading above
+ * the annotations sharing it, and would otherwise be read twice.
  */
 export function assignTopics(
 	annotations: PDFAnnotation[],
@@ -27,15 +24,12 @@ export function assignTopics(
 }
 
 /**
- * The annotation's topic, taken out of it and given back to be used as the name
- * of the note being written from it: a note that carries its topic in its name
- * would otherwise write it a second time inside itself, as a heading or as a
- * `{{topic}}` a template asks for.
+ * The topic, taken out of the annotation to name the note written from it: a
+ * note carrying its topic in its name should not repeat it inside.
  *
- * Grouping by topic has taken the line out of the body already. Without it the
- * body still holds the line, and only then is it dropped — and only while it is
- * still the line the topic was read from, since taking the tags out of a
- * comment can have shortened or removed it in the meantime.
+ * `stillInBody` when grouping by topic has not already removed the line. It is
+ * only dropped while it is still the line the topic was read from — taking the
+ * tags out can have shortened it in the meantime.
  */
 export function takeTopicForNoteName(
 	annotation: PDFAnnotation,

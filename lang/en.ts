@@ -55,7 +55,6 @@ export default {
     NOTICE_NO_NOTE_TO_INSERT_INTO: "Could not insert the annotations: no note is open for them to go into. Open one, or extract to a new note instead.",
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard.",
-    NOTICE_TEMPLATES_COLLAPSED: "The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. A template of yours for PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.",
 
     // ─── Written into exported notes ─────────────────────────────────────────────
     // The {{variables}} are names the formatter resolves; only the words around

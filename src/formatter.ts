@@ -10,10 +10,8 @@ import {
 import { PDFAnnotation } from "./types";
 
 /**
- * The `#` prefix for each heading in a note, given which of them are written,
- * outermost first. A heading that is not written takes no level with it, so the
- * ones under it move up and the note still reads as an outline with no gap in
- * its levels.
+ * The `#` prefix for each heading, outermost first. A heading that is not
+ * written takes no level with it, so the note keeps an unbroken outline.
  */
 export function headingLevels(written: boolean[]): string[] {
 	let depth = 0;
@@ -25,7 +23,6 @@ export function headingLevels(written: boolean[]): string[] {
 export class PDFAnnotationPluginFormatter {
 	private settings: PDFAnnotationPluginSetting;
 
-	// Template compilation options
 	private templateSettings = {
 		noEscape: true,
 	};
@@ -35,44 +32,35 @@ export class PDFAnnotationPluginFormatter {
 	}
 
 	/**
-	 * `onePerNote` says the note being written holds this one annotation and
-	 * nothing else, as the 'note per annotation' commands write them. The
-	 * headings that group have nothing to group there — a day, a folder and a
-	 * file heading over a single annotation say what the note is, one line at a
-	 * time, before it has said anything itself — so they are left out. The topic
-	 * heading is not: a topic is what the annotation is about rather than where
-	 * it came from, and it has a setting of its own for going into the name.
+	 * `onePerNote` for the notes holding a single annotation: the headings that
+	 * group have nothing to group there, so only the topic heading is written —
+	 * a topic is what the annotation is about, not where it came from.
 	 */
 	format(
 		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean,
 		onePerNote = false
 	): string {
-		// now iterate over the annotations printing topics, then folder, then comments...
 		let text = "";
 		let topic = "";
 		let currentLabel = "";
 
 		let date = "";
 
-		// A new group starts the headings under it over, so a topic reading
-		// from several files says which one each of its annotations came from.
-		// When they all came from the same place that heading has nothing left
-		// to tell apart, and repeating it under every topic — one per
-		// annotation, where the topics are the annotations' own first lines —
-		// buries the note in a heading that always says the same thing. So a
-		// heading is only started over when it has more than one thing to say.
+		// A new group restarts the headings under it, so a topic reading from
+		// several files says which each annotation came from. A heading with
+		// only one thing to say is not restarted, or it would repeat down the
+		// whole note.
 		const labelFor = (anno: PDFAnnotation) => {
 			if (this.settings.fileHeading === "file") return anno.file.name;
-			// A PDF sitting in the vault root has no folder to name.
+			// A PDF in the vault root has no folder to name.
 			return anno.folder || t.NOTE_VAULT_ROOT;
 		};
 		const dateFor = (anno: PDFAnnotation) => anno.created || t.NOTE_NO_DATE;
 		const labelVaries = new Set(grandtotal.map(labelFor)).size > 1;
 		const topicVaries = new Set(grandtotal.map((a) => a.topic)).size > 1;
 
-		// Nothing to head a topic or a day with unless the annotations were
-		// grouped by one in the first place.
+		// Nothing to head a topic or day with unless they were grouped by one.
 		const headingTopics =
 			this.settings.topicHeading && this.settings.sortByTopic;
 		const headingDates =
@@ -82,15 +70,10 @@ export class PDFAnnotationPluginFormatter {
 		const headingFiles =
 			this.settings.fileHeading !== "none" && !onePerNote;
 
-		// So one unchanging label heads the note rather than marking a place
-		// inside it: written once, above everything rather than under the first
-		// of them.
+		// One unchanging label heads the note instead of marking a place in it.
 		const headsTheNote = !labelVaries && headingFiles;
 
-		// Whichever heading encloses the others takes the first level, so the
-		// note reads as an outline whichever of them are written: the one file
-		// the annotations came from, then the days, then the topics within each
-		// day, then the files when they came from several.
+		// Whichever heading encloses the others takes the first level.
 		const [noteLevel, dateLevel, topicLevel, fileLevel] = headingLevels([
 			headsTheNote,
 			headingDates,
@@ -103,7 +86,6 @@ export class PDFAnnotationPluginFormatter {
 			text += `${noteLevel} ${currentLabel}\n\n`;
 		}
 
-		// console.log("all annots", grandtotal)
 		grandtotal.forEach((anno) => {
 			if (headingDates) {
 				if (date != dateFor(anno)) {
@@ -114,7 +96,6 @@ export class PDFAnnotationPluginFormatter {
 				}
 			}
 
-			// print main Title when Topic changes (and settings allow)
 			if (headingTopics) {
 				if (topic != anno.topic) {
 					topic = anno.topic;
@@ -138,10 +119,7 @@ export class PDFAnnotationPluginFormatter {
 		else return text;
 	}
 
-	/**
-	 * The template this annotation is written with: the one its type was given,
-	 * or the default that covers the types without one.
-	 */
+	/** The template of this annotation's type, or the default. */
 	templateFor(annotation: PDFAnnotation): Template {
 		return compileTemplate(
 			templateForAnnotation(this.settings, annotation.subtype),
@@ -158,8 +136,8 @@ export class PDFAnnotationPluginFormatter {
 			folder: annotation.folder,
 			filename: annotation.file.basename,
 			filepath: annotation.filepath,
-			// One template serves both locations: a PDF in the vault is worth a
-			// wiki link, one outside it is already a file:// URL.
+			// One template, both locations: a wiki link inside the vault, a
+			// file:// URL outside it.
 			filelink: isExternalFile
 				? annotation.filepath
 				: `[[${annotation.filepath}]]`,
@@ -168,8 +146,7 @@ export class PDFAnnotationPluginFormatter {
 			pageLabel: annotation.pageLabel,
 			author: annotation.author,
 			body: annotation.body,
-			// As pdf.js names it, which is what the settings call the type and
-			// what a {{#if}} in a template can be written against.
+			// As pdf.js names it, which a {{#if}} can be written against.
 			type: annotation.subtype,
 			topic: annotation.topic,
 		};

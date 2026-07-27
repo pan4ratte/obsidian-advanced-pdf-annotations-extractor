@@ -5,7 +5,7 @@
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | esbuild watch mode (no typecheck) |
-| `npm test` | Jest (ts-jest) — 232 tests, all passing |
+| `npm test` | Jest (ts-jest) — 187 tests, all passing |
 | `npm run lint` / `npm run lint:fix` | ESLint flat config with the official Obsidian ruleset |
 | `npm run build` | `tsc -noEmit -skipLibCheck && node esbuild.config.mjs production` |
 
@@ -63,17 +63,21 @@ list of subtype strings.
 
 ## Templates
 
-Two, not four: `highlightTemplate` for the `marksUpText` subtypes and
-`noteTemplate` for the rest. Location is a template variable, not a setting —
-`{{filelink}}` renders `[[path]]` inside the vault and the bare `file://` path
-outside it, and `{{isExternal}}` is exposed for templates that need more than
-the link to differ. `isExternalFile` reaches the formatter from the command:
-true only for the clipboard path command.
+One per annotation type over a `defaultTemplate` that covers the types with
+none of their own; a blank entry means "use the default". Location is a template
+variable, not a setting — `{{filelink}}` renders `[[path]]` inside the vault and
+the bare `file://` path outside it, and `{{isExternal}}` is exposed for
+templates that need more than the link to differ. `isExternalFile` reaches the
+formatter from the command: true only for the clipboard path commands.
 
-`PDFAnnotationPluginSetting.migrateTemplates` folds a `data.json` written by the
-four-template versions into the pair, reading the old keys off the raw loaded
-object since they are no longer fields. Keep the legacy defaults it compares
-against byte-exact — a mismatch makes an untouched default look customised.
+## Settings loading
+
+The fork changed the plugin id, so it always starts from a fresh `data.json` and
+carries **no migrations** — don't add any for versions of the ancestor plugin.
+`loadSettings` copies every declared field, then runs the `normalize*` statics in
+`PDFAnnotationPluginSetting` over the ones with a closed set of values. Those
+exist for a hand-edited `data.json` and for types added in later versions, not
+for upgrades: anything unrecognised falls back to the default.
 
 ## Source layout (flat, not a monorepo)
 
@@ -153,8 +157,7 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
   copy of `en.ts` listed in `helpers.ts`'s `localeMap`.
   Exempt, and to stay exempt: the annotation subtypes (spelled as the PDF format
   spells them), the `{{variable}}` names, the command IDs (persisted, so hotkeys
-  survive), markdown and YAML syntax the formatter writes, and
-  `LEGACY_TEMPLATE_PAIRS`' defaults (compared byte-exact against old `data.json`).
+  survive), and the markdown and YAML syntax the formatter writes.
 - `PLUGIN_NAME`/`PLUGIN_DESCRIPTION` duplicate `manifest.json`, which the plugin
   browser reads and no translation can reach. Change both together.
 - The lint config uses `obsidianmd.configs.recommendedWithLocalesEn`, which

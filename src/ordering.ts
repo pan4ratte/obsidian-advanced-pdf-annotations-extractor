@@ -2,37 +2,26 @@ import { PDFAnnotationPluginSetting } from "./settings";
 import { PDFAnnotation } from "./types";
 
 /**
- * Text in the order a reader would put it in, rather than the order its code
- * points happen to fall in. `>` and `<` compare UTF-16 units, which reads every
- * alphabet as if it were ASCII: `ё` would come after `я` instead of in the
- * middle of the Russian alphabet it belongs to, `ä` after `z`, and every
- * capital before every small letter, so `Ясность` would sort above `апория`.
- *
- * Numbers are read as numbers while it is at it, so a topic numbered 452 comes
- * before one numbered 1200 rather than after it.
+ * Reader's order, not code point order: `>` and `<` read every alphabet as
+ * ASCII, putting `ё` after `я` and `ä` after `z`. `numeric` so 452 sorts before
+ * 1200.
  */
 const collator = new Intl.Collator(undefined, { numeric: true });
 
-/** Text, either of which may be missing, in that order. */
 function compareText(one: string | undefined, other: string | undefined): number {
 	return collator.compare(one ?? "", other ?? "");
 }
 
 /**
- * The order the annotations are written in, outermost grouping first: the day
- * they were made, then the topic, then the folder, then the file, and within a
- * file the page and the place on it. Kept out of the plugin class so it can be
- * checked on its own.
+ * Outermost grouping first: day, topic, folder, file, then page and the place
+ * on it.
  */
 export function compareAnnotations(
 	settings: PDFAnnotationPluginSetting
 ): (a1: PDFAnnotation, a2: PDFAnnotation) => number {
 	return function (a1: PDFAnnotation, a2: PDFAnnotation): number {
 		if (settings.groupByDate) {
-			// The day the annotation was made, outside every other grouping. A
-			// PDF need not date its annotations at all, and the ones it left
-			// undated belong after those it dated rather than before the
-			// earliest of them. Days are `YYYY-MM-DD`, which sorts as text.
+			// `YYYY-MM-DD` sorts as text; the undated come last, not first.
 			const d1 = a1.created ?? "";
 			const d2 = a2.created ?? "";
 			if (d1 != d2) {
@@ -58,9 +47,8 @@ export function compareAnnotations(
 		if (a1.pageNumber > a2.pageNumber) return 1;
 		if (a1.pageNumber < a2.pageNumber) return -1;
 
-		// They are on the same page: down it, by the top of the annotation.
-		// `rect` is used rather than the quad points, which an annotation need
-		// not carry.
+		// Same page: down it. `rect`, not quad points, which not every
+		// annotation carries.
 		if (a1.rect[1] > a2.rect[1]) return -1;
 		if (a1.rect[1] < a2.rect[1]) return 1;
 		return 0;

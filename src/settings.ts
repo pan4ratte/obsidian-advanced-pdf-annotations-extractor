@@ -40,25 +40,20 @@ export interface SupportedAnnotation {
 	subtype: string;
 	description: string;
 	/**
-	 * True for the text markup annotations, which carry QuadPoints: the PDF text
-	 * underneath them is extracted into {{highlightedText}} and they are rendered
-	 * with the highlight templates. The rest only contribute their own comment
-	 * and are rendered with the note templates.
+	 * True for the text markup types, which carry QuadPoints: the PDF text
+	 * under them is extracted into {{highlightedText}}. The rest contribute
+	 * only their own comment.
 	 */
 	marksUpText?: boolean;
 	/** Part of the default selection. */
 	desiredByDefault?: boolean;
 }
 
-// The annotation types that carry text an exported note can actually show:
-// either the PDF text they mark up, or text the reader typed themselves.
-//
-// Deliberately absent are the graphical markup types — Ink, Square, Circle,
-// Line, Polygon, PolyLine, Stamp, Caret and FileAttachment. Their content is a
-// drawing, a stamp or an attached file, none of which survives a conversion to
-// markdown, and their Contents entry is empty unless a comment happens to be
-// attached. Extracting them yields mostly blank entries. Link, Widget and Popup
-// are absent too: they are not annotations the reader made.
+// The types carrying text a note can show: the PDF text they mark up, or text
+// the reader typed. The graphical types (Ink, Square, Stamp, …) are left out on
+// purpose — their content is a drawing and their Contents is usually empty, so
+// extracting them yields blank entries. Link, Widget and Popup are not the
+// reader's annotations at all.
 export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 	{
 		subtype: "Highlight",
@@ -101,9 +96,8 @@ export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
 export const DEFAULT_TEMPLATE_KEY = "default";
 
 /**
- * What each type is written with to begin with: nothing, so the default
- * template covers them — except the ones that mark up text, which have
- * `{{highlightedText}}` to show and would otherwise lose it.
+ * Nothing to begin with, so the default covers every type — except those
+ * marking up text, which would otherwise lose their `{{highlightedText}}`.
  */
 export function defaultAnnotationTemplates(): Record<string, string> {
 	return Object.fromEntries(
@@ -115,9 +109,8 @@ export function defaultAnnotationTemplates(): Record<string, string> {
 }
 
 /**
- * The template an annotation of this type is written with: its own, or the
- * default when it has none. Blank counts as none, so clearing a type's template
- * hands it back to the default rather than writing nothing at all.
+ * This type's own template, or the default. Blank counts as none, so clearing
+ * one hands the type back to the default rather than writing nothing.
  */
 export function templateForAnnotation(
 	settings: PDFAnnotationPluginSetting,
@@ -132,14 +125,10 @@ export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
 ).map((annotation) => annotation.subtype);
 
 /**
- * Which extractions move the tags found in the comments to the note's
- * properties. The two kinds are worth telling apart because a tag means a
- * different thing in each: one note holds every annotation of a PDF, so the
- * tags on it are the PDF's, while a note per annotation carries only the tags
- * of the single comment it was written from.
- *
- * Inserting into the note being edited counts as a single note: everything
- * gathered lands in the one note either way.
+ * Which extractions move the tags in the comments to the note's properties. The
+ * two kinds differ in what a tag means: on one note holding every annotation it
+ * is the PDF's subject, on a note per annotation only that comment's. Inserting
+ * into the note being edited counts as a single note.
  */
 export const TAG_EXTRACTION_MODES = {
 	never: t.OPTION_EXTRACT_TAGS_NEVER,
@@ -151,91 +140,26 @@ export const TAG_EXTRACTION_MODES = {
 export type TagExtraction = keyof typeof TAG_EXTRACTION_MODES;
 
 /**
- * Until {{filelink}} existed, each kind of annotation had two templates that
- * differed only in how they linked the PDF: a wiki link for the vault, a plain
- * path for everything else. `migrateTemplates` folds a data.json written by
- * those versions into the single template per kind.
- *
- * The two defaults per pair are history, not wording: they are compared against
- * what an old data.json holds, to tell an untouched default from an edit. They
- * do not belong in the locale and must never be reworded or translated — doing
- * so makes every unedited template look customised.
- */
-const LEGACY_TEMPLATE_PAIRS = [
-	{
-		field: "noteTemplate",
-		internalKey: "noteTemplateInternalPDFs",
-		externalKey: "noteTemplateExternalPDFs",
-		kind: "notes",
-		internalDefault:
-			"{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n",
-		externalDefault:
-			"{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filepath}}*\n\n",
-	},
-	{
-		field: "highlightTemplate",
-		internalKey: "highlightTemplateInternalPDFs",
-		externalKey: "highlightTemplateExternalPDFs",
-		kind: "highlights",
-		internalDefault:
-			"> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n",
-		externalDefault:
-			"> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filepath}}*\n\n",
-	},
-] as const;
-
-/**
- * What the second level heading above each group of annotations shows. Purely
- * what is written into the note: the order the annotations come in is
- * `sortByTopic` and `groupByFolder`, so `none` leaves an otherwise identical
- * note without its file headings.
+ * What the heading above each group of annotations shows. Only what is written:
+ * the order is `sortByTopic` and `groupByFolder`.
  */
 export const FILE_HEADINGS = ["folder", "file", "none"] as const;
 export type FileHeading = (typeof FILE_HEADINGS)[number];
 
 /**
- * Where the notes go: beside whatever is open, or somewhere in the vault the
- * reader picked.
- *
- * `current` follows the file being looked at rather than the PDF, which is the
- * same folder when a PDF in the vault is open and the only one there is when
- * the PDF is not in the vault at all.
+ * Where the notes go. `current` follows the file being looked at rather than
+ * the PDF — the same folder when the PDF is open, and the only one there is
+ * when the PDF lives outside the vault.
  */
 export const NOTE_LOCATIONS = ["current", "vault"] as const;
 export type NoteLocation = (typeof NOTE_LOCATIONS)[number];
-
-/**
- * Settings renamed when the ones deciding where a note goes stopped calling it
- * an export — nothing leaves Obsidian, the notes are written into the vault.
- * Old name to new. Only the names changed; every value carries over as it is.
- */
-const RENAMED_SETTINGS: Record<string, string> = {
-	exportLocation: "noteLocation",
-	exportFolder: "noteFolder",
-	exportSubfolder: "noteSubfolder",
-	exportName: "noteName",
-	oneNotePerAnnotationExportName: "oneNotePerAnnotationName",
-};
-
-/**
- * Settings this version no longer has, cleared out of data.json rather than
- * left behind for a reader to wonder about. Whether the clipboard command
- * wrote a note is a command of its own now, so there is nothing left to carry
- * the old value over to.
- */
-const REMOVED_SETTINGS = [
-	"exportClipboardExtraction",
-	"clipboardSavesToNote",
-	"oneNotePerAnnotation",
-];
 
 /** Characters Obsidian will not take in a path, whatever a template renders. */
 const ILLEGAL_PATH_CHARS = /[\\:*?"<>|]/g;
 
 /**
- * A folder as a path can use it: no leading, trailing or doubled slashes, no
- * characters Obsidian rejects, and every part trimmed. A nested path survives —
- * a subfolder template is allowed to render one — an empty one comes back empty.
+ * A folder as a path can use it: no stray slashes, no characters Obsidian
+ * rejects, every part trimmed. A nested path survives, an empty one stays empty.
  */
 function cleanFolderPath(value: string): string {
 	return value
@@ -247,19 +171,16 @@ function cleanFolderPath(value: string): string {
 }
 
 /**
- * Long enough for a sentence a `{{topic}}` can hold, short enough that the path
- * around it still fits what the file system will take. Counted in characters as
- * they are read rather than in the units they are stored in, so that a cut
- * never falls inside one.
+ * Long enough for a `{{topic}}` sentence, short enough that the path around it
+ * still fits. Counted in characters, not storage units, so no cut falls inside
+ * one.
  */
 const MAX_NOTE_NAME_LENGTH = 100;
 
 /**
- * A note name a vault will take: the characters Obsidian rejects taken out, the
- * line breaks a variable like `{{topic}}` carries in collapsed to spaces, and
- * neither a leading dot — which would write a hidden note nobody sees — nor a
- * trailing one left behind. Comes back empty when nothing usable is left, so the
- * caller can put a name of its own in its place.
+ * A note name a vault will take: rejected characters out, line breaks collapsed
+ * to spaces, no leading dot (a note nobody sees) or trailing one. Empty when
+ * nothing usable is left, for the caller to name instead.
  */
 export function cleanNoteName(value: string): string {
 	const collapsed = value
@@ -281,9 +202,8 @@ export function cleanNoteName(value: string): string {
 }
 
 /**
- * Where one note is written. Kept out of the plugin class so it can be checked
- * on its own: `currentFolder` is the folder of the file being looked at and
- * `subfolder` arrives already rendered, since the templates are compiled there.
+ * Where one note is written. `currentFolder` is the folder of the file being
+ * looked at; `subfolder` arrives already rendered.
  */
 export function resolveNotePath(
 	settings: PDFAnnotationPluginSetting,
@@ -303,24 +223,6 @@ export function resolveNotePath(
 }
 
 const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
-
-/** `[[{{filepath}}]]` as the internal templates wrote it, spacing included. */
-const FILEPATH_WIKILINK = /\[\[\s*\{\{\s*filepath\s*\}\}\s*\]\]/g;
-const FILEPATH_PLAIN = /\{\{\s*filepath\s*\}\}/g;
-
-/** Which pair of templates something is about. Not shown to anyone as is. */
-export type TemplateKind = (typeof LEGACY_TEMPLATE_PAIRS)[number]["kind"];
-
-export interface TemplateMigration {
-	/** True when data.json still held the pre-{{filelink}} template fields. */
-	migrated: boolean;
-	/**
-	 * Kinds whose external template said something its internal counterpart did
-	 * not, so folding the pair would have thrown an edit away. Stashed in
-	 * `legacyExternalTemplates` instead.
-	 */
-	dropped: TemplateKind[];
-}
 
 export class PDFAnnotationPluginSetting {
 	public topicHeading: boolean;
@@ -346,17 +248,10 @@ export class PDFAnnotationPluginSetting {
 	 * own and is written with `defaultTemplate` instead.
 	 */
 	public annotationTemplates: Record<string, string>;
-	/**
-	 * Templates for PDFs outside the vault that `migrateTemplates` could not
-	 * fold in, keyed by the setting they came from. Nothing reads them; they are
-	 * kept so an edit made before the collapse can still be copied back by hand.
-	 */
-	public legacyExternalTemplates: Record<string, string>;
 	public oneNotePerAnnotationName: string;
 	/**
-	 * Name the notes made by the 'note per annotation' commands after the
-	 * annotation's topic, in place of `oneNotePerAnnotationName`, and leave the
-	 * topic out of the note itself.
+	 * Name a note per annotation after its topic instead of using
+	 * `oneNotePerAnnotationName`, and leave the topic out of the note.
 	 */
 	public topicToNoteName: boolean;
 	public overwriteExistingNote: boolean;
@@ -377,7 +272,6 @@ export class PDFAnnotationPluginSetting {
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
 		this.defaultTemplate = t.DEFAULT_NOTE_TEMPLATE;
 		this.annotationTemplates = defaultAnnotationTemplates();
-		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotationName =
 			t.DEFAULT_ONE_NOTE_NAME;
 		// Off, so the name template keeps naming the notes it named before.
@@ -387,9 +281,8 @@ export class PDFAnnotationPluginSetting {
 	}
 
 	/**
-	 * Whether this extraction moves the tags it found to the note's properties.
-	 * `onePerAnnotation` is what tells the two kinds apart; inserting into the
-	 * note being edited asks with false, being a single note like any other.
+	 * `onePerAnnotation` tells the two kinds apart; inserting into the note
+	 * being edited asks with false, being a single note like any other.
 	 */
 	public extractsTags(onePerAnnotation: boolean): boolean {
 		switch (this.extractTags) {
@@ -431,301 +324,43 @@ export class PDFAnnotationPluginSetting {
 	}
 
 	/**
-	 * Fold the four templates older versions stored into the two this version
-	 * has. The internal template wins, because a vault is where most PDFs are
-	 * read; its `[[{{filepath}}]]` becomes `{{filelink}}`, which renders the
-	 * same way. An external template that was customised on its own is adopted
-	 * instead, and one that disagrees with a customised internal template is
-	 * stashed rather than discarded.
-	 *
-	 * `loaded` is the raw data.json, since the fields being read no longer exist
-	 * on this class — and the collapsed template is written back into it rather
-	 * than onto the settings, for `migrateTemplateTypes` to take from there.
-	 * Templates already collapsed are left alone.
+	 * A heading this version knows. Anything else would silence the heading
+	 * through the `none` branch by accident.
 	 */
-	public static migrateTemplates(
-		loaded: Record<string, unknown>,
-		settings: PDFAnnotationPluginSetting
-	): TemplateMigration {
-		const migration: TemplateMigration = { migrated: false, dropped: [] };
-
-		for (const pair of LEGACY_TEMPLATE_PAIRS) {
-			if (typeof loaded[pair.field] === "string") continue;
-
-			const internal = loaded[pair.internalKey];
-			const external = loaded[pair.externalKey];
-			if (typeof internal !== "string" && typeof external !== "string") {
-				continue;
-			}
-			migration.migrated = true;
-
-			const customInternal =
-				typeof internal === "string" && internal !== pair.internalDefault
-					? internal.replace(FILEPATH_WIKILINK, "{{filelink}}")
-					: null;
-			const customExternal =
-				typeof external === "string" && external !== pair.externalDefault
-					? external.replace(FILEPATH_PLAIN, "{{filelink}}")
-					: null;
-
-			const collapsed = customInternal ?? customExternal;
-			if (collapsed) {
-				loaded[pair.field] = collapsed;
-			}
-
-			// Both were edited, and not into the same thing: the difference is
-			// more than the link, so it is not ours to throw away.
-			if (customInternal && customExternal && customExternal !== collapsed) {
-				settings.legacyExternalTemplates[pair.externalKey] =
-					external as string;
-				migration.dropped.push(pair.kind);
-			}
-		}
-
-		return migration;
+	public static normalizeFileHeading(value: unknown): FileHeading {
+		return FILE_HEADINGS.includes(value as FileHeading)
+			? (value as FileHeading)
+			: "folder";
 	}
 
-	/**
-	 * Templates used to come in two: one for the annotations that mark up text
-	 * and one for everything else. Now each type may have a template of its own
-	 * over a default that covers the ones that do not, so the pair becomes that
-	 * default — what the plain annotations were written with — and a template
-	 * of their own for the types that mark up text.
-	 *
-	 * A pair that says the same thing twice leaves the types with none, since
-	 * the default already says it. `loaded` is the raw data.json: neither field
-	 * exists on this class any more, and the fold above leaves its result there.
-	 */
-	public static migrateTemplateTypes(
-		loaded: Record<string, unknown>,
-		settings: PDFAnnotationPluginSetting
-	): boolean {
-		// Written by this version already; nothing to take from the old pair
-		// even if a hand-edited data.json still carries it.
-		if (typeof loaded.defaultTemplate === "string") return false;
-
-		const note = loaded.noteTemplate;
-		const highlight = loaded.highlightTemplate;
-		if (typeof note !== "string" && typeof highlight !== "string") {
-			return false;
-		}
-
-		if (typeof note === "string") settings.defaultTemplate = note;
-
-		for (const { subtype, marksUpText } of SUPPORTED_ANNOTS) {
-			const ownTemplate =
-				marksUpText &&
-				typeof highlight === "string" &&
-				highlight !== settings.defaultTemplate;
-			settings.annotationTemplates[subtype] = ownTemplate ? highlight : "";
-		}
-
-		return true;
+	/** A location this version knows, for a data.json edited by hand. */
+	public static normalizeNoteLocation(value: unknown): NoteLocation {
+		return NOTE_LOCATIONS.includes(value as NoteLocation)
+			? (value as NoteLocation)
+			: "vault";
 	}
 
-	/**
-	 * Older versions stored one `useFolderNames` boolean that both ordered the
-	 * annotations and labelled their heading, so a note could not be grouped by
-	 * folder without saying so in every heading, nor grouped by topic alone.
-	 * Split it into the two settings that do those jobs: `groupByFolder` for the
-	 * order and `fileHeading` for the label.
-	 *
-	 * `useStructuringHeadlines` sat above both as a master switch. Each heading
-	 * level says whether it is written itself now, so switching it off becomes
-	 * both of them off.
-	 *
-	 * `loaded` is the raw data.json, since neither field exists on this class
-	 * any more. Returns whether anything was migrated, so the caller can write
-	 * the settings back.
-	 */
-	public static migrateStructure(
-		loaded: Record<string, unknown>,
-		settings: PDFAnnotationPluginSetting
-	): boolean {
-		let migrated = false;
-
-		const heading = loaded.fileHeading;
-		if (typeof heading === "string") {
-			// A value this version does not know is worse than the default: it
-			// would suppress the heading through the `none` branch by accident.
-			const known = FILE_HEADINGS.includes(heading as FileHeading);
-			settings.fileHeading = known ? (heading as FileHeading) : "folder";
-			migrated = !known;
-		} else if (typeof loaded.useFolderNames === "boolean") {
-			settings.fileHeading = loaded.useFolderNames ? "folder" : "file";
-			migrated = true;
-		} else {
-			settings.fileHeading = "folder";
-		}
-
-		// What the heading said before the master switch below could silence it.
-		// The order it implied survives being silenced, so it is read from here
-		// rather than from the field.
-		const headingBeforeSwitch = settings.fileHeading;
-
-		if (typeof loaded.topicHeading === "boolean") {
-			settings.topicHeading = loaded.topicHeading;
-		} else if (typeof loaded.useStructuringHeadlines === "boolean") {
-			settings.topicHeading = loaded.useStructuringHeadlines;
-			// The master switch suppressed every heading, the file one
-			// included, whatever the setting below it said.
-			if (!loaded.useStructuringHeadlines) settings.fileHeading = "none";
-			migrated = true;
-		}
-
-		if (typeof loaded.groupByFolder === "boolean") {
-			settings.groupByFolder = loaded.groupByFolder;
-		} else if (typeof heading === "string") {
-			// Before the split the heading carried the order too, and only the
-			// folder heading grouped by folder — `file` and `none` both left the
-			// annotations ordered file by file.
-			settings.groupByFolder = headingBeforeSwitch === "folder";
-			migrated = true;
-		} else if (typeof loaded.useFolderNames === "boolean") {
-			settings.groupByFolder = loaded.useFolderNames;
-			migrated = true;
-		} else {
-			settings.groupByFolder = true;
-		}
-
-		return migrated;
+	/** A mode this version knows, so the dropdown never shows nothing. */
+	public static normalizeTagExtraction(value: unknown): TagExtraction {
+		return typeof value === "string" && value in TAG_EXTRACTION_MODES
+			? (value as TagExtraction)
+			: "never";
 	}
 
-	/**
-	 * A data.json under the names those settings used to have, read back under
-	 * the ones they have now, and without the ones this version dropped.
-	 * Returns a copy, so the migrations that follow and the load itself all see
-	 * one set of names, along with whether anything was read that way — the
-	 * settings are written back if so, and the old names leave data.json for
-	 * good.
-	 *
-	 * A name this version already writes wins over the one it replaced, which
-	 * can only both be there if a data.json was edited by hand.
-	 */
-	public static normalizeLegacySettings(loaded: Record<string, unknown>): {
-		data: Record<string, unknown>;
-		changed: boolean;
-	} {
-		const data = { ...loaded };
-		let changed = false;
-
-		for (const [was, is] of Object.entries(RENAMED_SETTINGS)) {
-			if (!(was in data)) continue;
-			if (!(is in data)) {
-				data[is] = data[was];
-			}
-			delete data[was];
-			changed = true;
-		}
-
-		for (const gone of REMOVED_SETTINGS) {
-			if (!(gone in data)) continue;
-			delete data[gone];
-			changed = true;
-		}
-
-		return { data, changed };
-	}
-
-	/**
-	 * Extracting the tags used to be a toggle, which said all extractions or
-	 * none of them — the two the four modes still spell. Reads the old boolean
-	 * off the raw data.json, since it is no longer a field of this class, and
-	 * takes a mode it does not know back to `never` rather than leaving the
-	 * dropdown showing nothing.
-	 *
-	 * Returns whether anything was migrated, so the caller can write the
-	 * settings back and be rid of the old field.
-	 */
-	public static migrateTagExtraction(
-		loaded: Record<string, unknown>,
-		settings: PDFAnnotationPluginSetting
-	): boolean {
-		const legacy = loaded.extractTagsFromAnnotationsAsObsidianTags;
-		if (typeof legacy === "boolean") {
-			settings.extractTags = legacy ? "always" : "never";
-			return true;
-		}
-
-		if (!(settings.extractTags in TAG_EXTRACTION_MODES)) {
-			settings.extractTags = "never";
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Older versions stored one `exportPath` string, where the literal `./`
-	 * meant "beside the PDF" and anything else was a vault folder that had to
-	 * end in a slash. Split it into the location it was choosing between and
-	 * the folder it named.
-	 *
-	 * `loaded` is the raw data.json, since `exportPath` no longer exists on this
-	 * class. Returns whether anything was migrated, so the caller can write the
-	 * settings back.
-	 */
-	public static migrateNotePath(
-		loaded: Record<string, unknown>,
-		settings: PDFAnnotationPluginSetting
-	): boolean {
-		const location = loaded.noteLocation;
-		if (typeof location === "string") {
-			// `pdf` was this setting following the PDF rather than the file
-			// being looked at, which is the same folder whenever the PDF is
-			// the file being looked at.
-			if (location === "pdf") {
-				settings.noteLocation = "current";
-				return true;
-			}
-			const known = NOTE_LOCATIONS.includes(location as NoteLocation);
-			settings.noteLocation = known
-				? (location as NoteLocation)
-				: "vault";
-			return !known;
-		}
-
-		if (typeof loaded.exportPath !== "string") return false;
-
-		if (loaded.exportPath.trim() === "./") {
-			settings.noteLocation = "current";
-			settings.noteFolder = "";
-		} else {
-			// Anything else was a vault folder, written with the trailing
-			// slash the old setting demanded.
-			settings.noteLocation = "vault";
-			settings.noteFolder = cleanFolderPath(loaded.exportPath);
-		}
-		return true;
-	}
-
-	/**
-	 * data.json is written by users and by older versions of this plugin, which
-	 * stored the selection as a comma separated string. Accept both, and drop
-	 * anything that is not a list of subtypes.
-	 */
+	/** Null for anything data.json holds that is not a list of subtypes. */
 	public static normalizeDesiredAnnotations(value: unknown): string[] | null {
-		if (typeof value === "string") {
-			return value
-				.split(",")
-				.map((subtype) => subtype.trim())
-				.filter((subtype) => subtype.length > 0);
-		}
-		if (Array.isArray(value)) {
-			const entries: unknown[] = value;
-			const subtypes = entries.filter(
-				(subtype): subtype is string => typeof subtype === "string"
-			);
-			return subtypes.length === entries.length ? subtypes : null;
-		}
-		return null;
+		if (!Array.isArray(value)) return null;
+
+		const entries: unknown[] = value;
+		const subtypes = entries.filter(
+			(subtype): subtype is string => typeof subtype === "string"
+		);
+		return subtypes.length === entries.length ? subtypes : null;
 	}
 
 	/**
-	 * One entry per supported type, whatever data.json holds: a template it
-	 * gives as a string is kept as it is — blank included, which is a type
-	 * handed back to the default — and anything else is read as no template of
-	 * its own. A type it says nothing about, because this version knows one the
-	 * last did not, has none either.
+	 * One entry per supported type. A string is kept, blank included — that is
+	 * a type handed back to the default — and anything else read as none.
 	 */
 	public static normalizeAnnotationTemplates(
 		value: unknown
@@ -744,10 +379,8 @@ export class PDFAnnotationPluginSetting {
 }
 
 /**
- * Type-ahead over the vault's folders, for the setting that names one. Every
- * folder is offered on an empty query, so the field can be browsed as well as
- * typed into; the root is offered as `/`, which resolves to the vault root the
- * same way an empty field does.
+ * Type-ahead over the vault's folders. Every folder is offered on an empty
+ * query, so the field can be browsed as well as typed into.
  */
 class FolderSuggest extends AbstractInputSuggest<string> {
 	getSuggestions(query: string): string[] {
@@ -797,18 +430,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * A collapsible panel, closed to begin with. Returns the element its
-	 * contents go in.
-	 *
-	 * <details> has no open and close transition of its own, so it is animated
-	 * here: opening reveals the content first, so its height can be measured,
-	 * then animates up to it; closing runs the reverse and only marks the
-	 * element closed once the animation has finished, or the content would
-	 * vanish on the first frame.
-	 *
-	 * A toggle mid-animation picks up from the height currently on screen
-	 * rather than restarting, and anyone who has asked for less motion gets the
-	 * plain instant toggle the element does by itself.
+	 * A collapsible panel, closed to begin with; returns the element its
+	 * contents go in. <details> has no transition of its own, so opening
+	 * reveals the content to measure it and animates up to that height, and
+	 * closing only marks the element closed once the animation has finished.
+	 * A toggle mid-animation picks up from the height on screen.
 	 */
 	createAccordion(
 		parent: HTMLElement,
@@ -872,19 +498,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Put a numbered gutter beside a template's text area. The text area is
-	 * wrapped in a box it now shares with the gutter, which is redrawn as lines
-	 * come and go and scrolled in step with it.
+	 * A numbered gutter beside a template's text area, redrawn as lines come and
+	 * go and scrolled in step. Soft wrapping is off: a wrapped line is still one
+	 * line, with no honest number for its second row.
 	 *
-	 * Soft wrapping is turned off for this: a wrapped line occupies two rows on
-	 * screen but is still one line, and there is no honest number to put beside
-	 * the second row. Long template lines scroll sideways instead.
-	 *
-	 * Returns the box the two now share, for a caller that wants it somewhere
-	 * else in the card, and the redraw — for text put into the area by
-	 * something other than typing, such as switching which template is being
-	 * written, which fires no input event and would otherwise leave the numbers
-	 * counting the template before it.
+	 * Returns the box the two share and the redraw — needed for text put in by
+	 * anything other than typing, such as switching template, which fires no
+	 * input event.
 	 */
 	addLineNumbers(textarea: HTMLTextAreaElement): {
 		editorEl: HTMLElement | null;
@@ -918,10 +538,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Append `text` to `parent`, turning the first occurrence of `linkText`
-	 * into a link. Keeps the paragraph one translatable sentence instead of the
-	 * fragments either side of an anchor; a translation that drops the word
-	 * simply renders without the link rather than losing the sentence.
+	 * Appends `text`, turning the first `linkText` into a link. Keeps the
+	 * paragraph one translatable sentence rather than the fragments either side
+	 * of an anchor.
 	 */
 	appendTextWithLink(
 		parent: HTMLElement,
@@ -940,11 +559,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Make `pill` copy one template variable to the clipboard when clicked, and
-	 * give it the icon button that says so. The listener sits on the pill rather
-	 * than the button, so the whole pill is the target — and a click on the icon
-	 * bubbles up to that same listener instead of copying twice. The button is
-	 * still a real one, which is what makes the pill reachable by keyboard.
+	 * Makes `pill` copy a template variable, with the icon button that says so.
+	 * The listener is on the pill so the whole of it is the target; the button
+	 * is real, which is what makes the pill reachable by keyboard.
 	 */
 	addCopyAction(pill: HTMLElement, variable: string): void {
 		const button = pill.createEl("button", {
@@ -1016,10 +633,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			});
 		});
 
-		// The instructions are this heading's description rather than a
-		// paragraph after it, so the section reads as one block. They go in
-		// through descEl because setDesc takes text, and this text has a link
-		// in the middle of it.
+		// The heading's description rather than a paragraph after it, so the
+		// section reads as one block. Through descEl, since setDesc takes text
+		// and this has a link in the middle.
 		const templatesHeading = new Setting(containerEl)
 			.setName(t.SECTION_TEMPLATES)
 			.setHeading();
@@ -1071,10 +687,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			templateVariableRow.createEl("td", { text: description });
 		});
 
-		// One card, whose picker says which template is being written: the
-		// default that covers every type, or one type's own. Editing them one
-		// at a time keeps the card the size of a single template however many
-		// types there are.
+		// One card whose picker says which template is being written. Editing
+		// them one at a time keeps the card one template tall.
 		const templateColumns = containerEl.createDiv({
 			cls: "pdf-annotations-template-columns",
 		});
@@ -1141,19 +755,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				showTemplate(editing);
 			});
 		card.settingEl.addClass("pdf-annotations-template-setting");
-		// Last child of the card rather than of the picker's control, so the
-		// card is a row of text and picker with the editor across the width
-		// beneath it — and the two wrap onto lines of their own when the
-		// settings pane is too narrow to hold them side by side.
+		// Last child of the card, not of the picker's control: text and picker
+		// share a row with the editor across the width beneath them.
 		if (editorEl) card.settingEl.appendChild(editorEl);
 
-		// Two groups, in the order they take effect: what decides where an
-		// annotation lands, then what gets written above it.
-		// The topic heading has nothing to head until a topic is split off the
-		// annotation, so it follows the setting that does the splitting: off and
-		// out of reach while that one is. It stays in view either way, and the
-		// setting it is switched off from is remembered, so switching the
-		// grouping back on brings the heading back with it.
+		// Two groups, in the order they take effect: where an annotation lands,
+		// then what is written above it.
+		// The topic heading has nothing to head until a topic is split off, so
+		// it follows the setting that splits it — greyed out but still in view,
+		// and remembering the choice it was switched off from.
 		// Assigned as the settings below are built, before anything can call it.
 		let topicHeadingToggle!: ToggleComponent;
 		let dateHeadingToggle!: ToggleComponent;
@@ -1277,10 +887,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(t.SECTION_NOTES)
 			.setHeading();
-		// A note going beside its PDF has no folder of the vault to be put in
-		// and no subfolder under it, so the two fields are not there to be
-		// answered at all until that changes. They open and close together,
-		// from the one panel they share.
+		// A note beside its PDF has no vault folder to go in and no subfolder
+		// under it, so both fields open and close from the one panel.
 		let showNoteTarget!: (shown: boolean, animate: boolean) => void;
 		const syncNoteTarget = (animate: boolean) => {
 			showNoteTarget(
@@ -1341,10 +949,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		);
 		syncNoteTarget(false);
 
-		// The switch above the field it governs, as the destination sits above
-		// the folder it decides: the name template has nothing left to name
-		// once the topic names the notes, so it goes rather than sitting there
-		// looking answerable.
+		// The switch above the field it governs: once the topic names the
+		// notes, the name template has nothing left to name.
 		let showOneNoteName!: (shown: boolean, animate: boolean) => void;
 		const syncOneNoteName = (animate: boolean) => {
 			showOneNoteName(!this.plugin.settings.topicToNoteName, animate);

@@ -25,10 +25,8 @@ import { SUPPORTED_ANNOTS } from "src/settings";
 import { LoadedAnnotations } from "src/types";
 
 /**
- * A path that names a place on the machine rather than in the vault: a drive
- * letter, a UNC share, a unix root, or a home directory. Only used to tell the
- * two apart in the field — whether the path leads to a readable PDF is the
- * loader's answer to give.
+ * A place on the machine rather than in the vault. Only tells the two apart —
+ * whether the path leads to a readable PDF is the loader's answer to give.
  */
 const ABSOLUTE_PATH = /^(?:[a-zA-Z]:[\\/]|\\\\|\/|~[\\/])/;
 
@@ -38,10 +36,9 @@ type ExtractionSource =
 	| { kind: "external"; path: string };
 
 /**
- * Where an extraction puts what it gathered — the choice the ordinary commands
- * each make for themselves, asked here instead. Separate notes to begin with:
- * a reader who has narrowed an extraction down to certain pages, days and types
- * is picking annotations apart, not filing them together.
+ * Where an extraction puts what it gathered, which the ordinary commands each
+ * decide for themselves. Separate notes first: a reader who has narrowed one
+ * down is picking annotations apart, not filing them together.
  */
 const EXTRACTION_TARGETS = {
 	separate: t.MODAL_TARGET_SEPARATE,
@@ -51,36 +48,23 @@ const EXTRACTION_TARGETS = {
 
 type ExtractionTarget = keyof typeof EXTRACTION_TARGETS;
 
-/**
- * Tells one source from another, so a PDF already read is not read again and a
- * field pointed somewhere else drops what was read from where it pointed
- * before.
- */
+/** Tells one source from another, so a PDF already read is not read again. */
 function sourceKey(source: ExtractionSource): string {
 	return source.kind === "vault"
 		? `vault:${source.file.path}`
 		: `external:${source.path}`;
 }
 
-/**
- * A path is pasted with the quotes the file manager copied it in as often as
- * without them.
- */
+/** A path is pasted with the file manager's quotes as often as without. */
 function unquote(raw: string): string {
 	return raw.trim().replace(/^["']|["']$/g, "");
 }
 
 /**
- * A day as the reader's language writes one — "July 25, 2026", and the same day
- * in the months and word order of whatever language Obsidian is in. The days
- * are held and sorted as `YYYY-MM-DD` throughout and only spelled out here, so
- * the order of the list stays the order of the calendar whatever the format
- * puts first.
- *
- * Obsidian sets moment's locale to the app's own, so a Russian interface reads
- * Russian months even where this plugin has no translation of its own yet.
- * Anything that is not a day is left as it stands rather than shown as an
- * invalid date.
+ * A day as the reader's language writes one. Days are held and sorted as
+ * `YYYY-MM-DD` and only spelled out here, so the list stays in calendar order
+ * whatever the format puts first. Obsidian sets moment's locale to the app's,
+ * so a Russian interface reads Russian months without a translation here.
  */
 function readableDay(day: string): string {
 	const date = moment(day, "YYYY-MM-DD", true);
@@ -106,12 +90,9 @@ class PDFFileSuggest extends AbstractInputSuggest<TFile> {
 }
 
 /**
- * The extraction a reader sets up rather than one a command already decided:
- * which PDF, which pages, and which of the days its annotations were made on.
- *
- * The PDF is read once and kept, since the list of dates can only be made from
- * the annotations themselves — so extracting filters what is already in hand
- * instead of reading the file a second time.
+ * The extraction a reader sets up rather than one a command already decided.
+ * The PDF is read once and kept — the list of dates can only be made from the
+ * annotations themselves, so extracting filters what is already in hand.
  */
 export class AdvancedExtractionModal extends Modal {
 	private readonly plugin: PDFAnnotationPlugin;
@@ -124,17 +105,16 @@ export class AdvancedExtractionModal extends Modal {
 	private target: ExtractionTarget = "separate";
 
 	/**
-	 * The days still ticked in the list. Null until the list has been built,
-	 * and back to null whenever the field names a different PDF — every day is
-	 * ticked to begin with, since the list is there to leave days out.
+	 * The days still ticked. Null until the list is built and again whenever
+	 * the field names a different PDF; every day starts ticked, since the list
+	 * is there to leave days out.
 	 */
 	private chosenDays: Set<string> | null = null;
 
 	/**
-	 * The annotation types ticked for this extraction, which start as the ones
-	 * the settings ask for. Ticking one here settles this extraction and no
-	 * other: the modal is where an extraction is decided, not where the setting
-	 * behind every other command is changed.
+	 * The types ticked for this extraction, starting as the settings have them.
+	 * Ticking one here settles this extraction only, never the setting behind
+	 * every other command.
 	 */
 	private readonly chosenSubtypes = new Set<string>();
 
@@ -155,20 +135,12 @@ export class AdvancedExtractionModal extends Modal {
 		this.plugin = plugin;
 	}
 
-	/**
-	 * One card, in the bordered style the settings tab groups its own settings
-	 * into. Every question the modal asks is a card, so the three of them read
-	 * as three questions rather than as one column of rows.
-	 */
+	/** One card, in the bordered style the settings tab groups its own into. */
 	private card(): HTMLElement {
 		return this.contentEl.createDiv({ cls: "pdf-annotations-modal-card" });
 	}
 
-	/**
-	 * The annotation types this extraction is to write, ticked as the settings
-	 * have them: the same grid as the settings tab, answering the same question,
-	 * for this extraction only.
-	 */
+	/** The settings tab's grid, answering the same question for this run. */
 	private addSubtypes(): void {
 		const setting = new Setting(this.card())
 			.setName(t.SETTING_ANNOTATIONS_NAME)
@@ -215,17 +187,15 @@ export class AdvancedExtractionModal extends Modal {
 				suggest.onSelect((file) => {
 					search.setValue(file.path);
 					this.setPath(file.path);
-					// Registering a callback takes the selection over, closing
-					// the popover included: left to itself it stays open over
-					// the field it has just answered.
+					// Registering a callback takes the selection over,
+					// closing the popover included.
 					suggest.close();
 				});
 			});
 
-		// The pages and how to read them are one question, so they share a card:
-		// the toggle says what the field above it means, and neither carries a
-		// description — the placeholder shows the shape of an answer, and the
-		// toggle's own wording is the whole of what it does.
+		// One question, one card: the toggle says what the field above it
+		// means. The placeholder shows the shape of an answer, so neither
+		// needs a description.
 		const pagesCard = this.card();
 		new Setting(pagesCard)
 			.setName(t.MODAL_PAGES_NAME)
@@ -258,10 +228,9 @@ export class AdvancedExtractionModal extends Modal {
 				});
 			});
 
-		// The panel is what opens and closes, and it carries no layout of its
-		// own: `pdf-annotations-collapsed` is a plain class, so a `display` on
-		// the panel would be read after it and keep a closed panel on screen.
-		// The list inside it is where the column lives.
+		// The panel opens and closes and carries no layout of its own: a
+		// `display` on it would outrank `pdf-annotations-collapsed` and keep a
+		// closed panel on screen. The column lives on the list inside.
 		const datePanel = datesCard.createDiv({
 			cls: "pdf-annotations-collapsible pdf-annotations-collapsed",
 		});
@@ -281,9 +250,8 @@ export class AdvancedExtractionModal extends Modal {
 					});
 			});
 
-		// A plain row rather than a setting: a setting row draws a rule above
-		// itself and pads for a name and description this one does not have, all
-		// of which would only have to be taken back off again.
+		// A plain row: a setting row draws a rule and pads for a name and
+		// description this one does not have.
 		const actions = this.contentEl.createDiv({
 			cls: "pdf-annotations-modal-actions",
 		});
@@ -302,9 +270,8 @@ export class AdvancedExtractionModal extends Modal {
 	}
 
 	/**
-	 * Obsidian hands a modal's focus to the first field in it, which here opens
-	 * the type-ahead over every PDF in the vault before anything has been asked
-	 * of it. Given up on the next frame, once that focus has been handed out.
+	 * Obsidian focuses a modal's first field, which here opens the type-ahead
+	 * over the whole vault unasked. Given up once that focus is handed out.
 	 */
 	private releaseFocus(): void {
 		const input = this.fileInput?.inputEl;
@@ -318,10 +285,9 @@ export class AdvancedExtractionModal extends Modal {
 	}
 
 	/**
-	 * A path already in the clipboard is most likely the one the reader came
-	 * here to extract, so it is filled in — but only when it names a PDF this
-	 * plugin can read. Anything else in the clipboard is the reader's own, and
-	 * dropping it into the field would only have to be cleared out again.
+	 * A path in the clipboard is most likely the one to extract, so it is filled
+	 * in — but only when it names a readable PDF. Anything else is the reader's
+	 * own and would just have to be cleared out again.
 	 */
 	private async prefillFromClipboard(): Promise<void> {
 		try {
@@ -359,9 +325,8 @@ export class AdvancedExtractionModal extends Modal {
 		this.path = value;
 		const source = this.resolveSource();
 
-		// What was read belongs to the PDF it was read from. Pointed at another
-		// one — or at nothing, the field having been cleared — the annotations
-		// and the days ticked from them both go, list and all.
+		// What was read belongs to the PDF it was read from: pointed elsewhere,
+		// or cleared, the annotations and the ticked days both go.
 		if (!source || (this.loaded && sourceKey(source) !== this.loaded.key)) {
 			this.loaded = null;
 			this.chosenDays = null;
@@ -369,9 +334,8 @@ export class AdvancedExtractionModal extends Modal {
 		}
 
 		this.refresh();
-		// Read as soon as there is something to read, whether or not the dates
-		// have been asked for: reading is the slow part, and a reader who turns
-		// the list on then waits for what could have been read already.
+		// Read as soon as there is something to read, asked for or not: reading
+		// is the slow part, and the list should be there when it opens.
 		if (source) void this.prepare();
 	}
 
@@ -387,9 +351,8 @@ export class AdvancedExtractionModal extends Modal {
 	private async load(
 		source: ExtractionSource
 	): Promise<LoadedAnnotations | null> {
-		// Every type is read, whichever are ticked: ticking one off is then
-		// answered out of what is already in hand rather than by reading the
-		// whole PDF over again.
+		// Every type, whichever are ticked, so ticking one off needs no second
+		// read of the PDF.
 		const everyType = SUPPORTED_ANNOTS.map(({ subtype }) => subtype);
 
 		if (source.kind === "vault") {
@@ -413,11 +376,7 @@ export class AdvancedExtractionModal extends Modal {
 		};
 	}
 
-	/**
-	 * The annotations of the PDF the field names, read the first time they are
-	 * asked for and kept afterwards: the list of dates and the extraction
-	 * itself both want them, and a PDF is slow enough to read once.
-	 */
+	/** Read on first ask and kept; the dates and the extraction both want them. */
 	private async ensureLoaded(): Promise<LoadedAnnotations | null> {
 		const source = this.resolveSource();
 		if (!source) return null;
@@ -458,9 +417,8 @@ export class AdvancedExtractionModal extends Modal {
 	}
 
 	/**
-	 * Reads the PDF the field names and puts its days in the list. Started as
-	 * soon as a PDF is named rather than when the list is asked for, so the list
-	 * is already there when it opens; the panel it fills is closed until then.
+	 * Reads the PDF and fills the list of days. Started as soon as one is named
+	 * rather than when the list opens, into a panel still closed until then.
 	 */
 	private async prepare(): Promise<void> {
 		const loaded = await this.ensureLoaded();
@@ -500,9 +458,8 @@ export class AdvancedExtractionModal extends Modal {
 
 	private async extract(): Promise<void> {
 		const { selection, invalid } = PageSelection.parse(this.pages);
-		// Extracting the pages that were understood would quietly leave out the
-		// ones that were not, which is the wrong extraction rather than a
-		// smaller one.
+		// Extracting only the pages that were understood is the wrong
+		// extraction, not a smaller one.
 		if (invalid.length > 0) {
 			new Notice(`${t.NOTICE_PAGES_UNREADABLE}: ${invalid.join(", ")}`);
 			return;
@@ -517,18 +474,15 @@ export class AdvancedExtractionModal extends Modal {
 			days: this.byDate ? this.chosenDays : null,
 			subtypes: this.chosenSubtypes,
 		});
-		// A note saying it holds no annotations is what the ordinary commands
-		// write for a PDF that has none. Here it would mean the pages or dates
-		// were narrowed too far, which is worth saying instead of filing.
+		// Here an empty note would mean the filters were narrowed too far,
+		// which is worth saying rather than filing.
 		if (annotations.length === 0) {
 			new Notice(t.NOTICE_NOTHING_SELECTED);
 			return;
 		}
 
-		// Asked for from the palette, so there need be no note open at all —
-		// and nothing to insert into is a choice to change rather than an
-		// extraction to lose, which is why the modal is still here to change it
-		// in.
+		// Asked for from the palette, so no note need be open. Checked before
+		// closing: it is a choice to change, not an extraction to lose.
 		const view =
 			this.target === "current"
 				? this.app.workspace.getActiveViewOfType(MarkdownView)

@@ -21,7 +21,7 @@ This release reworks how an extraction is asked for and what it writes. The choi
 * **Name a note after its annotation's topic.** *Put the topic of the annotation to the note name* names each note per annotation after its comment's first line, and leaves that line out of the note.
 * **Ordering and headings are separate settings.** *Group by folder* decides the order, *Heading above each file* decides what is written between the annotations.
 
-Please note: several settings changed shape and are folded in on first load, with every value kept — the four templates became two and then one per type, the export path became a location plus a folder, `desiredAnnotations` became a list, and extracting tags became a choice of four.
+Please note: the fork has a plugin id of its own, so it starts from its own settings rather than reading those of the plugin it forked from. Set it up once in its settings tab.
 
 ### New features
 
