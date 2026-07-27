@@ -1117,15 +1117,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			"pdf-annotations-stacked-setting"
 		);
 		syncNoteTarget();
-		new Setting(containerEl)
-			.setName(t.SETTING_NOTE_NAME_NAME)
-			.setDesc(t.SETTING_NOTE_NAME_DESC)
-			.addText((input) => this.buildValueInput(input, "noteName"));
-		// The name template has nothing left to name once the topic names the
-		// notes, so it is shown as the setting it is: one of the two, not both.
-		// Faded and its field disabled, rather than merely faded — a field that
-		// looks spent but still takes what is typed into it is worse than one
-		// that plainly does nothing.
+
+		// The switch above the field it governs, as the destination sits above
+		// the folder it decides: the name template has nothing left to name
+		// once the topic names the notes, so it is shown as the setting it is —
+		// one of the two, not both. Faded and its field disabled, rather than
+		// merely faded: a field that looks spent but still takes what is typed
+		// into it is worse than one that plainly does nothing.
 		let oneNoteNameInput!: TextComponent;
 		let oneNoteNameSetting!: Setting;
 		const syncOneNoteName = () => {
@@ -1137,13 +1135,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 		};
 
-		oneNoteNameSetting = new Setting(containerEl)
-			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
-			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
-			.addText((input) => {
-				oneNoteNameInput = input;
-				this.buildValueInput(input, "oneNotePerAnnotationName");
-			});
 		new Setting(containerEl)
 			.setName(t.SETTING_TOPIC_TO_NAME_NAME)
 			.setDesc(t.SETTING_TOPIC_TO_NAME_DESC)
@@ -1156,7 +1147,34 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+		oneNoteNameSetting = new Setting(containerEl)
+			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
+			.addText((input) => {
+				oneNoteNameInput = input;
+				this.buildValueInput(input, "oneNotePerAnnotationName");
+			});
 		syncOneNoteName();
+
+		new Setting(containerEl)
+			.setName(t.SETTING_EXTRACT_TAGS_NAME)
+			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings
+							.extractTagsFromAnnotationsAsObsidianTags
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags =
+							value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName(t.SETTING_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_NOTE_NAME_DESC)
+			.addText((input) => this.buildValueInput(input, "noteName"));
 		new Setting(containerEl)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)
@@ -1165,17 +1183,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.overwriteExistingNote)
 					.onChange(async (value) => {
 						this.plugin.settings.overwriteExistingNote = value;
-						await this.plugin.saveSettings();
-					})
-			);
-			new Setting(containerEl)
-			.setName(t.SETTING_EXTRACT_TAGS_NAME)
-			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags)
-					.onChange(async (value) => {
-						this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags = value;
 						await this.plugin.saveSettings();
 					})
 			);

@@ -116,7 +116,7 @@ export default {
     SETTING_ONE_NOTE_NAME_NAME: "Name of a note per annotation",
     SETTING_ONE_NOTE_NAME_DESC: "What the notes made by the 'note per annotation' commands are called, as a template. '{{filename}}' is the PDF's name; add '{{counter}}' for the annotation's number, without which they would all be the same note. The annotation's own variables work here too, '{{topic}}' among them — it holds the annotation's first line, and only when 'Sort by topic' is on. Whenever a template renders nothing a note can be called, the PDF's name and the number are used instead.",
     SETTING_TOPIC_TO_NAME_NAME: "Put the topic of the annotation to the note name",
-    SETTING_TOPIC_TO_NAME_DESC: "Enable if you want to avoid duplication of the {{topic}} if your template has it. The notes made by the 'note per annotation' commands are then named after the annotation's topic rather than by the template above, and the topic is left out of the note itself — including the heading 'Collect notes with the same topic under a shared heading' would write.",
+    SETTING_TOPIC_TO_NAME_DESC: "Enable if you want to avoid duplication of the {{topic}} if your template has it. The notes made by the 'note per annotation' commands are then named after the annotation's topic rather than by the name template under this, and the topic is left out of the note itself — including the heading 'Collect notes with the same topic under a shared heading' would write.",
     SETTING_OVERWRITE_NAME: "Overwrite existing note",
     SETTING_OVERWRITE_DESC: "If enabled, a note of the same name is replaced rather than added to.",
     SETTING_EXTRACT_TAGS_NAME: "Extract tags in annotations as Obsidian tags",
