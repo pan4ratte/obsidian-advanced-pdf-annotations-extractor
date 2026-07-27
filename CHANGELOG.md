@@ -18,6 +18,9 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   zone are deliberately not read: a zone would move an annotation to the day
   before or after depending on where the note is read.
 - `{{created}}` template variable, holding that same day.
+- *Extract from the current file into a note per annotation* and *Extract from
+  the file path in the clipboard into a note per annotation*, replacing the
+  setting that used to decide this for every command at once.
 - A command for writing a PDF from outside the vault to a note of its own:
   *Extract from the file path in the clipboard into a new note*. The command
   that was there inserts into the note being edited, so it needs one open and
@@ -147,6 +150,12 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   clipboard command did behind its own name. The two things it chose between
   are two commands now, each saying which it is. Its value is dropped from
   `data.json`.
+- *One note per annotation*, for the same reason: it changed what every
+  extraction command did, from somewhere else and before the fact. Both
+  extraction commands have a *note per annotation* counterpart now, so the
+  choice is made where the extraction is asked for. *Name of a note per
+  annotation* stays, and is no longer hidden behind the toggle. The old value
+  is dropped from `data.json`.
 
 - `versions.json`, `version-bump.mjs`, the `npm run version` script and `.npmrc`.
   Versions are now bumped by editing `manifest.json` and `package.json` together;

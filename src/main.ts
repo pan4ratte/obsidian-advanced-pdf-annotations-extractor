@@ -96,7 +96,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		});
 	}
 
-	async loadSinglePDFFile(pdfFile: TFile) {
+	async loadSinglePDFFile(pdfFile: TFile, onePerAnnotation = false) {
 		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 		const containingFolder = pdfFile.parent.name;
 		const grandtotal: PDFAnnotation[] = [];
@@ -110,9 +110,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 			desiredAnnotations
 		);
 		this.sort(grandtotal);
-		await this.writeNotes(pdfFile, grandtotal, false);
+		await this.writeNotes(pdfFile, grandtotal, false, onePerAnnotation);
 	}
-	private extractTagsFromAnnotationsAndAddHeaderToNote(note: string, annotations: PDFAnnotation[]): string {
+	private tagsInAnnotations(annotations: PDFAnnotation[]): string[] {
 		// Use Set instead of Array to eliminate duplicates
 		const extractedTagsFromAnnotations = new Set<string>();
 		annotations.forEach((annotation) => {
@@ -122,43 +122,76 @@ export default class PDFAnnotationPlugin extends Plugin {
 				extractedTagsFromAnnotations.add(match[1]);
 			}
 		});
-		let obsidianHeaderWithTags = "---\ntags:\n";
-		extractedTagsFromAnnotations.forEach((tag) => {
-			obsidianHeaderWithTags += " - " + tag + "\n";
+		return [...extractedTagsFromAnnotations];
+	}
+
+	/**
+	 * Add the tags to the note's own properties, rather than writing a block of
+	 * front matter into its text: a note the annotations were appended to
+	 * already has its properties at the top, and a second block further down is
+	 * text like any other. Existing tags are kept.
+	 */
+	private async addTagsToNoteProperties(
+		note: TFile,
+		tags: string[]
+	): Promise<void> {
+		if (tags.length === 0) return;
+
+		await this.app.fileManager.processFrontMatter(note, (frontmatter) => {
+			const properties = frontmatter as Record<string, unknown>;
+			const existing = properties.tags;
+			const kept = Array.isArray(existing)
+				? existing.map(String)
+				: typeof existing === "string" && existing.length > 0
+					? [existing]
+					: [];
+
+			properties.tags = [...new Set([...kept, ...tags])];
 		});
-		obsidianHeaderWithTags += "---";
-		note = obsidianHeaderWithTags + "\n" + note;
-		return note;
 	}
 
 	private async writeNotes(
 		fileMeta: FileMeta,
 		grandtotal: PDFAnnotation[],
-		isExternalFile: boolean
+		isExternalFile: boolean,
+		onePerAnnotation = false
 	): Promise<void> {
-		if (this.settings.oneNotePerAnnotation) {
+		const currentFolder = this.currentFolder();
+
+		if (onePerAnnotation) {
 			// Written one after another: concurrent writes to the same note (when
 			// the note name lacks {{counter}}) would race each other.
 			for (const [index, anno] of grandtotal.entries()) {
-				let note = this.formatter.format([anno], isExternalFile);
+				const note = this.formatter.format([anno], isExternalFile);
 				const fileNameOfNote =
 					this.getResolvedOneNotePerAnnotationName(fileMeta, index + 1) + ".md";
-				const filePathOfNote = this.getResolvedNotePath(fileMeta, fileNameOfNote);
-				if (this.settings.extractTagsFromAnnotationsAsObsidianTags) {
-					note = this.extractTagsFromAnnotationsAndAddHeaderToNote(note, [anno]);
+				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
+				// A note per annotation is a great many notes; opening each of
+				// them buries whatever the reader was looking at.
+				const written = await this.saveHighlightsToFile(filePathOfNote, note, this.settings.overwriteExistingNote, false);
+				if (written && this.settings.extractTagsFromAnnotationsAsObsidianTags) {
+					await this.addTagsToNoteProperties(written, this.tagsInAnnotations([anno]));
 				}
-				await this.saveHighlightsToFileAndOpenIt(filePathOfNote, note, this.settings.overwriteExistingNote);
 			}
 		} else {
-			let finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
+			const finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
 			const fileNameOfNote =
 				this.getResolvedNoteName(fileMeta) + ".md";
-			const filePathOfNote = this.getResolvedNotePath(fileMeta, fileNameOfNote);
-			if (this.settings.extractTagsFromAnnotationsAsObsidianTags) {
-				finalMarkdown = this.extractTagsFromAnnotationsAndAddHeaderToNote(finalMarkdown, grandtotal);
+			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
+			const written = await this.saveHighlightsToFile(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote, true);
+			if (written && this.settings.extractTagsFromAnnotationsAsObsidianTags) {
+				await this.addTagsToNoteProperties(written, this.tagsInAnnotations(grandtotal));
 			}
-			await this.saveHighlightsToFileAndOpenIt(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote);
 		}
+	}
+
+	/**
+	 * The folder of the file being looked at, which the notes follow when they
+	 * are not going to a folder of their own. Empty for the vault root, and for
+	 * a command run with nothing open at all.
+	 */
+	private currentFolder(): string {
+		return this.app.workspace.getActiveFile()?.parent?.path ?? "";
 	}
 
 	private noticeClipboardPathIsDesktopOnly(): {
@@ -260,6 +293,28 @@ export default class PDFAnnotationPlugin extends Plugin {
 			},
 		});
 
+		// One note per annotation is a command rather than a setting, so the
+		// choice is made where the extraction is asked for instead of somewhere
+		// else, before the fact.
+		this.addCommand({
+			id: "extract-annotations-single-per-annotation",
+			name: t.COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION,
+			checkCallback: (checking: boolean) => {
+				const file = this.app.workspace.getActiveFile();
+				if (file != null && file.extension === "pdf") {
+					if (!checking) {
+						this.loadSinglePDFFile(file, true).catch((error) => {
+							console.error(error);
+							new Notice(t.NOTICE_EXTRACTION_FAILED);
+						});
+					}
+					return true;
+				} else {
+					return false;
+				}
+			},
+		});
+
 		this.addCommand({
 			id: "extract-annotations-single-from-clipboard-path",
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH,
@@ -286,6 +341,19 @@ export default class PDFAnnotationPlugin extends Plugin {
 				if (result.pdfFile) {
 					this.sort(result.grandtotal);
 					await this.writeNotes(result.pdfFile, result.grandtotal, true);
+				}
+			},
+		});
+
+		this.addCommand({
+			id: "extract-annotations-single-from-clipboard-path-per-annotation",
+			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION,
+			callback: async () => {
+				const clipText = await navigator.clipboard.readText();
+				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
+				if (result.pdfFile) {
+					this.sort(result.grandtotal);
+					await this.writeNotes(result.pdfFile, result.grandtotal, true, true);
 				}
 			},
 		});
@@ -468,10 +536,14 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
-	getResolvedNotePath(pdfFile: FileMeta, fileNameOfNote: string): string {
+	getResolvedNotePath(
+		pdfFile: FileMeta,
+		currentFolder: string,
+		fileNameOfNote: string
+	): string {
 		return resolveNotePath(
 			this.settings,
-			pdfFile,
+			currentFolder,
 			fileNameOfNote,
 			this.getResolvedNoteSubfolder(pdfFile)
 		);
@@ -498,7 +570,16 @@ export default class PDFAnnotationPlugin extends Plugin {
 		}
 	}
 
-	async saveHighlightsToFileAndOpenIt(filePath: string, mdString: string, overwriteExistingNote: boolean) {
+	/**
+	 * Returns the note it wrote, so its properties can be filled in afterwards,
+	 * or null when the vault would not take the path.
+	 */
+	async saveHighlightsToFile(
+		filePath: string,
+		mdString: string,
+		overwriteExistingNote: boolean,
+		openIt: boolean
+	): Promise<TFile | null> {
 		await this.createMissingFolders(filePath);
 		const fileExists = await this.app.vault.adapter.exists(filePath);
 		if (fileExists) {
@@ -507,15 +588,22 @@ export default class PDFAnnotationPlugin extends Plugin {
 			} else {
 				await this.appendHighlightsToFile(filePath, mdString);
 			}
-			await this.app.workspace.openLinkText(filePath, "", true);
-		} else {
-			try {
-				await this.app.vault.create(filePath, mdString);
+			if (openIt) {
 				await this.app.workspace.openLinkText(filePath, "", true);
-			} catch (error) {
-				console.error(error);
-				new Notice(t.NOTICE_NOTE_PATH_INVALID);
 			}
+			return this.app.vault.getFileByPath(filePath);
+		}
+
+		try {
+			const created = await this.app.vault.create(filePath, mdString);
+			if (openIt) {
+				await this.app.workspace.openLinkText(filePath, "", true);
+			}
+			return created;
+		} catch (error) {
+			console.error(error);
+			new Notice(t.NOTICE_NOTE_PATH_INVALID);
+			return null;
 		}
 	}
 

@@ -96,33 +96,34 @@ describe('desired annotation checkboxes', () => {
 });
 
 describe('resolveNotePath', () => {
-  const PDF = {name: 'Paper.pdf', basename: 'Paper', path: 'Papers/2024/Paper.pdf'};
-
   const resolve = (
     over: Partial<PDFAnnotationPluginSetting>,
     subfolder = '',
-    pdf = PDF
+    currentFolder = 'Papers/2024'
   ) => {
     const settings = new PDFAnnotationPluginSetting();
     Object.assign(settings, over);
-    return resolveNotePath(settings, pdf, 'Annotations for Paper.md', subfolder);
+    return resolveNotePath(
+      settings, currentFolder, 'Annotations for Paper.md', subfolder
+    );
   };
 
-  test('beside the PDF puts the note in the folder the PDF is in', () => {
-    expect(resolve({noteLocation: 'pdf'}))
+  test('beside the current file puts the note in the folder it is in', () => {
+    expect(resolve({noteLocation: 'current'}))
       .toBe('Papers/2024/Annotations for Paper.md');
   });
 
-  test('beside a PDF from outside the vault falls back to the root', () => {
-    const external = {
-      name: 'Paper.pdf', basename: 'Paper', path: 'file://C:/Books/Paper.pdf',
-    };
-    expect(resolve({noteLocation: 'pdf'}, '', external))
+  test('beside a file at the vault root writes to the root', () => {
+    // Obsidian gives the root folder the path '/'.
+    expect(resolve({noteLocation: 'current'}, '', '/'))
+      .toBe('Annotations for Paper.md');
+    // Nothing open at all.
+    expect(resolve({noteLocation: 'current'}, '', ''))
       .toBe('Annotations for Paper.md');
   });
 
-  test('the note folder is ignored while writing beside the PDF', () => {
-    expect(resolve({noteLocation: 'pdf', noteFolder: 'Notes'}, 'Paper'))
+  test('the note folder and subfolder are ignored beside the current file', () => {
+    expect(resolve({noteLocation: 'current', noteFolder: 'Notes'}, 'Paper'))
       .toBe('Papers/2024/Annotations for Paper.md');
   });
 
@@ -199,13 +200,14 @@ describe('normalizeLegacySettings', () => {
     expect('exportName' in data).toBe(false);
   });
 
-  test('the setting the clipboard command replaced is dropped, both its names', () => {
-    expect(normalize({exportClipboardExtraction: true})).toEqual({
-      data: {}, changed: true,
-    });
-    expect(normalize({clipboardSavesToNote: true})).toEqual({
-      data: {}, changed: true,
-    });
+  test('the settings their commands replaced are dropped, under every name', () => {
+    for (const gone of [
+      {exportClipboardExtraction: true},
+      {clipboardSavesToNote: true},
+      {oneNotePerAnnotation: true},
+    ]) {
+      expect(normalize(gone)).toEqual({data: {}, changed: true});
+    }
   });
 
   test('settings that were not renamed are left alone', () => {
@@ -253,9 +255,17 @@ describe('migrateNotePath', () => {
     expect(defaults.noteSubfolder).toBe('');
   });
 
-  test("the old './' becomes writing beside the PDF", () => {
+  test("the old './' becomes writing beside the current file", () => {
     expect(migrate({exportPath: './'})).toEqual({
-      location: 'pdf', folder: '', migrated: true,
+      location: 'current', folder: '', migrated: true,
+    });
+  });
+
+  test('a location that followed the PDF now follows the current file', () => {
+    // The PDF is the current file whenever one in the vault is open, so this
+    // is the same folder for everyone it was already working for.
+    expect(migrate({noteLocation: 'pdf'})).toEqual({
+      location: 'current', folder: '', migrated: true,
     });
   });
 
@@ -272,8 +282,8 @@ describe('migrateNotePath', () => {
   });
 
   test('a data.json that already names a location is left alone', () => {
-    expect(migrate({noteLocation: 'pdf', exportPath: 'Notes/'})).toEqual({
-      location: 'pdf', folder: '', migrated: false,
+    expect(migrate({noteLocation: 'current', exportPath: 'Notes/'})).toEqual({
+      location: 'current', folder: '', migrated: false,
     });
   });
 

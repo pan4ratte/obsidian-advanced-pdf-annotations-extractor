@@ -13,7 +13,7 @@ import {
 } from "obsidian";
 import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
-import { asIndexable, FileMeta } from "src/types";
+import { asIndexable } from "src/types";
 
 // The variable names are the interface — what a template types — so they live
 // here; only their descriptions are translated. The whole annotation is
@@ -140,10 +140,14 @@ export const FILE_HEADINGS = ["folder", "file", "none"] as const;
 export type FileHeading = (typeof FILE_HEADINGS)[number];
 
 /**
- * Where the notes go: beside the PDF they came from, or somewhere in the vault
- * the reader picked.
+ * Where the notes go: beside whatever is open, or somewhere in the vault the
+ * reader picked.
+ *
+ * `current` follows the file being looked at rather than the PDF, which is the
+ * same folder when a PDF in the vault is open and the only one there is when
+ * the PDF is not in the vault at all.
  */
-export const NOTE_LOCATIONS = ["pdf", "vault"] as const;
+export const NOTE_LOCATIONS = ["current", "vault"] as const;
 export type NoteLocation = (typeof NOTE_LOCATIONS)[number];
 
 /**
@@ -168,6 +172,7 @@ const RENAMED_SETTINGS: Record<string, string> = {
 const REMOVED_SETTINGS = [
 	"exportClipboardExtraction",
 	"clipboardSavesToNote",
+	"oneNotePerAnnotation",
 ];
 
 /** Characters Obsidian will not take in a path, whatever a template renders. */
@@ -188,27 +193,23 @@ function cleanFolderPath(value: string): string {
 }
 
 /**
- * Where one note is written. Kept out of the plugin class so it can be
- * checked on its own: `subfolder` arrives already rendered, since the templates
- * are compiled there.
+ * Where one note is written. Kept out of the plugin class so it can be checked
+ * on its own: `currentFolder` is the folder of the file being looked at and
+ * `subfolder` arrives already rendered, since the templates are compiled there.
  */
 export function resolveNotePath(
 	settings: PDFAnnotationPluginSetting,
-	pdfFile: FileMeta,
+	currentFolder: string,
 	fileNameOfNote: string,
 	subfolder = ""
 ): string {
-	if (settings.noteLocation === "pdf") {
-		// A PDF outside the vault has no folder inside it to sit beside, so
-		// its notes fall back to the vault root.
-		if (pdfFile.path.startsWith("file://")) return fileNameOfNote;
-		return pdfFile.path.replace(pdfFile.name, fileNameOfNote);
-	}
-
-	const folder = [settings.noteFolder, subfolder]
-		.map(cleanFolderPath)
-		.filter((part) => part.length > 0)
-		.join("/");
+	const folder =
+		settings.noteLocation === "current"
+			? cleanFolderPath(currentFolder)
+			: [settings.noteFolder, subfolder]
+					.map(cleanFolderPath)
+					.filter((part) => part.length > 0)
+					.join("/");
 
 	return folder ? `${folder}/${fileNameOfNote}` : fileNameOfNote;
 }
@@ -258,7 +259,6 @@ export class PDFAnnotationPluginSetting {
 	 * kept so an edit made before the collapse can still be copied back by hand.
 	 */
 	public legacyExternalTemplates: Record<string, string>;
-	public oneNotePerAnnotation: boolean;
 	public oneNotePerAnnotationName: string;
 	public overwriteExistingNote: boolean;
 	public extractTagsFromAnnotationsAsObsidianTags: boolean;
@@ -279,7 +279,6 @@ export class PDFAnnotationPluginSetting {
 		this.noteTemplate = t.DEFAULT_NOTE_TEMPLATE;
 		this.highlightTemplate = t.DEFAULT_HIGHLIGHT_TEMPLATE;
 		this.legacyExternalTemplates = {};
-		this.oneNotePerAnnotation = false;
 		this.oneNotePerAnnotationName =
 			t.DEFAULT_ONE_NOTE_NAME;
 		this.overwriteExistingNote = false;
@@ -485,6 +484,13 @@ export class PDFAnnotationPluginSetting {
 	): boolean {
 		const location = loaded.noteLocation;
 		if (typeof location === "string") {
+			// `pdf` was this setting following the PDF rather than the file
+			// being looked at, which is the same folder whenever the PDF is
+			// the file being looked at.
+			if (location === "pdf") {
+				settings.noteLocation = "current";
+				return true;
+			}
 			const known = NOTE_LOCATIONS.includes(location as NoteLocation);
 			settings.noteLocation = known
 				? (location as NoteLocation)
@@ -495,7 +501,7 @@ export class PDFAnnotationPluginSetting {
 		if (typeof loaded.exportPath !== "string") return false;
 
 		if (loaded.exportPath.trim() === "./") {
-			settings.noteLocation = "pdf";
+			settings.noteLocation = "current";
 			settings.noteFolder = "";
 		} else {
 			// Anything else was a vault folder, written with the trailing
@@ -763,7 +769,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// the full row underneath the text.
 		const annotationSetting = new Setting(containerEl)
 			.setName(t.SETTING_ANNOTATIONS_NAME)
-			.setDesc(t.SETTING_ANNOTATIONS_DESC)
 			.setHeading();
 		annotationSetting.settingEl.addClass(
 			"pdf-annotations-annotation-setting"
@@ -1022,7 +1027,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions({
-						pdf: t.OPTION_NOTE_LOCATION_PDF,
+						current: t.OPTION_NOTE_LOCATION_CURRENT,
 						vault: t.OPTION_NOTE_LOCATION_VAULT,
 					})
 					.setValue(this.plugin.settings.noteLocation)
@@ -1066,28 +1071,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.setDesc(t.SETTING_NOTE_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "noteName"));
 		new Setting(containerEl)
-			.setName(t.SETTING_ONE_NOTE_NAME)
-			.setDesc(t.SETTING_ONE_NOTE_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.oneNotePerAnnotation)
-					.onChange(async (value) => {
-						this.plugin.settings.oneNotePerAnnotation = value;
-						oneNotePerAnnotationName.settingEl.toggleVisibility(value);
-						await this.plugin.saveSettings();
-					})
+			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
+			.addText((input) =>
+				this.buildValueInput(input, "oneNotePerAnnotationName")
 			);
-		const oneNotePerAnnotationName = new Setting(containerEl)
-			.setName(
-				t.SETTING_ONE_NOTE_NAME_NAME
-			)
-			.setDesc(
-				t.SETTING_ONE_NOTE_NAME_DESC
-			)
-			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationName"));
-		oneNotePerAnnotationName.settingEl.toggleVisibility(
-			this.plugin.settings.oneNotePerAnnotation
-		);
 		new Setting(containerEl)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)
