@@ -65,8 +65,8 @@ export default {
     // One sentence, not the pieces either side of the link: the link is woven in
     // by looking for HANDLEBARS_LINK inside it, so a translation can put that
     // word where its own grammar wants it.
-    SECTION_TEMPLATES: "Import formatting templates",
-    SECTION_TEMPLATES_DESC: "Use templates to define the look of the imported annotations. Variables reference table below lists available Handlebars syntax options: on import those variables will be replaced with their corresponding values.",
+    SECTION_TEMPLATES: "Import templates",
+    SECTION_TEMPLATES_DESC: "Templates allow you to define the look of the imported annotations. Variables reference table below lists available Handlebars syntax options: on import those variables will be replaced with their corresponding values.",
     HANDLEBARS_LINK: "Handlebars",
     SHOW_VARIABLES_TABLE: "Show variables reference table",
     HIDE_VARIABLES_TABLE: "Hide variables reference table",
