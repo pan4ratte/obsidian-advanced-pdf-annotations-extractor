@@ -1,4 +1,5 @@
 import {describe, expect, test} from '@jest/globals';
+import {t} from '../lang/helpers';
 import {
   ANNOTS_TREATED_AS_HIGHLIGHTS,
   cleanNoteName,
@@ -93,6 +94,25 @@ describe('desired annotation checkboxes', () => {
     s.desiredAnnotations = ['Text', 'Redact'];
     s.setAnnotationDesired('Highlight', true);
     expect(s.desiredAnnotations).toEqual(['Highlight', 'Text', 'Redact']);
+  });
+});
+
+describe('naming a note per annotation after its topic', () => {
+  test('is off, so the name template keeps naming what it named', () => {
+    expect(new PDFAnnotationPluginSetting().topicToNoteName).toBe(false);
+  });
+
+  test('names a note whose annotation has no comment by number', () => {
+    // Rendered by the plugin against {{counter}}; the counter is what keeps
+    // the untitled notes of one PDF apart.
+    expect(t.NAME_NO_TOPIC).toContain('{{counter}}');
+  });
+
+  test('is a field of its own, which is what makes it load', () => {
+    // The plugin reads back every field the settings object declares, so a
+    // setting that is declared cannot be one that silently never loads.
+    expect(Object.keys(new PDFAnnotationPluginSetting()))
+      .toContain('topicToNoteName');
   });
 });
 

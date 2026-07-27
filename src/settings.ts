@@ -294,6 +294,12 @@ export class PDFAnnotationPluginSetting {
 	 */
 	public legacyExternalTemplates: Record<string, string>;
 	public oneNotePerAnnotationName: string;
+	/**
+	 * Name the notes made by the 'note per annotation' commands after the
+	 * annotation's topic, in place of `oneNotePerAnnotationName`, and leave the
+	 * topic out of the note itself.
+	 */
+	public topicToNoteName: boolean;
 	public overwriteExistingNote: boolean;
 	public extractTagsFromAnnotationsAsObsidianTags: boolean;
 
@@ -315,6 +321,8 @@ export class PDFAnnotationPluginSetting {
 		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotationName =
 			t.DEFAULT_ONE_NOTE_NAME;
+		// Off, so the name template keeps naming the notes it named before.
+		this.topicToNoteName = false;
 		this.overwriteExistingNote = false;
 		this.extractTagsFromAnnotationsAsObsidianTags = false;
 	}
@@ -1053,6 +1061,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			const intoVault = this.plugin.settings.noteLocation === "vault";
 			noteFolderInput.setDisabled(!intoVault);
 			noteSubfolderInput.setDisabled(!intoVault);
+			// Faded as well as disabled: a note going beside its PDF has no
+			// folder of the vault to be put in and no subfolder under it, so
+			// neither field has anything to say until that changes.
+			for (const setting of [noteFolderSetting, noteSubfolderSetting]) {
+				setting.settingEl.classList.toggle(
+					"pdf-annotations-setting-disabled",
+					!intoVault
+				);
+			}
 		};
 
 		new Setting(containerEl)
@@ -1104,12 +1121,42 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.setName(t.SETTING_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_NOTE_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "noteName"));
-		new Setting(containerEl)
+		// The name template has nothing left to name once the topic names the
+		// notes, so it is shown as the setting it is: one of the two, not both.
+		// Faded and its field disabled, rather than merely faded — a field that
+		// looks spent but still takes what is typed into it is worse than one
+		// that plainly does nothing.
+		let oneNoteNameInput!: TextComponent;
+		let oneNoteNameSetting!: Setting;
+		const syncOneNoteName = () => {
+			const named = this.plugin.settings.topicToNoteName;
+			oneNoteNameInput.setDisabled(named);
+			oneNoteNameSetting.settingEl.classList.toggle(
+				"pdf-annotations-setting-disabled",
+				named
+			);
+		};
+
+		oneNoteNameSetting = new Setting(containerEl)
 			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
-			.addText((input) =>
-				this.buildValueInput(input, "oneNotePerAnnotationName")
+			.addText((input) => {
+				oneNoteNameInput = input;
+				this.buildValueInput(input, "oneNotePerAnnotationName");
+			});
+		new Setting(containerEl)
+			.setName(t.SETTING_TOPIC_TO_NAME_NAME)
+			.setDesc(t.SETTING_TOPIC_TO_NAME_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.topicToNoteName)
+					.onChange(async (value) => {
+						this.plugin.settings.topicToNoteName = value;
+						syncOneNoteName();
+						await this.plugin.saveSettings();
+					})
 			);
+		syncOneNoteName();
 		new Setting(containerEl)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)

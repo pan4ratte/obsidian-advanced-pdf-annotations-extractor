@@ -119,6 +119,17 @@
 	width: 100%;
 }
 
+/* A setting another one has taken over from: left in place, so it is plain
+   which setting is in charge of what, but faded and unreachable — its field is
+   disabled as well, so nothing here is only skin deep. */
+.pdf-annotations-setting-disabled {
+	opacity: 0.5;
+}
+
+.pdf-annotations-setting-disabled .setting-item-control {
+	pointer-events: none;
+}
+
 /* "Annotations to extract": heading, description and checkbox grid form a
    single card, stacked — the text always above, the checkboxes across the full
    width below it. */

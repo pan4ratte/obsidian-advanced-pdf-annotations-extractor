@@ -9,6 +9,25 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Added
 
+- *Put the topic of the annotation to the note name*, for the commands that
+  write a note per annotation. The note is named after the annotation's topic —
+  its comment's first line — and the topic is then left out of the note itself,
+  so a template holding `{{topic}}`, or the heading *Collect notes with the same
+  topic under a shared heading* writes, does not say a second time what the note
+  is already called. The name template is not used while it is on: it is faded
+  and its field disabled, so it is plain which of the two names the notes. Off
+  by default.
+- A setting another setting has taken over from is faded, not merely
+  unresponsive: *Select a folder in the vault* and *Optional subfolder* under
+  *Notes destination* → *Same folder as current file*, which have no folder to
+  name while the notes follow their PDF, and the name template under *Put the
+  topic of the annotation to the note name*. Their fields were already disabled
+  and looked as usable as any other.
+- `No topic 1`, `No topic 2` and so on name the notes per annotation whose
+  annotation has no comment to name them from — a highlight marked without a
+  word written about it, which is a thing a reader does all the time. It stands
+  in wherever a name template renders nothing, in place of the PDF's name and
+  the number.
 - Grouping by the day an annotation was made. *Group by creation date* keeps
   the annotations made on the same day together, outside every other grouping,
   with *Heading above each date* writing the day above them as `YYYY-MM-DD`.

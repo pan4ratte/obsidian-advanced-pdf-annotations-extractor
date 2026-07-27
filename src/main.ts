@@ -24,7 +24,7 @@ import {
 } from "src/settings";
 import { compareAnnotations } from "src/ordering";
 import { takeTagsFromAnnotations } from "src/tags";
-import { assignTopics } from "src/topics";
+import { assignTopics, takeTopicForNoteName } from "src/topics";
 import {
 	asIndexable,
 	FileMeta,
@@ -157,15 +157,28 @@ export default class PDFAnnotationPlugin extends Plugin {
 			// Written one after another: concurrent writes to the same note (when
 			// the note name lacks {{counter}}) would race each other.
 			for (const [index, anno] of grandtotal.entries()) {
+				const counter = index + 1;
 				const tags = takeTags([anno]);
+				// Taken out of the annotation before the note is written from
+				// it: what the note is called it need not also say inside.
+				// Grouping by topic has taken the line out of the body
+				// already, so only the other case has anything left to take.
+				const topic = this.settings.topicToNoteName
+					? takeTopicForNoteName(anno, !this.settings.sortByTopic)
+					: null;
 				const note = this.formatter.format([anno], isExternalFile);
 				const fileNameOfNote =
-					this.getResolvedOneNotePerAnnotationName(
-						fileMeta,
-						index + 1,
-						anno,
-						isExternalFile
-					) + ".md";
+					(topic === null
+						? this.getResolvedOneNotePerAnnotationName(
+								fileMeta,
+								counter,
+								anno,
+								isExternalFile
+							)
+						: this.usableNoteName(
+								topic,
+								this.getResolvedNoTopicName(fileMeta, counter)
+							)) + ".md";
 				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
 				// A note per annotation is a great many notes; opening each of
 				// them buries whatever the reader was looking at.
@@ -547,6 +560,20 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
+	/**
+	 * What a note is called when the topic was to name it and the annotation
+	 * has no comment to take a topic from — a highlight marked without a word
+	 * written about it, which is a thing a reader does all the time. Numbered,
+	 * since a PDF holds as many of them as it likes and they would otherwise
+	 * all be the one note.
+	 */
+	getResolvedNoTopicName(file: FileMeta, counter: number): string {
+		return compileTemplate(t.NAME_NO_TOPIC, this.templateSettings)({
+			filename: file.basename,
+			counter: counter,
+		});
+	}
+
 	getResolvedOneNotePerAnnotationName(
 		file: FileMeta,
 		counter: number,
@@ -562,9 +589,11 @@ export default class PDFAnnotationPlugin extends Plugin {
 					isExternalFile
 				)
 			),
-			// Distinct per annotation, so a template that names them all the
-			// same does not collapse them into one note.
-			`${file.basename}-${counter}`
+			// A name template for a note per annotation renders nothing when
+			// what it asks of the annotation is not there — `{{topic}}` for a
+			// highlight marked without a comment. Numbered, so a template that
+			// names them all the same does not collapse them into one note.
+			this.getResolvedNoTopicName(file, counter)
 		);
 	}
 
