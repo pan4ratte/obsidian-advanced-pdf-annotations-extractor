@@ -8,7 +8,6 @@ import {
 	setIcon,
 	Setting,
 	setTooltip,
-	TextComponent,
 	ToggleComponent,
 } from "obsidian";
 import { t } from "lang/helpers";
@@ -706,6 +705,65 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * A panel that shows and hides with the motion the accordion opens with:
+	 * height and opacity over the same 180ms. Returns the function that puts it
+	 * one way or the other, which takes `animate` — the first showing, when the
+	 * tab is drawn, has nothing to animate from.
+	 *
+	 * Hidden is `display: none` once the animation has finished rather than a
+	 * height of zero, so a hidden panel leaves nothing behind: no gap in the
+	 * settings it sits between, and nothing for a tab key to land in. Reversing
+	 * mid-animation picks up from the height on screen, and anyone who has asked
+	 * for less motion is simply shown the panel or not.
+	 */
+	createCollapsible(
+		panel: HTMLElement
+	): (shown: boolean, animate: boolean) => void {
+		let animation: Animation | null = null;
+
+		return (shown: boolean, animate: boolean) => {
+			const reduceMotion = window.matchMedia(
+				"(prefers-reduced-motion: reduce)"
+			).matches;
+
+			if (!animate || reduceMotion) {
+				animation?.cancel();
+				animation = null;
+				panel.toggleClass("pdf-annotations-collapsed", !shown);
+				return;
+			}
+
+			// Measured before cancelling, while it is still the height on
+			// screen rather than the natural one.
+			const interrupted = animation !== null;
+			const onScreen = interrupted
+				? panel.getBoundingClientRect().height
+				: 0;
+			animation?.cancel();
+
+			// Shown before it is measured: `display: none` has no height. The
+			// animation writes no style of its own, so what is measured is the
+			// natural height either way.
+			panel.removeClass("pdf-annotations-collapsed");
+			const full = panel.scrollHeight;
+			const from = interrupted ? onScreen : shown ? 0 : full;
+			const to = shown ? full : 0;
+
+			animation = panel.animate(
+				{
+					height: [`${from}px`, `${to}px`],
+					opacity: shown ? [0, 1] : [1, 0],
+				},
+				{ duration: 180, easing: "ease-in-out" }
+			);
+			animation.onfinish = () => {
+				animation = null;
+				if (!shown) panel.addClass("pdf-annotations-collapsed");
+			};
+		};
+	}
+
+	/**
 	 * Put a numbered gutter beside a template's text area. The text area is
 	 * wrapped in a box it now shares with the gutter, which is redrawn as lines
 	 * come and go and scrolled in step with it.
@@ -1053,23 +1111,16 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(t.SECTION_NOTES)
 			.setHeading();
-		// The folder and the subfolder are only somewhere to put a note when
-		// the note is going into the vault rather than beside its PDF.
-		let noteFolderInput!: TextComponent;
-		let noteSubfolderInput!: TextComponent;
-		const syncNoteTarget = () => {
-			const intoVault = this.plugin.settings.noteLocation === "vault";
-			noteFolderInput.setDisabled(!intoVault);
-			noteSubfolderInput.setDisabled(!intoVault);
-			// Faded as well as disabled: a note going beside its PDF has no
-			// folder of the vault to be put in and no subfolder under it, so
-			// neither field has anything to say until that changes.
-			for (const setting of [noteFolderSetting, noteSubfolderSetting]) {
-				setting.settingEl.classList.toggle(
-					"pdf-annotations-setting-disabled",
-					!intoVault
-				);
-			}
+		// A note going beside its PDF has no folder of the vault to be put in
+		// and no subfolder under it, so the two fields are not there to be
+		// answered at all until that changes. They open and close together,
+		// from the one panel they share.
+		let showNoteTarget!: (shown: boolean, animate: boolean) => void;
+		const syncNoteTarget = (animate: boolean) => {
+			showNoteTarget(
+				this.plugin.settings.noteLocation === "vault",
+				animate
+			);
 		};
 
 		new Setting(containerEl)
@@ -1085,15 +1136,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.noteLocation =
 							value as NoteLocation;
-						syncNoteTarget();
+						syncNoteTarget(true);
 						await this.plugin.saveSettings();
 					})
 			);
-		const noteFolderSetting = new Setting(containerEl)
+
+		const noteTargetPanel = containerEl.createDiv({
+			cls: "pdf-annotations-collapsible",
+		});
+		showNoteTarget = this.createCollapsible(noteTargetPanel);
+		const noteFolderSetting = new Setting(noteTargetPanel)
 			.setName(t.SETTING_NOTE_FOLDER_NAME)
 			.setDesc(t.SETTING_NOTE_FOLDER_DESC)
 			.addText((input) => {
-				noteFolderInput = input;
 				input.setPlaceholder(t.PLACEHOLDER_VAULT_ROOT);
 				this.buildValueInput(input, "noteFolder");
 				new FolderSuggest(this.app, input.inputEl).onSelect(
@@ -1105,34 +1160,25 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				);
 			});
 		noteFolderSetting.settingEl.addClass("pdf-annotations-stacked-setting");
-		const noteSubfolderSetting = new Setting(containerEl)
+		const noteSubfolderSetting = new Setting(noteTargetPanel)
 			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
 			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
 			.addText((input) => {
-				noteSubfolderInput = input;
 				input.setPlaceholder(t.PLACEHOLDER_NO_SUBFOLDER);
 				this.buildValueInput(input, "noteSubfolder");
 			});
 		noteSubfolderSetting.settingEl.addClass(
 			"pdf-annotations-stacked-setting"
 		);
-		syncNoteTarget();
+		syncNoteTarget(false);
 
 		// The switch above the field it governs, as the destination sits above
 		// the folder it decides: the name template has nothing left to name
-		// once the topic names the notes, so it is shown as the setting it is —
-		// one of the two, not both. Faded and its field disabled, rather than
-		// merely faded: a field that looks spent but still takes what is typed
-		// into it is worse than one that plainly does nothing.
-		let oneNoteNameInput!: TextComponent;
-		let oneNoteNameSetting!: Setting;
-		const syncOneNoteName = () => {
-			const named = this.plugin.settings.topicToNoteName;
-			oneNoteNameInput.setDisabled(named);
-			oneNoteNameSetting.settingEl.classList.toggle(
-				"pdf-annotations-setting-disabled",
-				named
-			);
+		// once the topic names the notes, so it goes rather than sitting there
+		// looking answerable.
+		let showOneNoteName!: (shown: boolean, animate: boolean) => void;
+		const syncOneNoteName = (animate: boolean) => {
+			showOneNoteName(!this.plugin.settings.topicToNoteName, animate);
 		};
 
 		new Setting(containerEl)
@@ -1143,18 +1189,22 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.topicToNoteName)
 					.onChange(async (value) => {
 						this.plugin.settings.topicToNoteName = value;
-						syncOneNoteName();
+						syncOneNoteName(true);
 						await this.plugin.saveSettings();
 					})
 			);
-		oneNoteNameSetting = new Setting(containerEl)
+
+		const oneNoteNamePanel = containerEl.createDiv({
+			cls: "pdf-annotations-collapsible",
+		});
+		showOneNoteName = this.createCollapsible(oneNoteNamePanel);
+		new Setting(oneNoteNamePanel)
 			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
-			.addText((input) => {
-				oneNoteNameInput = input;
-				this.buildValueInput(input, "oneNotePerAnnotationName");
-			});
-		syncOneNoteName();
+			.addText((input) =>
+				this.buildValueInput(input, "oneNotePerAnnotationName")
+			);
+		syncOneNoteName(false);
 
 		new Setting(containerEl)
 			.setName(t.SETTING_EXTRACT_TAGS_NAME)

@@ -119,15 +119,17 @@
 	width: 100%;
 }
 
-/* A setting another one has taken over from: left in place, so it is plain
-   which setting is in charge of what, but faded and unreachable — its field is
-   disabled as well, so nothing here is only skin deep. */
-.pdf-annotations-setting-disabled {
-	opacity: 0.5;
+/* Settings that another setting has taken the question out of: they open and
+   close like the accordion, their height animated from the script, so the panel
+   has to clip what does not fit yet. */
+.pdf-annotations-collapsible {
+	overflow: hidden;
 }
 
-.pdf-annotations-setting-disabled .setting-item-control {
-	pointer-events: none;
+/* Set once the closing animation has finished, so a closed panel leaves no gap
+   between the settings around it and nothing for a tab key to land in. */
+.pdf-annotations-collapsed {
+	display: none;
 }
 
 /* "Annotations to extract": heading, description and checkbox grid form a

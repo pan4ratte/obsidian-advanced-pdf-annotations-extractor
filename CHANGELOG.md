@@ -17,12 +17,13 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   is already called. The name template is not used while it is on: it is faded
   and its field disabled, so it is plain which of the two names the notes. Off
   by default.
-- A setting another setting has taken over from is faded, not merely
-  unresponsive: *Select a folder in the vault* and *Optional subfolder* under
-  *Notes destination* → *Same folder as current file*, which have no folder to
-  name while the notes follow their PDF, and the name template under *Put the
-  topic of the annotation to the note name*. Their fields were already disabled
-  and looked as usable as any other.
+- A setting another setting has taken the question out of is not shown at all:
+  *Select a folder in the vault* and *Optional subfolder* while *Notes
+  destination* is *Same folder as current file*, and *Name of a note per
+  annotation* while *Put the topic of the annotation to the note name* is on.
+  They open and close with the motion the *Template variables* panel opens with,
+  and leave no gap behind when closed. Their fields used to sit there disabled,
+  looking as answerable as any other.
 - `No topic 1`, `No topic 2` and so on name the notes per annotation whose
   annotation has no comment to name them from — a highlight marked without a
   word written about it, which is a thing a reader does all the time. It stands
