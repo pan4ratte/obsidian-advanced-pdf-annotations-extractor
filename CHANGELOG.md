@@ -7,6 +7,17 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ## Unreleased
 
+### Changed
+
+- **Extract tags from annotations to the tags property** is a choice of four
+  rather than a toggle: *never*, *always*, *single note extraction*, or
+  *extraction to separate notes*. The two kinds are worth telling apart because
+  a tag means a different thing in each — one note holds every annotation of a
+  PDF, so the tags on it are the PDF's, while a note per annotation carries only
+  the tags of the one comment it was written from. Inserting into the note being
+  edited counts as a single note. A `data.json` from the toggle is folded in: on
+  becomes *always* and off becomes *never*, which is what the toggle meant.
+
 ### Added
 
 - **Extraction with advanced settings**, a command that asks what to extract

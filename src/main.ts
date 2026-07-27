@@ -174,7 +174,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean
 	): Promise<void> {
-		const tags = this.settings.extractTagsFromAnnotationsAsObsidianTags
+		// Everything gathered goes into the one note being edited, which is a
+		// single note as far as the setting is concerned.
+		const tags = this.settings.extractsTags(false)
 			? takeTagsFromAnnotations(grandtotal)
 			: [];
 
@@ -209,8 +211,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		}
 
 		const currentFolder = this.currentFolder();
-		const extractTags =
-			this.settings.extractTagsFromAnnotationsAsObsidianTags;
+		const extractTags = this.settings.extractsTags(onePerAnnotation);
 
 		/**
 		 * Taken out of the comments before anything is rendered from them, so
@@ -551,6 +552,13 @@ export default class PDFAnnotationPlugin extends Plugin {
 				this.settings
 			);
 
+			// Extracting the tags used to be all extractions or none.
+			const tagsMigrated =
+				PDFAnnotationPluginSetting.migrateTagExtraction(
+					settingsData,
+					this.settings
+				);
+
 			// One entry per type this version knows, whatever data.json holds.
 			this.settings.annotationTemplates =
 				PDFAnnotationPluginSetting.normalizeAnnotationTemplates(
@@ -574,6 +582,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				typesMigrated ||
 				structureMigrated ||
 				pathMigrated ||
+				tagsMigrated ||
 				legacyNames
 			) {
 				await this.saveSettings();

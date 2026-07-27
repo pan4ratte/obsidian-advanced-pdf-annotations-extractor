@@ -313,6 +313,64 @@ describe('normalizeLegacySettings', () => {
   });
 });
 
+describe('tag extraction', () => {
+  const migrate = (loaded: Record<string, unknown>, held?: string) => {
+    const settings = new PDFAnnotationPluginSetting();
+    if (held !== undefined) {
+      (settings as unknown as Record<string, unknown>).extractTags = held;
+    }
+    const migrated = PDFAnnotationPluginSetting.migrateTagExtraction(
+      loaded,
+      settings
+    );
+    return {mode: settings.extractTags, migrated};
+  };
+
+  test('starts off, as the toggle before it did', () => {
+    expect(new PDFAnnotationPluginSetting().extractTags).toBe('never');
+  });
+
+  test('the old toggle on becomes every extraction', () => {
+    expect(migrate({extractTagsFromAnnotationsAsObsidianTags: true})).toEqual({
+      mode: 'always', migrated: true,
+    });
+  });
+
+  test('the old toggle off becomes none of them', () => {
+    expect(migrate({extractTagsFromAnnotationsAsObsidianTags: false})).toEqual({
+      mode: 'never', migrated: true,
+    });
+  });
+
+  test('a mode this version knows is left as it stands', () => {
+    expect(migrate({}, 'separate')).toEqual({mode: 'separate', migrated: false});
+  });
+
+  test('a mode it does not know goes back to never', () => {
+    expect(migrate({}, 'sometimes')).toEqual({mode: 'never', migrated: true});
+  });
+
+  const asks = (mode: string, onePerAnnotation: boolean) => {
+    const settings = new PDFAnnotationPluginSetting();
+    (settings as unknown as Record<string, unknown>).extractTags = mode;
+    return settings.extractsTags(onePerAnnotation);
+  };
+
+  test.each([
+    ['never', false, false],
+    ['never', true, false],
+    ['always', false, true],
+    ['always', true, true],
+    // A note being inserted into is a single note, and asks with false.
+    ['single', false, true],
+    ['single', true, false],
+    ['separate', false, false],
+    ['separate', true, true],
+  ])('%s, one note per annotation %p: %p', (mode, onePerAnnotation, expected) => {
+    expect(asks(mode, onePerAnnotation)).toBe(expected);
+  });
+});
+
 describe('migrateNotePath', () => {
   const migrate = (loaded: Record<string, unknown>) => {
     const settings = new PDFAnnotationPluginSetting();

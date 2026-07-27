@@ -132,6 +132,25 @@ export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
 ).map((annotation) => annotation.subtype);
 
 /**
+ * Which extractions move the tags found in the comments to the note's
+ * properties. The two kinds are worth telling apart because a tag means a
+ * different thing in each: one note holds every annotation of a PDF, so the
+ * tags on it are the PDF's, while a note per annotation carries only the tags
+ * of the single comment it was written from.
+ *
+ * Inserting into the note being edited counts as a single note: everything
+ * gathered lands in the one note either way.
+ */
+export const TAG_EXTRACTION_MODES = {
+	never: t.OPTION_EXTRACT_TAGS_NEVER,
+	always: t.OPTION_EXTRACT_TAGS_ALWAYS,
+	single: t.OPTION_EXTRACT_TAGS_SINGLE,
+	separate: t.OPTION_EXTRACT_TAGS_SEPARATE,
+};
+
+export type TagExtraction = keyof typeof TAG_EXTRACTION_MODES;
+
+/**
  * Until {{filelink}} existed, each kind of annotation had two templates that
  * differed only in how they linked the PDF: a wiki link for the vault, a plain
  * path for everything else. `migrateTemplates` folds a data.json written by
@@ -341,7 +360,7 @@ export class PDFAnnotationPluginSetting {
 	 */
 	public topicToNoteName: boolean;
 	public overwriteExistingNote: boolean;
-	public extractTagsFromAnnotationsAsObsidianTags: boolean;
+	public extractTags: TagExtraction;
 
 	constructor() {
 		this.topicHeading = true;
@@ -364,7 +383,25 @@ export class PDFAnnotationPluginSetting {
 		// Off, so the name template keeps naming the notes it named before.
 		this.topicToNoteName = false;
 		this.overwriteExistingNote = false;
-		this.extractTagsFromAnnotationsAsObsidianTags = false;
+		this.extractTags = "never";
+	}
+
+	/**
+	 * Whether this extraction moves the tags it found to the note's properties.
+	 * `onePerAnnotation` is what tells the two kinds apart; inserting into the
+	 * note being edited asks with false, being a single note like any other.
+	 */
+	public extractsTags(onePerAnnotation: boolean): boolean {
+		switch (this.extractTags) {
+			case "always":
+				return true;
+			case "single":
+				return !onePerAnnotation;
+			case "separate":
+				return onePerAnnotation;
+			default:
+				return false;
+		}
 	}
 
 	public isAnnotationDesired(annotationType: string): boolean {
@@ -588,6 +625,33 @@ export class PDFAnnotationPluginSetting {
 		}
 
 		return { data, changed };
+	}
+
+	/**
+	 * Extracting the tags used to be a toggle, which said all extractions or
+	 * none of them — the two the four modes still spell. Reads the old boolean
+	 * off the raw data.json, since it is no longer a field of this class, and
+	 * takes a mode it does not know back to `never` rather than leaving the
+	 * dropdown showing nothing.
+	 *
+	 * Returns whether anything was migrated, so the caller can write the
+	 * settings back and be rid of the old field.
+	 */
+	public static migrateTagExtraction(
+		loaded: Record<string, unknown>,
+		settings: PDFAnnotationPluginSetting
+	): boolean {
+		const legacy = loaded.extractTagsFromAnnotationsAsObsidianTags;
+		if (typeof legacy === "boolean") {
+			settings.extractTags = legacy ? "always" : "never";
+			return true;
+		}
+
+		if (!(settings.extractTags in TAG_EXTRACTION_MODES)) {
+			settings.extractTags = "never";
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -1317,15 +1381,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(t.SETTING_EXTRACT_TAGS_NAME)
 			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(
-						this.plugin.settings
-							.extractTagsFromAnnotationsAsObsidianTags
-					)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(TAG_EXTRACTION_MODES)
+					.setValue(this.plugin.settings.extractTags)
 					.onChange(async (value) => {
-						this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags =
-							value;
+						this.plugin.settings.extractTags =
+							value as TagExtraction;
 						await this.plugin.saveSettings();
 					})
 			);
