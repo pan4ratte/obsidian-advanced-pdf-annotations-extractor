@@ -76,9 +76,17 @@ export default defineConfig([
 			// Same treatment for the locale module, where every user-facing
 			// string now lives. "Handlebars" is the name of the template
 			// language, so it keeps its capital wherever it is mentioned.
+			//
+			// `brands` keeps the plugin's own name in the case it is published
+			// under; passing the option replaces the rule's default brand list,
+			// so "Obsidian" has to be named here too to stay capitalised.
 			"obsidianmd/ui/sentence-case-locale-module": [
 				"warn",
 				{
+					brands: [
+						"Advanced PDF Annotations Extractor",
+						"Obsidian",
+					],
 					ignoreWords: [
 						"PDFs",
 						"PDF's",

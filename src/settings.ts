@@ -84,6 +84,11 @@ export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
  * differed only in how they linked the PDF: a wiki link for the vault, a plain
  * path for everything else. `migrateTemplates` folds a data.json written by
  * those versions into the single template per kind.
+ *
+ * The two defaults per pair are history, not wording: they are compared against
+ * what an old data.json holds, to tell an untouched default from an edit. They
+ * do not belong in the locale and must never be reworded or translated — doing
+ * so makes every unedited template look customised.
  */
 const LEGACY_TEMPLATE_PAIRS = [
 	{
@@ -154,23 +159,14 @@ export class PDFAnnotationPluginSetting {
 		this.useFolderNames = true;
 		this.sortByTopic = true;
 		this.exportPath = "";
-		this.exportName = "Annotations for {{filename}}";
+		this.exportName = STRINGS.defaults.exportName;
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
-		this.noteTemplate =
-			"{{body}}\n" +
-			"\n" +
-			"* *noted by {{author}} at page {{pageNumber}} on {{filelink}}*\n" +
-			"\n";
-		this.highlightTemplate =
-			"> {{highlightedText}}\n" +
-			"\n" +
-			"{{body}}\n" +
-			"\n" +
-			"* *highlighted by {{author}} at page {{pageNumber}} on {{filelink}}*\n" +
-			"\n";
+		this.noteTemplate = STRINGS.defaults.noteTemplate;
+		this.highlightTemplate = STRINGS.defaults.highlightTemplate;
 		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotation = false;
-		this.oneNotePerAnnotationExportName = "Annotations for {{filename}}-{{counter}}";
+		this.oneNotePerAnnotationExportName =
+			STRINGS.defaults.oneNotePerAnnotationExportName;
 		this.overwriteExistingNote = false;
 		this.extractTagsFromAnnotationsAsObsidianTags = false;
 		this.exportClipboardExtraction = false;
@@ -372,8 +368,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		const header = new Setting(containerEl)
-			.setName(this.plugin.manifest.name)
-			.setDesc(this.plugin.manifest.description)
+			.setName(STRINGS.plugin.name)
+			.setDesc(STRINGS.plugin.description)
 			.setHeading();
 		header.settingEl.addClass("pdf-annotations-settings-header");
 

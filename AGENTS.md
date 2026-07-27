@@ -138,10 +138,16 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
 - Settings UI: headings via `new Setting(el).setName(...).setHeading()`, sentence
   case for all user-facing text, no plugin name in command names.
 - **No string literals in the UI** — command names, notices, setting names and
-  descriptions all come from `STRINGS` in `src/locale/en.ts`. Strings taking a
-  value are functions there, so an argument cannot go missing in translation.
-  Exempt: the annotation subtypes (spelled as the PDF format spells them) and
-  the `{{variable}}` names, which are interface, not wording.
+  descriptions, the settings header, and the default templates and export names
+  (they end up in exported notes) all come from `STRINGS` in `src/locale/en.ts`.
+  Strings taking a value are functions there, so an argument cannot go missing
+  in translation. Exempt, and to stay exempt: the annotation subtypes (spelled
+  as the PDF format spells them), the `{{variable}}` names, the command IDs
+  (persisted, so hotkeys survive), markdown and YAML syntax the formatter
+  writes, and `LEGACY_TEMPLATE_PAIRS`' defaults (compared byte-exact against old
+  `data.json`).
+- `STRINGS.plugin.name`/`.description` duplicate `manifest.json`, which the
+  plugin browser reads and no translation can reach. Change both together.
 - The lint config uses `obsidianmd.configs.recommendedWithLocalesEn`, which
   sentence-case checks every string in `locale/en.ts` and **bans the disable
   comment** for that rule — there is no exempting a string, so write UI text

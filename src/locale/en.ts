@@ -12,6 +12,17 @@
  * plugin's interface rather than its wording.
  */
 export const STRINGS = {
+	/**
+	 * The heading the settings tab opens with. `manifest.json` carries the same
+	 * two strings for the plugin browser, which cannot be translated — keep them
+	 * in step when either changes.
+	 */
+	plugin: {
+		name: "Advanced PDF Annotations Extractor",
+		description:
+			"Extract annotations from PDFs with advanced settings and user-friendly features.",
+	},
+
 	commands: {
 		extractCurrentFile: "Extract from the current file",
 		extractClipboardPath: "Extract from the file path in the clipboard",
@@ -45,6 +56,24 @@ export const STRINGS = {
 	/** Written into the exported note, not shown in the interface. */
 	output: {
 		noAnnotations: "*No annotations*",
+	},
+
+	/**
+	 * What the settings hold before anyone edits them. Wording, not mechanism:
+	 * these end up in exported notes, so "noted by" and "Annotations for" are
+	 * as much this plugin's English as any label is.
+	 *
+	 * The `{{variables}}` are not translatable — they are the names the
+	 * formatter resolves. Only the words around them may change.
+	 */
+	defaults: {
+		noteTemplate:
+			"{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
+		highlightTemplate:
+			"> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
+		exportName: "Annotations for {{filename}}",
+		oneNotePerAnnotationExportName:
+			"Annotations for {{filename}}-{{counter}}",
 	},
 
 	/** What each annotation type is, as its checkbox is labelled. */
