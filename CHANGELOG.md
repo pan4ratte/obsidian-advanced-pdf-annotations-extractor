@@ -9,6 +9,16 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Added
 
+- Grouping by the day an annotation was made. *Group by creation date* keeps
+  the annotations made on the same day together, outside every other grouping,
+  with *Heading above each date* writing the day above them as `YYYY-MM-DD`.
+  Off by default, so an upgrade reorders nothing. The day comes from the PDF's
+  own `CreationDate` on the annotation, which a reader is free to leave out —
+  those annotations come last, under `No date`. The time of day and the time
+  zone are deliberately not read: a zone would move an annotation to the day
+  before or after depending on where the note is read.
+- `{{created}}` template variable, holding that same day.
+
 - `{{topic}}` template variable, holding the first line of the annotation body
   when grouping by topic is enabled. It was already reachable but undocumented.
 - `StrikeOut` annotations can now be extracted. It is the fourth text markup

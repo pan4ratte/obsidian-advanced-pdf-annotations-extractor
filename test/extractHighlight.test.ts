@@ -1,5 +1,5 @@
 import {describe, expect, test, jest, beforeEach} from '@jest/globals';
-import {extractHighlight} from '../src/extractHighlight';
+import {extractHighlight, pdfDateToDay} from '../src/extractHighlight';
 
 jest.mock('src/settings', () => {
   return {
@@ -9,6 +9,42 @@ jest.mock('src/settings', () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+describe('pdfDateToDay', () => {
+  test('reads the day out of a full PDF date string', () => {
+    expect(pdfDateToDay("D:20240115143000+01'00'")).toBe('2024-01-15');
+    expect(pdfDateToDay('D:20240115143000Z')).toBe('2024-01-15');
+  });
+
+  test('the zone is ignored rather than moving the annotation a day', () => {
+    // Same instant, two zones: both belong to the day the reader's PDF says.
+    expect(pdfDateToDay("D:20240115233000+05'00'")).toBe('2024-01-15');
+    expect(pdfDateToDay("D:20240115013000-05'00'")).toBe('2024-01-15');
+  });
+
+  test('accepts the parts the spec leaves optional', () => {
+    expect(pdfDateToDay('D:2024')).toBe('2024-01-01');
+    expect(pdfDateToDay('D:202403')).toBe('2024-03-01');
+    expect(pdfDateToDay('D:20240307')).toBe('2024-03-07');
+  });
+
+  test('accepts a date written without the D: prefix', () => {
+    expect(pdfDateToDay('20240115143000')).toBe('2024-01-15');
+  });
+
+  test('gives no day for a missing date, so it stays tellable from a real one', () => {
+    expect(pdfDateToDay(null)).toBeUndefined();
+    expect(pdfDateToDay(undefined)).toBeUndefined();
+    expect(pdfDateToDay('')).toBeUndefined();
+  });
+
+  test('gives no day for a date that cannot be read', () => {
+    expect(pdfDateToDay('yesterday')).toBeUndefined();
+    expect(pdfDateToDay('D:20241315')).toBeUndefined();
+    expect(pdfDateToDay('D:20240100')).toBeUndefined();
+    expect(pdfDateToDay('D:20240132')).toBeUndefined();
+  });
 });
 
 describe('extractHighlight - simple text', () => {

@@ -90,6 +90,12 @@ export interface RawPDFAnnotation {
 	 * subtypes have them, and pdf.js reports null when they are unusable.
 	 */
 	quadPoints?: ArrayLike<number> | null;
+	/**
+	 * When the annotation was made, as the PDF date string pdf.js hands over
+	 * (`D:YYYYMMDDHHmmSS` and an optional zone). Null when the PDF omits it,
+	 * which readers are free to do.
+	 */
+	creationDate?: string | null;
 }
 
 /** A pdf.js annotation once the extraction has filled in the note's fields. */
@@ -108,4 +114,9 @@ export interface PDFAnnotation extends RawPDFAnnotation {
 	body: string;
 	/** First line of the body, split off when sorting by topic. */
 	topic?: string;
+	/**
+	 * The day `creationDate` names, as `YYYY-MM-DD`. Undefined when the PDF
+	 * gave no date, or one that could not be read.
+	 */
+	created?: string;
 }

@@ -25,6 +25,7 @@ export default {
     // them may be translated.
     NOTE_NO_ANNOTATIONS: "*No annotations*",
     NOTE_VAULT_ROOT: "Vault root",
+    NOTE_NO_DATE: "No date",
     DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
     DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
     DEFAULT_EXPORT_NAME: "Annotations for {{filename}}",
@@ -49,6 +50,7 @@ export default {
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Body of the annotation",
     VAR_TOPIC: "First line of the body, when grouping by topic is enabled",
+    VAR_CREATED: "Day the annotation was made, as YYYY-MM-DD, empty when the PDF gives no date",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
     // ─── Settings: annotations ───────────────────────────────────────────────────
@@ -76,12 +78,16 @@ export default {
     SECTION_GROUPING: "Grouping",
     SETTING_SORT_BY_TOPIC_NAME: "Group by annotation topic",
     SETTING_SORT_BY_TOPIC_DESC: "Treats the first line of each PDF comment as its topic and groups by it first, above folder and file. The topic line is removed from {{body}} and made available as {{topic}}.",
+    SETTING_GROUP_BY_DATE_NAME: "Group by creation date",
+    SETTING_GROUP_BY_DATE_DESC: "Keeps the annotations made on the same day together, before every other grouping. Annotations the PDF gives no date for come last. Affects the order only — what the headings say is set below.",
     SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
     SETTING_GROUP_BY_FOLDER_DESC: "Keeps every PDF in the same folder together, before the annotations are ordered file by file. Affects the order only — what the headings say is set below.",
 
     // ─── Settings: headings ──────────────────────────────────────────────────────
     SECTION_HEADINGS: "Headings",
     SECTION_HEADINGS_DESC: "The only text written between the annotations. Each heading is written once, where its group starts, rather than above every annotation — that is all these do that a template cannot. Whichever heading encloses the other takes the first level, so the note reads as an outline. Turn both off to get nothing but your templates.",
+    SETTING_DATE_HEADING_NAME: "Heading above each date",
+    SETTING_DATE_HEADING_DESC: "Writes the day as a heading where it changes. Available only while grouping by creation date.",
     SETTING_TOPIC_HEADING_NAME: "Heading above each topic",
     SETTING_TOPIC_HEADING_DESC: "Writes the topic as a heading where it changes. Available only while grouping by topic, since that is what splits a topic off the annotation to head anything with.",
     SETTING_FILE_HEADING_NAME: "Heading above each file",

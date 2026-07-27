@@ -27,6 +27,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
 	author: t.VAR_AUTHOR,
 	body: t.VAR_BODY,
 	topic: t.VAR_TOPIC,
+	created: t.VAR_CREATED,
 	isExternal: t.VAR_IS_EXTERNAL,
 };
 
@@ -158,8 +159,10 @@ export interface TemplateMigration {
 
 export class PDFAnnotationPluginSetting {
 	public topicHeading: boolean;
+	public dateHeading: boolean;
 	public fileHeading: FileHeading;
 	public groupByFolder: boolean;
+	public groupByDate: boolean;
 	public sortByTopic: boolean;
 	public exportPath: string;
 	public exportName: string;
@@ -180,8 +183,11 @@ export class PDFAnnotationPluginSetting {
 
 	constructor() {
 		this.topicHeading = true;
+		this.dateHeading = true;
 		this.fileHeading = "folder";
 		this.groupByFolder = true;
+		// Off, so an upgrade does not reorder notes nobody asked to reorder.
+		this.groupByDate = false;
 		this.sortByTopic = true;
 		this.exportPath = "";
 		this.exportName = t.DEFAULT_EXPORT_NAME;
@@ -701,20 +707,34 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// out of reach while that one is. It stays in view either way, and the
 		// setting it is switched off from is remembered, so switching the
 		// grouping back on brings the heading back with it.
-		// Assigned as the setting below is built, before anything can call it.
+		// Assigned as the settings below are built, before anything can call it.
 		let topicHeadingToggle!: ToggleComponent;
-		let syncingTopicHeading = false;
-		const syncTopicHeading = () => {
-			const enabled = this.plugin.settings.sortByTopic;
+		let dateHeadingToggle!: ToggleComponent;
+		let syncingHeadings = false;
+		const syncHeading = (
+			toggle: ToggleComponent,
+			enabled: boolean,
+			remembered: boolean
+		) => {
 			// setValue calls onChange, which would take this for an edit and
 			// write the remembered choice away.
-			syncingTopicHeading = true;
-			topicHeadingToggle.setValue(
-				enabled && this.plugin.settings.topicHeading
-			);
-			topicHeadingToggle.setDisabled(!enabled);
-			syncingTopicHeading = false;
+			syncingHeadings = true;
+			toggle.setValue(enabled && remembered);
+			toggle.setDisabled(!enabled);
+			syncingHeadings = false;
 		};
+		const syncTopicHeading = () =>
+			syncHeading(
+				topicHeadingToggle,
+				this.plugin.settings.sortByTopic,
+				this.plugin.settings.topicHeading
+			);
+		const syncDateHeading = () =>
+			syncHeading(
+				dateHeadingToggle,
+				this.plugin.settings.groupByDate,
+				this.plugin.settings.dateHeading
+			);
 
 		new Setting(containerEl)
 			.setName(t.SECTION_GROUPING)
@@ -728,6 +748,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.sortByTopic = value;
 						syncTopicHeading();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName(t.SETTING_GROUP_BY_DATE_NAME)
+			.setDesc(t.SETTING_GROUP_BY_DATE_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.groupByDate)
+					.onChange(async (value) => {
+						this.plugin.settings.groupByDate = value;
+						syncDateHeading();
 						await this.plugin.saveSettings();
 					})
 			);
@@ -749,6 +782,21 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.setDesc(t.SECTION_HEADINGS_DESC)
 			.setHeading();
 		new Setting(containerEl)
+			.setName(t.SETTING_DATE_HEADING_NAME)
+			.setDesc(t.SETTING_DATE_HEADING_DESC)
+			.addToggle((toggle) => {
+				dateHeadingToggle = toggle;
+				toggle
+					.setValue(this.plugin.settings.dateHeading)
+					.onChange(async (value) => {
+						if (syncingHeadings) return;
+						this.plugin.settings.dateHeading = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		syncDateHeading();
+
+		new Setting(containerEl)
 			.setName(t.SETTING_TOPIC_HEADING_NAME)
 			.setDesc(t.SETTING_TOPIC_HEADING_DESC)
 			.addToggle((toggle) => {
@@ -756,7 +804,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.topicHeading)
 					.onChange(async (value) => {
-						if (syncingTopicHeading) return;
+						if (syncingHeadings) return;
 						this.plugin.settings.topicHeading = value;
 						await this.plugin.saveSettings();
 					});

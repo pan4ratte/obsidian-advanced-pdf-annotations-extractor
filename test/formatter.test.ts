@@ -147,6 +147,88 @@ describe('headings', () => {
     ).toBe('# Paper.pdf\n\n-\n-\n# Other.pdf\n\n-\n');
   });
 
+  test('the date heads the note above the topics it groups', () => {
+    expect(
+      format({groupByDate: true, fileHeading: 'none'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'B', created: '2024-01-15'}),
+        annotation({topic: 'C', created: '2024-03-02'}),
+      ])
+    ).toBe('# 2024-01-15\n\n## A\n\n-\n## B\n\n-\n# 2024-03-02\n\n## C\n\n-\n');
+  });
+
+  test('an annotation the PDF gave no date is headed as such', () => {
+    expect(
+      format({groupByDate: true, sortByTopic: false, fileHeading: 'none'}, [
+        annotation({created: '2024-01-15'}),
+        annotation({created: undefined}),
+      ])
+    ).toBe('# 2024-01-15\n\n-\n# No date\n\n-\n');
+  });
+
+  test('all three headings nest, outermost first', () => {
+    expect(
+      format({groupByDate: true, fileHeading: 'file'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
+        annotation({topic: 'B', created: '2024-03-02'}),
+      ])
+    ).toBe(
+      '# 2024-01-15\n\n## A\n\n### Paper.pdf\n\n-\n### Other.pdf\n\n-\n' +
+        '# 2024-03-02\n\n## B\n\n### Paper.pdf\n\n-\n'
+    );
+  });
+
+  test('a constant file heading still heads the note, above the dates', () => {
+    expect(
+      format({groupByDate: true, fileHeading: 'folder'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'B', created: '2024-03-02'}),
+      ])
+    ).toBe('# refs\n\n## 2024-01-15\n\n### A\n\n-\n## 2024-03-02\n\n### B\n\n-\n');
+  });
+
+  test('a new date starts the topics under it over', () => {
+    // A topic spanning two days is named under each of them, so neither day's
+    // annotations sit under a heading belonging to the other.
+    expect(
+      format({groupByDate: true, fileHeading: 'none'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'B', created: '2024-01-15'}),
+        annotation({topic: 'A', created: '2024-03-02'}),
+      ])
+    ).toBe('# 2024-01-15\n\n## A\n\n-\n## B\n\n-\n# 2024-03-02\n\n## A\n\n-\n');
+  });
+
+  test('a topic that never changes is not repeated under each date', () => {
+    // Same rule as the file heading: one that says the same thing throughout
+    // is written where it first applies and not again.
+    expect(
+      format({groupByDate: true, fileHeading: 'none'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'A', created: '2024-03-02'}),
+      ])
+    ).toBe('# 2024-01-15\n\n## A\n\n-\n# 2024-03-02\n\n-\n');
+  });
+
+  test('grouping by date without its heading only affects the order', () => {
+    expect(
+      format({groupByDate: true, dateHeading: false, fileHeading: 'none'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'B', created: '2024-03-02'}),
+      ])
+    ).toBe('# A\n\n-\n# B\n\n-\n');
+  });
+
+  test('no date heading is written when the annotations are not grouped by date', () => {
+    expect(
+      format({groupByDate: false, fileHeading: 'none'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'B', created: '2024-03-02'}),
+      ])
+    ).toBe('# A\n\n-\n# B\n\n-\n');
+  });
+
   test('no topic heading is written when there is no topic to write', () => {
     expect(headingsFor({sortByTopic: false, fileHeading: 'none'})).toBe('-\n-\n');
     expect(headingsFor({sortByTopic: false, fileHeading: 'folder'})).toBe('# refs\n\n-\n-\n');

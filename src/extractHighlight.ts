@@ -14,6 +14,34 @@ interface QuadPoint {
 }
 
 /**
+ * `D:YYYYMMDD` and whatever follows it. Everything after the year is optional
+ * in the PDF spec, and the `D:` prefix is missing from some writers' output.
+ * The time and zone are deliberately not read: the day is what the annotations
+ * are grouped by, and a zone would move an annotation to the day before or
+ * after depending on where the note is read.
+ */
+const PDF_DATE = /^(?:D:)?(\d{4})(\d{2})?(\d{2})?/;
+
+/**
+ * The day a PDF date string names, as `YYYY-MM-DD`. Undefined for a missing or
+ * unreadable date, so an annotation with no date of its own stays
+ * distinguishable from one made at the epoch.
+ */
+export function pdfDateToDay(raw: string | null | undefined): string | undefined {
+	if (!raw) return undefined;
+	const parsed = PDF_DATE.exec(raw.trim());
+	if (!parsed) return undefined;
+
+	const [, year, month = "01", day = "01"] = parsed;
+	// A writer that pads a date out with zeroes, or gets it wrong, would
+	// otherwise sort under a month that does not exist.
+	if (Number(month) < 1 || Number(month) > 12) return undefined;
+	if (Number(day) < 1 || Number(day) > 31) return undefined;
+
+	return `${year}-${month}-${day}`;
+}
+
+/**
  * The fields of a pdf.js text item the extraction reads. A full `TextItem`
  * satisfies this; it types `transform` as `any[]`, which is why the matrix is
  * restated here.
@@ -154,6 +182,7 @@ async function loadPage(
 			pageLabel: pageLabel, // Real page number defined by author
 			author: raw.titleObj.str,
 			body: raw.contentsObj.str,
+			created: pdfDateToDay(raw.creationDate),
 		};
 
 		if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {

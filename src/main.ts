@@ -53,6 +53,20 @@ export default class PDFAnnotationPlugin extends Plugin {
 		}
 
 		grandtotal.sort(function (a1, a2) {
+			if (settings.groupByDate) {
+				// The day the annotation was made, outside every other
+				// grouping. A PDF need not date its annotations at all, and
+				// the ones it left undated belong after those it dated rather
+				// than before the earliest of them.
+				const d1 = a1.created ?? "";
+				const d2 = a2.created ?? "";
+				if (d1 != d2) {
+					if (!d1) return 1;
+					if (!d2) return -1;
+					return d1 < d2 ? -1 : 1;
+				}
+			}
+
 			if (settings.sortByTopic) {
 				// sort by topic
 				if (a1.topic > a2.topic) return 1;
