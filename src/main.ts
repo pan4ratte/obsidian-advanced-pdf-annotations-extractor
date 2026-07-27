@@ -42,7 +42,9 @@ export default class PDFAnnotationPlugin extends Plugin {
 	sort(grandtotal: PDFAnnotation[]) {
 		const settings = this.settings;
 
-		if (settings.sortByTopic && settings.useStructuringHeadlines) {
+		// Independent of the headings: the topic is a sort key and a template
+		// variable in its own right, just like the folder name.
+		if (settings.sortByTopic) {
 			grandtotal.forEach((anno) => {
 				const lines = anno.body.split(/\r\n|\n\r|\n|\r/); // split by:     \r\n  \n\r  \n  or  \r
 				anno.topic = lines[0]; // First line of contents
@@ -57,7 +59,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				if (a1.topic < a2.topic) return -1;
 			}
 
-			if (settings.useFolderNames) {
+			if (settings.groupByFolder) {
 				// then sort by folder
 				if (a1.folder > a2.folder) return 1;
 				if (a1.folder < a2.folder) return -1;
@@ -330,13 +332,22 @@ export default class PDFAnnotationPlugin extends Plugin {
 			this.settings.desiredAnnotations =
 				desiredAnnotations ?? [...DEFAULT_DESIRED_ANNOTATIONS];
 
+			// Grouping and heading used to be one boolean. Runs against the raw
+			// data.json, since the field it reads is not one of the keys copied
+			// across above.
+			const structureMigrated =
+				PDFAnnotationPluginSetting.migrateStructure(
+					loadedSettings,
+					this.settings
+				);
+
 			// Written back at once, so data.json stops carrying the four
 			// template fields this version no longer reads.
 			const migration = PDFAnnotationPluginSetting.migrateTemplates(
 				loadedSettings,
 				this.settings
 			);
-			if (migration.migrated) {
+			if (migration.migrated || structureMigrated) {
 				await this.saveSettings();
 			}
 			if (migration.dropped.length > 0) {

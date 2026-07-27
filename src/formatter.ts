@@ -25,29 +25,60 @@ export class PDFAnnotationPluginFormatter {
 		// now iterate over the annotations printing topics, then folder, then comments...
 		let text = "";
 		let topic = "";
-		let currentFolder = "";
+		let currentLabel = "";
+
+		// A new topic starts the file headings over, so a topic reading from
+		// several files says which one each of its annotations came from. When
+		// they all came from the same place that heading has nothing left to
+		// tell apart, and repeating it under every topic — one per annotation,
+		// where the topics are the annotations' own first lines — buries the
+		// note in a heading that always says the same thing.
+		const labelFor = (anno: PDFAnnotation) => {
+			if (this.settings.fileHeading === "file") return anno.file.name;
+			// A PDF sitting in the vault root has no folder to name.
+			return anno.folder || t.NOTE_VAULT_ROOT;
+		};
+		const labelVaries = new Set(grandtotal.map(labelFor)).size > 1;
+
+		// Nothing to head a topic with unless the topic was split off the body
+		// in the first place.
+		const headingTopics =
+			this.settings.topicHeading && this.settings.sortByTopic;
+
+		// So one unchanging label heads the note rather than marking a place
+		// inside it: written once, above the topics rather than under the first
+		// of them.
+		const headsTheNote =
+			!labelVaries && this.settings.fileHeading !== "none";
+
+		// Whichever heading encloses the other is the first level, so the note
+		// reads as an outline either way round: topics within the one file the
+		// annotations came from, or files within each topic when they came from
+		// several.
+		const topicLevel = headsTheNote ? "##" : "#";
+		const fileLevel = headingTopics && !headsTheNote ? "##" : "#";
+
+		if (headsTheNote && grandtotal.length > 0) {
+			currentLabel = labelFor(grandtotal[0]);
+			text += `${fileLevel} ${currentLabel}\n\n`;
+		}
+
 		// console.log("all annots", grandtotal)
 		grandtotal.forEach((anno) => {
 			// print main Title when Topic changes (and settings allow)
-			if (this.settings.useStructuringHeadlines) {
-				if (this.settings.sortByTopic) {
-					if (topic != anno.topic) {
-						topic = anno.topic;
-						currentFolder = "";
-						text += `# ${topic}\n`;
-					}
+			if (headingTopics) {
+				if (topic != anno.topic) {
+					topic = anno.topic;
+					if (labelVaries) currentLabel = "";
+					text += `${topicLevel} ${topic}\n\n`;
 				}
+			}
 
-				if (this.settings.useFolderNames) {
-					if (currentFolder != anno.folder) {
-						currentFolder = anno.folder;
-						text += `## ${currentFolder}\n`;
-					}
-				} else {
-					if (currentFolder != anno.file.name) {
-						currentFolder = anno.file.name;
-						text += `## ${currentFolder}\n`;
-					}
+			if (this.settings.fileHeading !== "none") {
+				const label = labelFor(anno);
+				if (currentLabel != label) {
+					currentLabel = label;
+					text += `${fileLevel} ${label}\n\n`;
 				}
 			}
 

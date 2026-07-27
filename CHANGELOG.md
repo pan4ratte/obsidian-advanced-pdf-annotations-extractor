@@ -10,13 +10,67 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 ### Added
 
 - `{{topic}}` template variable, holding the first line of the annotation body
-  when sorting by topic is enabled. It was already reachable but undocumented.
+  when grouping by topic is enabled. It was already reachable but undocumented.
 - `StrikeOut` annotations can now be extracted. It is the fourth text markup
   type, so it captures the struck out text the way highlights, underlines and
   squigglies do. Not enabled by default — tick it in the settings.
 
+### Fixed
+
+- A file heading that says the same thing throughout a note is written once, at
+  the top, instead of above every annotation. Each topic started the file
+  headings over, so that a topic reading from several files says which one each
+  annotation came from — but the topics are the annotations' own first lines, so
+  as soon as the comments differ every annotation is its own topic, and a note
+  extracted from a single PDF repeated one unchanging heading all the way down.
+  Such a heading now heads the note, above the topics rather than under the
+  first of them. It is still repeated per topic when the annotations really do
+  come from more than one folder or file, which is the case it was there for.
+- A PDF in the vault root is headed `Vault root` under *Heading above each
+  file* → *Folder name*. It has no folder to name, and the empty heading it
+  produced was indistinguishable from no heading at all.
+
+- Headings are levelled by what encloses what, so a note reads as an outline
+  and the outline pane follows it. The topic heading was always a first-level
+  one and the file heading always a second-level one, which put an `h2` over the
+  `h1`s in a note headed by its file. Whichever of the two encloses the other
+  takes the first level now: the file when one unchanging heading heads the
+  note, the topic when the files vary and each topic lists the ones it reads
+  from, and whichever is on its own when only one of them is written.
+- Every heading is followed by a blank line.
+
 ### Changed
 
+- Grouping by topic no longer depends on the headings setting. The first line of
+  a comment was only split off into `{{topic}}` while headings were enabled, so
+  with them off the topic sort key was empty and did nothing. The two settings
+  are now independent, the way folder grouping already was. If you had grouping
+  by topic on and headings off, the first line of each comment now moves out of
+  `{{body}}` and into `{{topic}}`.
+- **How annotations are ordered is now separate from what is written above
+  them.** *Use folder name* did both jobs at once: it was a boolean that chose
+  between the folder name and the file name, so a note could not be grouped by
+  folder without repeating the folder name in every heading, and could not be
+  grouped by topic alone without losing the heading level too. It is now
+  *Group by folder*, a toggle that only affects the order, and *Heading above
+  each file*, a choice of folder name, file name or no heading that only affects
+  what the note says. An existing setting is split into the two on first load
+  and keeps the order and the headings it produced before.
+- Each heading level says for itself whether it is written. *Use structuring
+  headlines* was a master switch over both of them, so the only way to drop one
+  heading was to drop the other with it. It is gone, replaced by *Heading above
+  each topic*; the file heading already had a *No heading* choice of its own.
+  Switching the old setting off migrates to both levels off, which is what it
+  did.
+- The settings under Structure are now two sections, Grouping and Headings, each
+  listing its settings in the order they take effect: *Group by annotation
+  topic*, *Group by folder*, then *Heading above each topic*, *Heading above
+  each file*. Grouping decides the order the annotations come in, headings
+  decide what is written between them, and nothing sits in both groups any more.
+  *Heading above each topic* switches off and greys out while grouping by topic
+  is off, the one setting that still depends on another: without a topic split
+  off the body there is nothing for it to head. It stays in view, and the choice
+  it was switched off from comes back when the grouping does.
 - The template variables in the settings tab are a table now, each with a button
   that copies the variable to the clipboard.
 - Each template field is a full-width monospaced box with a numbered gutter.

@@ -2,6 +2,7 @@ import {describe, expect, test} from '@jest/globals';
 import {
   ANNOTS_TREATED_AS_HIGHLIGHTS,
   DEFAULT_DESIRED_ANNOTATIONS,
+  FILE_HEADINGS,
   PDFAnnotationPluginSetting,
   SUPPORTED_ANNOTS,
 } from '../src/settings';
@@ -90,6 +91,123 @@ describe('desired annotation checkboxes', () => {
     s.desiredAnnotations = ['Text', 'Redact'];
     s.setAnnotationDesired('Highlight', true);
     expect(s.desiredAnnotations).toEqual(['Highlight', 'Text', 'Redact']);
+  });
+});
+
+describe('migrateStructure', () => {
+  const migrate = (loaded: Record<string, unknown>) => {
+    const settings = new PDFAnnotationPluginSetting();
+    const migrated = PDFAnnotationPluginSetting.migrateStructure(loaded, settings);
+    return {heading: settings.fileHeading, byFolder: settings.groupByFolder, migrated};
+  };
+
+  const migrateHeadings = (loaded: Record<string, unknown>) => {
+    const settings = new PDFAnnotationPluginSetting();
+    PDFAnnotationPluginSetting.migrateStructure(loaded, settings);
+    return {topic: settings.topicHeading, file: settings.fileHeading};
+  };
+
+  test('the three choices are the ones the formatter branches on', () => {
+    expect(FILE_HEADINGS).toEqual(['folder', 'file', 'none']);
+  });
+
+  test('defaults to grouping by folder and saying so in the heading', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    expect(defaults.fileHeading).toBe('folder');
+    expect(defaults.groupByFolder).toBe(true);
+  });
+
+  test('the old boolean splits into the order and the label it used to mean', () => {
+    expect(migrate({useFolderNames: true})).toEqual({
+      heading: 'folder', byFolder: true, migrated: true,
+    });
+    expect(migrate({useFolderNames: false})).toEqual({
+      heading: 'file', byFolder: false, migrated: true,
+    });
+  });
+
+  test('a data.json holding both fields is left alone', () => {
+    for (const heading of FILE_HEADINGS) {
+      for (const byFolder of [true, false]) {
+        expect(migrate({fileHeading: heading, groupByFolder: byFolder})).toEqual({
+          heading, byFolder, migrated: false,
+        });
+      }
+    }
+  });
+
+  test('the two are independent once split: a folder order under file headings', () => {
+    expect(migrate({fileHeading: 'file', groupByFolder: true})).toEqual({
+      heading: 'file', byFolder: true, migrated: false,
+    });
+  });
+
+  test('a heading from before the split carries the order it used to imply', () => {
+    // Only the folder heading grouped by folder; file and none did not.
+    expect(migrate({fileHeading: 'folder'})).toEqual({
+      heading: 'folder', byFolder: true, migrated: true,
+    });
+    expect(migrate({fileHeading: 'file'})).toEqual({
+      heading: 'file', byFolder: false, migrated: true,
+    });
+    expect(migrate({fileHeading: 'none'})).toEqual({
+      heading: 'none', byFolder: false, migrated: true,
+    });
+  });
+
+  test('the newer fields win over a boolean an older version left behind', () => {
+    expect(migrate({fileHeading: 'none', useFolderNames: true})).toEqual({
+      heading: 'none', byFolder: false, migrated: true,
+    });
+    expect(migrate({groupByFolder: false, useFolderNames: true})).toEqual({
+      heading: 'folder', byFolder: false, migrated: true,
+    });
+  });
+
+  test('a heading this version does not know falls back to the folder name', () => {
+    // Not 'none': a typo must not silently suppress the heading.
+    expect(migrate({fileHeading: 'Folder'})).toEqual({
+      heading: 'folder', byFolder: true, migrated: true,
+    });
+    expect(migrate({fileHeading: ''}).heading).toBe('folder');
+  });
+
+  test('the master switch off silences both heading levels', () => {
+    expect(migrateHeadings({useStructuringHeadlines: false, useFolderNames: true}))
+      .toEqual({topic: false, file: 'none'});
+    expect(migrateHeadings({useStructuringHeadlines: false, fileHeading: 'file'}))
+      .toEqual({topic: false, file: 'none'});
+  });
+
+  test('the master switch on leaves the file heading as it was', () => {
+    expect(migrateHeadings({useStructuringHeadlines: true, useFolderNames: false}))
+      .toEqual({topic: true, file: 'file'});
+  });
+
+  test('silencing the headings does not change the order they were in', () => {
+    // The heading said 'folder' before the switch overrode it, and the order
+    // that implied outlives the heading.
+    expect(migrate({useStructuringHeadlines: false, fileHeading: 'folder'})).toEqual({
+      heading: 'none', byFolder: true, migrated: true,
+    });
+    expect(migrate({useStructuringHeadlines: false, useFolderNames: true}).byFolder).toBe(true);
+  });
+
+  test('a data.json holding the split fields keeps them', () => {
+    expect(migrateHeadings({topicHeading: false, fileHeading: 'folder'}))
+      .toEqual({topic: false, file: 'folder'});
+    expect(migrateHeadings({topicHeading: true, useStructuringHeadlines: false}))
+      .toEqual({topic: true, file: 'folder'});
+  });
+
+  test('a data.json from before any of the fields gets the defaults', () => {
+    expect(migrateHeadings({})).toEqual({topic: true, file: 'folder'});
+    expect(migrate({sortByTopic: false})).toEqual({
+      heading: 'folder', byFolder: true, migrated: false,
+    });
+    expect(migrate({useFolderNames: 'yes'})).toEqual({
+      heading: 'folder', byFolder: true, migrated: false,
+    });
   });
 });
 

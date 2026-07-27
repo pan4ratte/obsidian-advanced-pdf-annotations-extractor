@@ -7,6 +7,7 @@ import {
 	setIcon,
 	Setting,
 	setTooltip,
+	ToggleComponent,
 } from "obsidian";
 import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
@@ -126,6 +127,15 @@ const LEGACY_TEMPLATE_PAIRS = [
 	},
 ] as const;
 
+/**
+ * What the second level heading above each group of annotations shows. Purely
+ * what is written into the note: the order the annotations come in is
+ * `sortByTopic` and `groupByFolder`, so `none` leaves an otherwise identical
+ * note without its file headings.
+ */
+export const FILE_HEADINGS = ["folder", "file", "none"] as const;
+export type FileHeading = (typeof FILE_HEADINGS)[number];
+
 const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
 
 /** `[[{{filepath}}]]` as the internal templates wrote it, spacing included. */
@@ -147,8 +157,9 @@ export interface TemplateMigration {
 }
 
 export class PDFAnnotationPluginSetting {
-	public useStructuringHeadlines: boolean;
-	public useFolderNames: boolean;
+	public topicHeading: boolean;
+	public fileHeading: FileHeading;
+	public groupByFolder: boolean;
 	public sortByTopic: boolean;
 	public exportPath: string;
 	public exportName: string;
@@ -168,8 +179,9 @@ export class PDFAnnotationPluginSetting {
 	public exportClipboardExtraction: boolean;
 
 	constructor() {
-		this.useStructuringHeadlines = true;
-		this.useFolderNames = true;
+		this.topicHeading = true;
+		this.fileHeading = "folder";
+		this.groupByFolder = true;
 		this.sortByTopic = true;
 		this.exportPath = "";
 		this.exportName = t.DEFAULT_EXPORT_NAME;
@@ -262,6 +274,74 @@ export class PDFAnnotationPluginSetting {
 		}
 
 		return migration;
+	}
+
+	/**
+	 * Older versions stored one `useFolderNames` boolean that both ordered the
+	 * annotations and labelled their heading, so a note could not be grouped by
+	 * folder without saying so in every heading, nor grouped by topic alone.
+	 * Split it into the two settings that do those jobs: `groupByFolder` for the
+	 * order and `fileHeading` for the label.
+	 *
+	 * `useStructuringHeadlines` sat above both as a master switch. Each heading
+	 * level says whether it is written itself now, so switching it off becomes
+	 * both of them off.
+	 *
+	 * `loaded` is the raw data.json, since neither field exists on this class
+	 * any more. Returns whether anything was migrated, so the caller can write
+	 * the settings back.
+	 */
+	public static migrateStructure(
+		loaded: Record<string, unknown>,
+		settings: PDFAnnotationPluginSetting
+	): boolean {
+		let migrated = false;
+
+		const heading = loaded.fileHeading;
+		if (typeof heading === "string") {
+			// A value this version does not know is worse than the default: it
+			// would suppress the heading through the `none` branch by accident.
+			const known = FILE_HEADINGS.includes(heading as FileHeading);
+			settings.fileHeading = known ? (heading as FileHeading) : "folder";
+			migrated = !known;
+		} else if (typeof loaded.useFolderNames === "boolean") {
+			settings.fileHeading = loaded.useFolderNames ? "folder" : "file";
+			migrated = true;
+		} else {
+			settings.fileHeading = "folder";
+		}
+
+		// What the heading said before the master switch below could silence it.
+		// The order it implied survives being silenced, so it is read from here
+		// rather than from the field.
+		const headingBeforeSwitch = settings.fileHeading;
+
+		if (typeof loaded.topicHeading === "boolean") {
+			settings.topicHeading = loaded.topicHeading;
+		} else if (typeof loaded.useStructuringHeadlines === "boolean") {
+			settings.topicHeading = loaded.useStructuringHeadlines;
+			// The master switch suppressed every heading, the file one
+			// included, whatever the setting below it said.
+			if (!loaded.useStructuringHeadlines) settings.fileHeading = "none";
+			migrated = true;
+		}
+
+		if (typeof loaded.groupByFolder === "boolean") {
+			settings.groupByFolder = loaded.groupByFolder;
+		} else if (typeof heading === "string") {
+			// Before the split the heading carried the order too, and only the
+			// folder heading grouped by folder — `file` and `none` both left the
+			// annotations ordered file by file.
+			settings.groupByFolder = headingBeforeSwitch === "folder";
+			migrated = true;
+		} else if (typeof loaded.useFolderNames === "boolean") {
+			settings.groupByFolder = loaded.useFolderNames;
+			migrated = true;
+		} else {
+			settings.groupByFolder = true;
+		}
+
+		return migrated;
 	}
 
 	/**
@@ -614,33 +694,31 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			card.settingEl.addClass("pdf-annotations-template-setting");
 		});
 
+		// Two groups, in the order they take effect: what decides where an
+		// annotation lands, then what gets written above it.
+		// The topic heading has nothing to head until a topic is split off the
+		// annotation, so it follows the setting that does the splitting: off and
+		// out of reach while that one is. It stays in view either way, and the
+		// setting it is switched off from is remembered, so switching the
+		// grouping back on brings the heading back with it.
+		// Assigned as the setting below is built, before anything can call it.
+		let topicHeadingToggle!: ToggleComponent;
+		let syncingTopicHeading = false;
+		const syncTopicHeading = () => {
+			const enabled = this.plugin.settings.sortByTopic;
+			// setValue calls onChange, which would take this for an edit and
+			// write the remembered choice away.
+			syncingTopicHeading = true;
+			topicHeadingToggle.setValue(
+				enabled && this.plugin.settings.topicHeading
+			);
+			topicHeadingToggle.setDisabled(!enabled);
+			syncingTopicHeading = false;
+		};
+
 		new Setting(containerEl)
-			.setName(t.SECTION_STRUCTURE)
+			.setName(t.SECTION_GROUPING)
 			.setHeading();
-		new Setting(containerEl)
-			.setName(t.SETTING_HEADLINES_NAME)
-			.setDesc(t.SETTING_HEADLINES_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.useStructuringHeadlines)
-					.onChange(async (value) => {
-						this.plugin.settings.useStructuringHeadlines = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName(t.SETTING_FOLDER_NAMES_NAME)
-			.setDesc(t.SETTING_FOLDER_NAMES_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.useFolderNames)
-					.onChange(async (value) => {
-						this.plugin.settings.useFolderNames = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
 		new Setting(containerEl)
 			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
 			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
@@ -649,6 +727,55 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.sortByTopic)
 					.onChange(async (value) => {
 						this.plugin.settings.sortByTopic = value;
+						syncTopicHeading();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName(t.SETTING_GROUP_BY_FOLDER_NAME)
+			.setDesc(t.SETTING_GROUP_BY_FOLDER_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.groupByFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.groupByFolder = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName(t.SECTION_HEADINGS)
+			.setDesc(t.SECTION_HEADINGS_DESC)
+			.setHeading();
+		new Setting(containerEl)
+			.setName(t.SETTING_TOPIC_HEADING_NAME)
+			.setDesc(t.SETTING_TOPIC_HEADING_DESC)
+			.addToggle((toggle) => {
+				topicHeadingToggle = toggle;
+				toggle
+					.setValue(this.plugin.settings.topicHeading)
+					.onChange(async (value) => {
+						if (syncingTopicHeading) return;
+						this.plugin.settings.topicHeading = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		syncTopicHeading();
+
+		new Setting(containerEl)
+			.setName(t.SETTING_FILE_HEADING_NAME)
+			.setDesc(t.SETTING_FILE_HEADING_DESC)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						folder: t.OPTION_FILE_HEADING_FOLDER,
+						file: t.OPTION_FILE_HEADING_FILE,
+						none: t.OPTION_FILE_HEADING_NONE,
+					})
+					.setValue(this.plugin.settings.fileHeading)
+					.onChange(async (value) => {
+						this.plugin.settings.fileHeading = value as FileHeading;
 						await this.plugin.saveSettings();
 					})
 			);

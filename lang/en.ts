@@ -24,6 +24,7 @@ export default {
     // The {{variables}} are names the formatter resolves; only the words around
     // them may be translated.
     NOTE_NO_ANNOTATIONS: "*No annotations*",
+    NOTE_VAULT_ROOT: "Vault root",
     DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
     DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filelink}}*\n\n",
     DEFAULT_EXPORT_NAME: "Annotations for {{filename}}",
@@ -47,7 +48,7 @@ export default {
     VAR_PAGE_LABEL: "Page label of annotation (relative to number of defined page indexes)",
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Body of the annotation",
-    VAR_TOPIC: "First line of the body, when sorting by topic is enabled",
+    VAR_TOPIC: "First line of the body, when grouping by topic is enabled",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
     // ─── Settings: annotations ───────────────────────────────────────────────────
@@ -71,14 +72,23 @@ export default {
     SETTING_NOTE_TEMPLATE_NAME: "Template for notes",
     SETTING_NOTE_TEMPLATE_DESC: "Used for the annotation types that only carry a comment, so {{highlightedText}} is empty.",
 
-    // ─── Settings: structure ─────────────────────────────────────────────────────
-    SECTION_STRUCTURE: "Structure",
-    SETTING_HEADLINES_NAME: "Use structuring headlines",
-    SETTING_HEADLINES_DESC: "If disabled, no structuring headlines will be shown. Just the annotations in the specified template style.",
-    SETTING_FOLDER_NAMES_NAME: "Use folder name",
-    SETTING_FOLDER_NAMES_DESC: "If enabled, uses the PDF's folder name (instead of the PDF-filename) for sorting",
-    SETTING_SORT_BY_TOPIC_NAME: "Sort by topic",
-    SETTING_SORT_BY_TOPIC_DESC: "If enabled, uses the notes first line as topic for primary sorting",
+    // ─── Settings: grouping ──────────────────────────────────────────────────────
+    SECTION_GROUPING: "Grouping",
+    SETTING_SORT_BY_TOPIC_NAME: "Group by annotation topic",
+    SETTING_SORT_BY_TOPIC_DESC: "Treats the first line of each PDF comment as its topic and groups by it first, above folder and file. The topic line is removed from {{body}} and made available as {{topic}}.",
+    SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
+    SETTING_GROUP_BY_FOLDER_DESC: "Keeps every PDF in the same folder together, before the annotations are ordered file by file. Affects the order only — what the headings say is set below.",
+
+    // ─── Settings: headings ──────────────────────────────────────────────────────
+    SECTION_HEADINGS: "Headings",
+    SECTION_HEADINGS_DESC: "The only text written between the annotations. Each heading is written once, where its group starts, rather than above every annotation — that is all these do that a template cannot. Whichever heading encloses the other takes the first level, so the note reads as an outline. Turn both off to get nothing but your templates.",
+    SETTING_TOPIC_HEADING_NAME: "Heading above each topic",
+    SETTING_TOPIC_HEADING_DESC: "Writes the topic as a heading where it changes. Available only while grouping by topic, since that is what splits a topic off the annotation to head anything with.",
+    SETTING_FILE_HEADING_NAME: "Heading above each file",
+    SETTING_FILE_HEADING_DESC: "What the heading above each file says: the name of the PDF's folder, the name of the PDF itself, or nothing at all. One that would say the same thing throughout heads the note instead, written once. The order the annotations come in is unaffected.",
+    OPTION_FILE_HEADING_FOLDER: "Folder name",
+    OPTION_FILE_HEADING_FILE: "File name",
+    OPTION_FILE_HEADING_NONE: "No heading",
 
     // ─── Settings: note export ───────────────────────────────────────────────────
     SECTION_NOTE_EXPORT: "Note export",
