@@ -407,11 +407,16 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			});
 		});
 
-		new Setting(containerEl)
+		// The instructions are this heading's description rather than a
+		// paragraph after it, so the section reads as one block. They go in
+		// through descEl because setDesc takes text, and this text has a link
+		// in the middle of it.
+		const templatesHeading = new Setting(containerEl)
 			.setName(STRINGS.settings.templates.heading)
 			.setHeading();
+		templatesHeading.descEl.addClass("pdf-annotations-template-instructions");
 		this.appendTextWithLink(
-			containerEl.createEl("p"),
+			templatesHeading.descEl,
 			STRINGS.settings.templates.instructions,
 			STRINGS.settings.templates.handlebarsLink,
 			HANDLEBARS_DOCS
@@ -450,20 +455,34 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			templateVariableRow.createEl("td", { text: description });
 		});
 
-		new Setting(containerEl)
-			.setName(STRINGS.settings.templates.highlightName)
-			.setDesc(STRINGS.settings.templates.highlightDesc)
-			.addTextArea((input) => {
-				input.inputEl.addClass("pdf-annotations-template-input");
-				this.buildValueInput(input, "highlightTemplate");
-			});
-		new Setting(containerEl)
-			.setName(STRINGS.settings.templates.noteName)
-			.setDesc(STRINGS.settings.templates.noteDesc)
-			.addTextArea((input) => {
-				input.inputEl.addClass("pdf-annotations-template-input");
-				this.buildValueInput(input, "noteTemplate");
-			});
+		// The two templates are cards side by side, each with its text above
+		// its input; styles.css lays the pair out and drops them to one column
+		// when the tab is too narrow.
+		const templateColumns = containerEl.createDiv({
+			cls: "pdf-annotations-template-columns",
+		});
+		const templateCards = [
+			{
+				name: STRINGS.settings.templates.highlightName,
+				desc: STRINGS.settings.templates.highlightDesc,
+				settingsKey: "highlightTemplate",
+			},
+			{
+				name: STRINGS.settings.templates.noteName,
+				desc: STRINGS.settings.templates.noteDesc,
+				settingsKey: "noteTemplate",
+			},
+		];
+		templateCards.forEach(({ name, desc, settingsKey }) => {
+			const card = new Setting(templateColumns)
+				.setName(name)
+				.setDesc(desc)
+				.addTextArea((input) => {
+					input.inputEl.addClass("pdf-annotations-template-input");
+					this.buildValueInput(input, settingsKey);
+				});
+			card.settingEl.addClass("pdf-annotations-template-setting");
+		});
 
 		new Setting(containerEl)
 			.setName(STRINGS.settings.structure.heading)

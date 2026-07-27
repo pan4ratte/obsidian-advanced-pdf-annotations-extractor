@@ -1,7 +1,60 @@
-/* Template text areas in the plugin settings tab. */
+/* The instructions belonging to the "Templates" heading. Sized like the rest of
+   the tab rather than like a heading's own description, and given the same gap
+   under the name as the other headings that carry one. */
+.pdf-annotations-template-instructions {
+	padding-top: 8px;
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-normal);
+	color: var(--text-normal);
+}
+
+/* The two template cards side by side, dropping to one column when the tab is
+   too narrow to give both a usable width. */
+.pdf-annotations-template-columns {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(24em, 1fr));
+	gap: 16px;
+	margin-bottom: 16px;
+	/* Each card is as tall as its own template. Without this, grid stretches
+	   both to the taller one, and the growing text area drags its neighbour
+	   along with it. */
+	align-items: start;
+}
+
+/* Each card stacks: name and description above, the text area across the full
+   width below. min-width keeps a text area from pushing its column wider than
+   the half of the row it was given. */
+.pdf-annotations-template-setting {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
+	min-width: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--setting-items-background);
+	border-radius: var(--setting-items-radius);
+	padding: 16px;
+}
+
+.pdf-annotations-template-setting .setting-item-info {
+	margin-right: 0;
+}
+
+/* Obsidian gives the control `flex: 1 1 auto`, which in this column layout
+   makes it soak up any height the card is given. Held to its content instead,
+   so the text area's height is only ever its own. */
+.pdf-annotations-template-setting .setting-item-control {
+	width: 100%;
+	flex-grow: 0;
+}
+
+/* Template text areas in the plugin settings tab: a fixed box, thirteen lines
+   tall and as wide as its column, scrolling once the template outgrows it. */
 .pdf-annotations-template-input {
 	width: 100%;
-	height: 10em;
+	height: 13em;
+	overflow-y: auto;
+	resize: none;
+	margin-top: 8px;
 }
 
 /* "Annotations to extract": heading, description and checkbox grid form a
@@ -39,13 +92,19 @@
     );
     gap: 8px;
     width: 100%;
+	margin-top: 4px;
 }
 
+/* The card is a heading row, whose type carries into everything inside it. The
+   labels are ordinary text, so they say so themselves. */
 .pdf-annotations-annotation-option {
 	display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-normal);
+    color: var(--text-normal);
 }
 
 /* Obsidian sizes checkboxes for full-width setting rows; in the grid they sit
