@@ -193,6 +193,35 @@ function cleanFolderPath(value: string): string {
 }
 
 /**
+ * Long enough for a sentence a `{{topic}}` can hold, short enough that the path
+ * around it still fits what the file system will take.
+ */
+const MAX_NOTE_NAME_LENGTH = 100;
+
+/**
+ * A note name a vault will take: the characters Obsidian rejects taken out, the
+ * line breaks a variable like `{{topic}}` carries in collapsed to spaces, and
+ * neither a leading dot — which would write a hidden note nobody sees — nor a
+ * trailing one left behind. Comes back empty when nothing usable is left, so the
+ * caller can put a name of its own in its place.
+ */
+export function cleanNoteName(value: string): string {
+	const collapsed = value
+		.replace(ILLEGAL_PATH_CHARS, "")
+		// A name is one path part: a slash in it would write the note somewhere
+		// else, which is what the subfolder setting is for.
+		.replace(/\//g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, MAX_NOTE_NAME_LENGTH);
+
+	return collapsed
+		.replace(/^\.+/, "")
+		.replace(/[. ]+$/, "")
+		.trim();
+}
+
+/**
  * Where one note is written. Kept out of the plugin class so it can be checked
  * on its own: `currentFolder` is the folder of the file being looked at and
  * `subfolder` arrives already rendered, since the templates are compiled there.

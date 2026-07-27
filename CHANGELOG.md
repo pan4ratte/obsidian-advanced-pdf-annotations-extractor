@@ -42,6 +42,23 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Changed
 
+- `{{topic}}` holds the comment's first line whether or not *Group by topic* is
+  on. It was read only while grouping, so a template asking for it — in a note,
+  a highlight, or the name of a note per annotation — rendered nothing at all
+  for anyone who does not group. What the grouping decides now is only whether
+  that line is taken out of `{{body}}`: it is, because the topic is written as a
+  heading above the annotations sharing it and would be read twice otherwise.
+  With the grouping off nothing writes it on its own, so the comment stays whole
+  and `{{topic}}` and `{{body}}` in one template repeat the line — which is the
+  template's business, and how a reader gets the first line as a title of their
+  own making.
+- *Extract tags in annotations as Obsidian tags* moves the tags rather than
+  copying them: a tag read into the note's properties is taken out of the
+  extracted text, so it stands in one place instead of two — and out of the note
+  name as well, where a `{{topic}}` would otherwise have carried a `#` into a
+  file name that no link can point at. A line left holding nothing but the tags
+  goes with them; a comment nobody tagged is written exactly as it was made.
+  Turning the setting off writes the comments untouched, tags and all.
 - The settings that decide where a note goes and what it is called no longer
   call it an export. Nothing leaves Obsidian: the annotations are read out of a
   PDF and the notes are written into the vault, so *Note export* is now simply
@@ -163,6 +180,24 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Fixed
 
+- *Extract tags in annotations as Obsidian tags* finds the tags written on a
+  comment's first line. *Sort by topic* splits that line off as the topic before
+  a note is written, and only what was left of the comment was searched — so a
+  tag beside the title, or a one-line comment that is nothing but tags, reached
+  no note's properties at all. The two are read together now.
+- *Name of a note per annotation* renders the annotation's own variables, so a
+  template such as `{{topic}}` names each note after its annotation. Only the
+  PDF's `{{filename}}` and the `{{counter}}` were passed before, and a template
+  of anything else rendered an empty name, which was written as a hidden `.md` —
+  or refused by the vault outright — so nothing appeared to be extracted at all.
+- A note name is cleaned the way a folder path already was: the characters
+  Obsidian will not take are dropped, the line breaks a variable like
+  `{{topic}}` carries in become spaces, and a name too long for the file system
+  is cut short. A topic of `Chapter 1: a study?` used to be refused as a path.
+- A name template that still renders nothing usable — `{{topic}}` holds nothing
+  unless *Sort by topic* is on, and nothing at all for an annotation without a
+  comment — falls back to the PDF's name, numbered per annotation, rather than
+  writing no note.
 - A file heading that says the same thing throughout a note is written once, at
   the top, instead of above every annotation. Each topic started the file
   headings over, so that a topic reading from several files says which one each

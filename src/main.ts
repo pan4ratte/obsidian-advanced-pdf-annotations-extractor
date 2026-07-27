@@ -16,11 +16,14 @@ import {
 import { t } from "lang/helpers";
 import { loadPDFFile } from "src/extractHighlight";
 import {
+	cleanNoteName,
 	DEFAULT_DESIRED_ANNOTATIONS,
 	PDFAnnotationPluginSetting,
 	PDFAnnotationPluginSettingTab,
 	resolveNotePath,
 } from "src/settings";
+import { takeTagsFromAnnotations } from "src/tags";
+import { assignTopics } from "src/topics";
 import {
 	asIndexable,
 	FileMeta,
@@ -30,6 +33,12 @@ import {
 } from "src/types";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
+
+/**
+ * For when a name template and the PDF's own name both render nothing a vault
+ * would take. Never seen in practice; better than writing no note at all.
+ */
+const FALLBACK_NOTE_NAME = "Annotations";
 
 export default class PDFAnnotationPlugin extends Plugin {
 	public settings: PDFAnnotationPluginSetting;
@@ -44,14 +53,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const settings = this.settings;
 
 		// Independent of the headings: the topic is a sort key and a template
-		// variable in its own right, just like the folder name.
-		if (settings.sortByTopic) {
-			grandtotal.forEach((anno) => {
-				const lines = anno.body.split(/\r\n|\n\r|\n|\r/); // split by:     \r\n  \n\r  \n  or  \r
-				anno.topic = lines[0]; // First line of contents
-				anno.body = lines.slice(1).join("\r\n");
-			});
-		}
+		// variable in its own right, just like the folder name. Grouping by it
+		// decides whether the line it is read from is left in the body, not
+		// whether it is read at all.
+		assignTopics(grandtotal, settings.sortByTopic);
 
 		grandtotal.sort(function (a1, a2) {
 			if (settings.groupByDate) {
@@ -112,19 +117,6 @@ export default class PDFAnnotationPlugin extends Plugin {
 		this.sort(grandtotal);
 		await this.writeNotes(pdfFile, grandtotal, false, onePerAnnotation);
 	}
-	private tagsInAnnotations(annotations: PDFAnnotation[]): string[] {
-		// Use Set instead of Array to eliminate duplicates
-		const extractedTagsFromAnnotations = new Set<string>();
-		annotations.forEach((annotation) => {
-			const tagPattern = /#([\wöäü_/-]*[A-Za-zöäü][\wöäü_/-]*)/g;
-			let match: RegExpExecArray | null;
-			while ((match = tagPattern.exec(annotation.body)) !== null) {
-				extractedTagsFromAnnotations.add(match[1]);
-			}
-		});
-		return [...extractedTagsFromAnnotations];
-	}
-
 	/**
 	 * Add the tags to the note's own properties, rather than writing a block of
 	 * front matter into its text: a note the annotations were appended to
@@ -157,30 +149,47 @@ export default class PDFAnnotationPlugin extends Plugin {
 		onePerAnnotation = false
 	): Promise<void> {
 		const currentFolder = this.currentFolder();
+		const extractTags =
+			this.settings.extractTagsFromAnnotationsAsObsidianTags;
+
+		/**
+		 * Taken out of the comments before anything is rendered from them, so
+		 * that a tag ends up in the note's properties and nowhere else — not in
+		 * the text of the note, and not in the name a `{{topic}}` gives it.
+		 */
+		const takeTags = (annotations: PDFAnnotation[]) =>
+			extractTags ? takeTagsFromAnnotations(annotations) : [];
 
 		if (onePerAnnotation) {
 			// Written one after another: concurrent writes to the same note (when
 			// the note name lacks {{counter}}) would race each other.
 			for (const [index, anno] of grandtotal.entries()) {
+				const tags = takeTags([anno]);
 				const note = this.formatter.format([anno], isExternalFile);
 				const fileNameOfNote =
-					this.getResolvedOneNotePerAnnotationName(fileMeta, index + 1) + ".md";
+					this.getResolvedOneNotePerAnnotationName(
+						fileMeta,
+						index + 1,
+						anno,
+						isExternalFile
+					) + ".md";
 				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
 				// A note per annotation is a great many notes; opening each of
 				// them buries whatever the reader was looking at.
 				const written = await this.saveHighlightsToFile(filePathOfNote, note, this.settings.overwriteExistingNote, false);
-				if (written && this.settings.extractTagsFromAnnotationsAsObsidianTags) {
-					await this.addTagsToNoteProperties(written, this.tagsInAnnotations([anno]));
+				if (written) {
+					await this.addTagsToNoteProperties(written, tags);
 				}
 			}
 		} else {
+			const tags = takeTags(grandtotal);
 			const finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
 			const fileNameOfNote =
 				this.getResolvedNoteName(fileMeta) + ".md";
 			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
 			const written = await this.saveHighlightsToFile(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote, true);
-			if (written && this.settings.extractTagsFromAnnotationsAsObsidianTags) {
-				await this.addTagsToNoteProperties(written, this.tagsInAnnotations(grandtotal));
+			if (written) {
+				await this.addTagsToNoteProperties(written, tags);
 			}
 		}
 	}
@@ -497,28 +506,69 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	getTemplateVariablesForOneNotePerAnnotationName(
 		file: FileMeta,
-		counter: number
+		counter: number,
+		annotation: PDFAnnotation,
+		isExternalFile: boolean
 	): Record<string, unknown> {
 		const shortcuts = {
 			filename: file.basename,
 			counter: counter,
 		};
 
-		return { file: file, ...shortcuts };
+		// The note holds one annotation and nothing else, so the annotation's
+		// own variables name it as well as the PDF's do — {{topic}} above all,
+		// which is what the reader who wants the annotation's first line for a
+		// title reaches for.
+		return {
+			...this.formatter.getTemplateVariablesForAnnotation(
+				annotation,
+				isExternalFile
+			),
+			file: file,
+			...shortcuts,
+		};
+	}
+
+	/**
+	 * A name the vault will take, whatever the template rendered. A template can
+	 * come back empty — `{{topic}}` is empty unless the annotations were sorted
+	 * by topic, and unless the annotation has a body at all — and an empty name
+	 * writes a hidden `.md` the reader never finds, so the PDF's own name stands
+	 * in rather than the extraction quietly coming to nothing.
+	 */
+	private usableNoteName(rendered: string, fallback: string): string {
+		return (
+			cleanNoteName(rendered) ||
+			cleanNoteName(fallback) ||
+			FALLBACK_NOTE_NAME
+		);
 	}
 
 	getResolvedNoteName(file: FileMeta): string {
-		return this.noteNameTemplate(
-			this.getTemplateVariablesForNoteName(file)
+		return this.usableNoteName(
+			this.noteNameTemplate(this.getTemplateVariablesForNoteName(file)),
+			file.basename
 		);
 	}
 
 	getResolvedOneNotePerAnnotationName(
 		file: FileMeta,
-		counter: number
+		counter: number,
+		annotation: PDFAnnotation,
+		isExternalFile: boolean
 	): string {
-		return this.oneNotePerAnnotationNameTemplate(
-			this.getTemplateVariablesForOneNotePerAnnotationName(file, counter)
+		return this.usableNoteName(
+			this.oneNotePerAnnotationNameTemplate(
+				this.getTemplateVariablesForOneNotePerAnnotationName(
+					file,
+					counter,
+					annotation,
+					isExternalFile
+				)
+			),
+			// Distinct per annotation, so a template that names them all the
+			// same does not collapse them into one note.
+			`${file.basename}-${counter}`
 		);
 	}
 

@@ -112,7 +112,11 @@ export interface PDFAnnotation extends RawPDFAnnotation {
 	pageLabel: string;
 	author: string;
 	body: string;
-	/** First line of the body, split off when sorting by topic. */
+	/**
+	 * First line of the body, read once the annotations are gathered, and split
+	 * off from the body itself when they are grouped by topic. Undefined only
+	 * until then.
+	 */
 	topic?: string;
 	/**
 	 * The day `creationDate` names, as `YYYY-MM-DD`. Undefined when the PDF

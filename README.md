@@ -26,7 +26,7 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 		- {{pageLabel}}: 'Page label (page number defined by author)',
 		- {{author}}: 'Author of annotation',
 		- {{body}}: 'Body of annotation',
-		- {{topic}}: 'First line of the body, when sorting by topic is enabled',
+		- {{topic}}: 'First line of the body. Grouping by topic also takes it out of `{{body}}`, since it is written as a heading instead',
 		- {{isExternal}}: 'True for PDFs outside the vault, for `{{#if isExternal}}`'
 		
 		The annotation itself is available as `{{annotation}}` for anything without a shortcut, e.g. `{{annotation.subtype}}`.

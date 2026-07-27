@@ -1,6 +1,7 @@
 import {describe, expect, test} from '@jest/globals';
 import {
   ANNOTS_TREATED_AS_HIGHLIGHTS,
+  cleanNoteName,
   DEFAULT_DESIRED_ANNOTATIONS,
   FILE_HEADINGS,
   PDFAnnotationPluginSetting,
@@ -92,6 +93,51 @@ describe('desired annotation checkboxes', () => {
     s.desiredAnnotations = ['Text', 'Redact'];
     s.setAnnotationDesired('Highlight', true);
     expect(s.desiredAnnotations).toEqual(['Highlight', 'Text', 'Redact']);
+  });
+});
+
+describe('cleanNoteName', () => {
+  test('a name a vault already takes is left alone', () => {
+    expect(cleanNoteName('Annotations for Paper-1')).toBe(
+      'Annotations for Paper-1'
+    );
+  });
+
+  test('characters a vault name cannot hold are dropped', () => {
+    expect(cleanNoteName('Chapter 1: what "counts"?')).toBe(
+      'Chapter 1 what counts'
+    );
+  });
+
+  test('a slash names no folder, since the subfolder setting does that', () => {
+    expect(cleanNoteName('Part 1/Chapter 2')).toBe('Part 1 Chapter 2');
+  });
+
+  test('the line breaks a topic carries in become spaces', () => {
+    expect(cleanNoteName('First line\r\nsecond line')).toBe(
+      'First line second line'
+    );
+  });
+
+  test('a name that renders nothing usable comes back empty', () => {
+    expect(cleanNoteName('')).toBe('');
+    expect(cleanNoteName('   ')).toBe('');
+    expect(cleanNoteName('???')).toBe('');
+    expect(cleanNoteName('...')).toBe('');
+  });
+
+  test('no leading dot, which would write a note nobody sees', () => {
+    expect(cleanNoteName('.hidden')).toBe('hidden');
+  });
+
+  test('no trailing dot or space, which a file system would refuse', () => {
+    expect(cleanNoteName('Ibid. ')).toBe('Ibid');
+  });
+
+  test('a topic of a whole paragraph is cut to a name of a length', () => {
+    const cleaned = cleanNoteName('word '.repeat(60));
+    expect(cleaned.length).toBeLessThanOrEqual(100);
+    expect(cleaned.endsWith(' ')).toBe(false);
   });
 });
 

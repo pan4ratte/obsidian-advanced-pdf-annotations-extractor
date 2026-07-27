@@ -52,7 +52,7 @@ export default {
     VAR_PAGE_LABEL: "Page label of annotation (relative to number of defined page indexes)",
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Body of the annotation",
-    VAR_TOPIC: "First line of the body, when grouping by topic is enabled",
+    VAR_TOPIC: "First line of the body. Grouping by topic also takes it out of {{body}}, since it is written as a heading instead",
     VAR_CREATED: "Day the annotation was made, like 2024-01-15, empty when the PDF gives no date",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
@@ -112,9 +112,9 @@ export default {
     SETTING_NOTE_NAME_NAME: "Note name",
     SETTING_NOTE_NAME_DESC: "What the note is called, as a template. '{{filename}}' is the PDF's name, so a note can be named after the PDF it came from and given a prefix or suffix. Without it every PDF writes to the same note.",
     SETTING_ONE_NOTE_NAME_NAME: "Name of a note per annotation",
-    SETTING_ONE_NOTE_NAME_DESC: "What the notes made by the 'note per annotation' commands are called, as a template. '{{filename}}' is the PDF's name; add '{{counter}}' for the annotation's number, without which they would all be the same note.",
+    SETTING_ONE_NOTE_NAME_DESC: "What the notes made by the 'note per annotation' commands are called, as a template. '{{filename}}' is the PDF's name; add '{{counter}}' for the annotation's number, without which they would all be the same note. The annotation's own variables work here too, '{{topic}}' among them — it holds the annotation's first line, and only when 'Sort by topic' is on. Whenever a template renders nothing a note can be called, the PDF's name and the number are used instead.",
     SETTING_OVERWRITE_NAME: "Overwrite existing note",
     SETTING_OVERWRITE_DESC: "If enabled, a note of the same name is replaced rather than added to.",
     SETTING_EXTRACT_TAGS_NAME: "Extract tags in annotations as Obsidian tags",
-    SETTING_EXTRACT_TAGS_DESC: "If enabled, tags written in the annotations are added to the note's tags property. Tags the note already has are kept.",
+    SETTING_EXTRACT_TAGS_DESC: "If enabled, tags written in the annotations are moved to the note's tags property: they are taken out of the extracted text, so each tag stands in one place rather than two. Tags the note already has are kept.",
 };
