@@ -2,6 +2,7 @@ import {
 	compile as compileTemplate,
 	TemplateDelegate as Template,
 } from "handlebars";
+import { STRINGS } from "./locale/en";
 import {
 	ANNOTS_TREATED_AS_HIGHLIGHTS,
 	PDFAnnotationPluginSetting,
@@ -57,7 +58,7 @@ export class PDFAnnotationPluginFormatter {
 			}
 		});
 
-		if (grandtotal.length == 0) return "*No Annotations*";
+		if (grandtotal.length == 0) return STRINGS.output.noAnnotations;
 		else return text;
 	}
 

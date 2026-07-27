@@ -14,6 +14,7 @@ import {
 	Notice,
 } from "obsidian";
 import { loadPDFFile } from "src/extractHighlight";
+import { STRINGS } from "src/locale/en";
 import {
 	DEFAULT_DESIRED_ANNOTATIONS,
 	PDFAnnotationPluginSetting,
@@ -147,9 +148,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal: PDFAnnotation[];
 		pdfFile: PDFFile | null;
 	} {
-		new Notice(
-			"Reading a PDF from a path outside the vault is only available in the desktop app."
-		);
+		new Notice(STRINGS.notices.clipboardPathIsDesktopOnly);
 		return { grandtotal: [], pdfFile: null };
 	}
 
@@ -209,10 +208,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 					desiredAnnotations
 				);
 			} else {
-				new Notice("The path in the clipboard is not a file.");
+				new Notice(STRINGS.notices.clipboardPathIsNotAFile);
 			}
 		} catch (error) {
-			new Notice("The clipboard does not contain a readable file path.");
+			new Notice(STRINGS.notices.clipboardPathUnreadable);
 			console.error(error);
 		}
 		return { grandtotal, pdfFile };
@@ -226,7 +225,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations-single",
-			name: "Extract from the current file",
+			name: STRINGS.commands.extractCurrentFile,
 			checkCallback: (checking: boolean) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file != null && file.extension === "pdf") {
@@ -234,9 +233,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 						// load file if (not only checking) && conditions are valid
 						this.loadSinglePDFFile(file).catch((error) => {
 							console.error(error);
-							new Notice(
-								"Could not extract the annotations of this PDF."
-							);
+							new Notice(STRINGS.notices.extractionFailed);
 						});
 					}
 					return true;
@@ -248,7 +245,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations-single-from-clipboard-path",
-			name: "Extract from the file path in the clipboard",
+			name: STRINGS.commands.extractClipboardPath,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const clipText = await navigator.clipboard.readText();
 				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
@@ -265,7 +262,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "extract-annotations",
-			name: "Extract from every PDF in the current folder",
+			name: STRINGS.commands.extractCurrentFolder,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const file = this.app.workspace.getActiveFile();
 				if (file == null) return;
@@ -343,10 +340,12 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.saveSettings();
 			}
 			if (migration.dropped.length > 0) {
+				const outcome =
+					migration.dropped.length > 1
+						? "both"
+						: migration.dropped[0];
 				new Notice(
-					`The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. Your template for ${migration.dropped.join(
-						" and "
-					)} of PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.`,
+					STRINGS.notices.templatesCollapsed[outcome],
 					15000
 				);
 			}
@@ -437,9 +436,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.app.workspace.openLinkText(filePath, "", true);
 			} catch (error) {
 				console.error(error);
-				new Notice(
-					"Error creating note with annotations, because the notes export path is invalid. Please check the file path in the settings. Folders must exist."
-				);
+				new Notice(STRINGS.notices.exportPathInvalid);
 			}
 		}
 	}

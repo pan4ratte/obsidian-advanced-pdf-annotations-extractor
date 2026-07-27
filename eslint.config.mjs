@@ -8,8 +8,10 @@ export default defineConfig([
 
 	// Official Obsidian plugin guidelines ruleset. Bundles eslint:recommended,
 	// typescript-eslint recommended-type-checked, import, depend, no-unsanitized
-	// and manifest/license validation.
-	obsidianmd.configs.recommended,
+	// and manifest/license validation. The `WithLocalesEn` variant adds the
+	// sentence-case check for `src/locale/en.ts`, which is where the UI text
+	// lives now that it is out of the call sites the plain rule can see.
+	obsidianmd.configs.recommendedWithLocalesEn,
 
 	{
 		files: ["**/*.ts"],
@@ -63,6 +65,24 @@ export default defineConfig([
 						"PDFs",
 						"PDF's",
 						"cursor",
+						"Underline",
+						"Squiggly",
+						"StrikeOut",
+						"FreeText",
+					],
+				},
+			],
+
+			// Same treatment for the locale module, where every user-facing
+			// string now lives. "Handlebars" is the name of the template
+			// language, so it keeps its capital wherever it is mentioned.
+			"obsidianmd/ui/sentence-case-locale-module": [
+				"warn",
+				{
+					ignoreWords: [
+						"PDFs",
+						"PDF's",
+						"Handlebars",
 						"Underline",
 						"Squiggly",
 						"StrikeOut",

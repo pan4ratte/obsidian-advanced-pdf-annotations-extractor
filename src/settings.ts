@@ -8,24 +8,13 @@ import {
 	Setting,
 	setTooltip,
 } from "obsidian";
+import { STRINGS } from "src/locale/en";
 import PDFAnnotationPlugin from "src/main";
 import { asIndexable } from "src/types";
 
 // The whole annotation is available as {{annotation}} too, for fields that have
 // no shortcut of their own.
-export const TEMPLATE_VARIABLES = {
-	highlightedText: "Highlighted text from PDF",
-	folder: "Folder of the PDF file",
-	filename: "File name of the PDF (without the extension)",
-	filepath: "Path to the PDF file",
-	filelink: "A [[wikilink]] for PDFs in the vault and a file:// path for PDFs outside",
-	pageNumber: "Page number of annotation (relative to number of physical pages)",
-	pageLabel: "Page label of annotation (relative to number of defined page indexes)",
-	author: "Author of the annotation",
-	body: "Body of the annotation",
-	topic: "First line of the body, when sorting by topic is enabled",
-	isExternal: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
-};
+export const TEMPLATE_VARIABLES = STRINGS.templateVariables;
 
 export interface SupportedAnnotation {
 	/** PDF annotation subtype, as reported by pdf.js. */
@@ -54,32 +43,32 @@ export interface SupportedAnnotation {
 export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 	{
 		subtype: "Highlight",
-		description: "Highlighted text",
+		description: STRINGS.annotationTypes.Highlight,
 		marksUpText: true,
 		desiredByDefault: true,
 	},
 	{
 		subtype: "Underline",
-		description: "Underlined text",
+		description: STRINGS.annotationTypes.Underline,
 		marksUpText: true,
 		desiredByDefault: true,
 	},
 	{
 		subtype: "Squiggly",
-		description: "Squiggly underlined text",
+		description: STRINGS.annotationTypes.Squiggly,
 		marksUpText: true,
 	},
 	{
 		subtype: "StrikeOut",
-		description: "Struck out text",
+		description: STRINGS.annotationTypes.StrikeOut,
 		marksUpText: true,
 	},
 	{
 		subtype: "Text",
-		description: "Sticky note comment",
+		description: STRINGS.annotationTypes.Text,
 		desiredByDefault: true,
 	},
-	{ subtype: "FreeText", description: "Free text on the page" },
+	{ subtype: "FreeText", description: STRINGS.annotationTypes.FreeText },
 ];
 
 export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
@@ -101,7 +90,7 @@ const LEGACY_TEMPLATE_PAIRS = [
 		field: "noteTemplate",
 		internalKey: "noteTemplateInternalPDFs",
 		externalKey: "noteTemplateExternalPDFs",
-		label: "notes",
+		kind: "notes",
 		internalDefault:
 			"{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n",
 		externalDefault:
@@ -111,7 +100,7 @@ const LEGACY_TEMPLATE_PAIRS = [
 		field: "highlightTemplate",
 		internalKey: "highlightTemplateInternalPDFs",
 		externalKey: "highlightTemplateExternalPDFs",
-		label: "highlights",
+		kind: "highlights",
 		internalDefault:
 			"> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n",
 		externalDefault:
@@ -119,9 +108,14 @@ const LEGACY_TEMPLATE_PAIRS = [
 	},
 ] as const;
 
+const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
+
 /** `[[{{filepath}}]]` as the internal templates wrote it, spacing included. */
 const FILEPATH_WIKILINK = /\[\[\s*\{\{\s*filepath\s*\}\}\s*\]\]/g;
 const FILEPATH_PLAIN = /\{\{\s*filepath\s*\}\}/g;
+
+/** Which pair of templates something is about. Not shown to anyone as is. */
+export type TemplateKind = (typeof LEGACY_TEMPLATE_PAIRS)[number]["kind"];
 
 export interface TemplateMigration {
 	/** True when data.json still held the pre-{{filelink}} template fields. */
@@ -131,7 +125,7 @@ export interface TemplateMigration {
 	 * not, so folding the pair would have thrown an edit away. Stashed in
 	 * `legacyExternalTemplates` instead.
 	 */
-	dropped: string[];
+	dropped: TemplateKind[];
 }
 
 export class PDFAnnotationPluginSetting {
@@ -254,7 +248,7 @@ export class PDFAnnotationPluginSetting {
 			if (customInternal && customExternal && customExternal !== collapsed) {
 				settings.legacyExternalTemplates[pair.externalKey] =
 					external as string;
-				migration.dropped.push(pair.label);
+				migration.dropped.push(pair.kind);
 			}
 		}
 
@@ -318,6 +312,28 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * Append `text` to `parent`, turning the first occurrence of `linkText`
+	 * into a link. Keeps the paragraph one translatable sentence instead of the
+	 * fragments either side of an anchor; a translation that drops the word
+	 * simply renders without the link rather than losing the sentence.
+	 */
+	appendTextWithLink(
+		parent: HTMLElement,
+		text: string,
+		linkText: string,
+		href: string
+	): void {
+		const at = text.indexOf(linkText);
+		if (at < 0) {
+			parent.createSpan({ text });
+			return;
+		}
+		parent.createSpan({ text: text.slice(0, at) });
+		parent.createEl("a", { text: linkText, href });
+		parent.createSpan({ text: text.slice(at + linkText.length) });
+	}
+
+	/**
 	 * Make `pill` copy one template variable to the clipboard when clicked, and
 	 * give it the icon button that says so. The listener sits on the pill rather
 	 * than the button, so the whole pill is the target — and a click on the icon
@@ -327,21 +343,24 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	addCopyAction(pill: HTMLElement, variable: string): void {
 		const button = pill.createEl("button", {
 			cls: ["clickable-icon", "pdf-annotations-copy-button"],
-			attr: { type: "button", "aria-label": `Copy ${variable}` },
+			attr: {
+				type: "button",
+				"aria-label": STRINGS.settings.templates.copyLabel(variable),
+			},
 		});
 		setIcon(button, "copy");
-		setTooltip(pill, "Copy to clipboard");
+		setTooltip(pill, STRINGS.settings.templates.copyTooltip);
 
 		pill.addEventListener("click", () => {
 			navigator.clipboard
 				.writeText(variable)
 				.then(() => {
-					new Notice(`Copied ${variable} to the clipboard.`);
+					new Notice(STRINGS.notices.copied(variable));
 					setIcon(button, "check");
 					window.setTimeout(() => setIcon(button, "copy"), 1500);
 				})
 				.catch((error) => {
-					new Notice("Could not copy to the clipboard.");
+					new Notice(STRINGS.notices.copyFailed);
 					console.error(error);
 				});
 		});
@@ -362,10 +381,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// goes into the setting's control element, which styles.css widens to
 		// the full row underneath the text.
 		const annotationSetting = new Setting(containerEl)
-			.setName("Annotations to extract")
-			.setDesc(
-				"Choose, which annotation types will be extracted. Highlight, underline, squiggly and strikeout also capture the PDF text underneath them — others contribute their own comment only."
-			)
+			.setName(STRINGS.settings.annotations.name)
+			.setDesc(STRINGS.settings.annotations.desc)
 			.setHeading();
 		annotationSetting.settingEl.addClass(
 			"pdf-annotations-annotation-setting"
@@ -394,29 +411,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			});
 		});
 
-		new Setting(containerEl).setName("Templates").setHeading();
-		const templateInstructionsEl = containerEl.createEl("p");
-		templateInstructionsEl.append(
-			createSpan({
-				text:
-					"The following settings determine how the highlights and notes created by " +
-					"the plugin will be rendered. There are two, because annotations that " +
-					"mark up PDF text carry the text they mark up and the others do not. " +
-					"Both are used for PDFs inside and outside the vault alike: " +
-					"{{filelink}} links the PDF the way its location calls for. " +
-					"Templates are interpreted using ",
-			})
-		);
-		templateInstructionsEl.append(
-			createEl("a", {
-				text: "Handlebars",
-				href: "https://handlebarsjs.com/guide/expressions.html",
-			})
-		);
-		templateInstructionsEl.append(
-			createSpan({
-				text: " syntax. The following variables are available:",
-			})
+		new Setting(containerEl)
+			.setName(STRINGS.settings.templates.heading)
+			.setHeading();
+		this.appendTextWithLink(
+			containerEl.createEl("p"),
+			STRINGS.settings.templates.instructions,
+			STRINGS.settings.templates.handlebarsLink,
+			HANDLEBARS_DOCS
 		);
 
 		const templateVariableTable = containerEl.createEl("table", {
@@ -425,8 +427,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		const templateVariableHead = templateVariableTable
 			.createEl("thead")
 			.createEl("tr");
-		templateVariableHead.createEl("th", { text: "Variable" });
-		templateVariableHead.createEl("th", { text: "Description" });
+		templateVariableHead.createEl("th", {
+			text: STRINGS.settings.templates.variableColumn,
+		});
+		templateVariableHead.createEl("th", {
+			text: STRINGS.settings.templates.descriptionColumn,
+		});
 
 		const templateVariableBody = templateVariableTable.createEl("tbody");
 		Object.entries(TEMPLATE_VARIABLES).forEach((variableData) => {
@@ -449,30 +455,26 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl)
-			.setName("Template for highlights")
-			.setDesc(
-				"Used for the annotation types that mark up PDF text, so {{highlightedText}} holds what they mark up."
-			)
+			.setName(STRINGS.settings.templates.highlightName)
+			.setDesc(STRINGS.settings.templates.highlightDesc)
 			.addTextArea((input) => {
 				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "highlightTemplate");
 			});
 		new Setting(containerEl)
-			.setName("Template for notes")
-			.setDesc(
-				"Used for the annotation types that only carry a comment, so {{highlightedText}} is empty."
-			)
+			.setName(STRINGS.settings.templates.noteName)
+			.setDesc(STRINGS.settings.templates.noteDesc)
 			.addTextArea((input) => {
 				input.inputEl.addClass("pdf-annotations-template-input");
 				this.buildValueInput(input, "noteTemplate");
 			});
 
-		new Setting(containerEl).setName("Structure").setHeading();
 		new Setting(containerEl)
-			.setName("Use structuring headlines")
-			.setDesc(
-				"If disabled, no structuring headlines will be shown. Just the annotations in the specified template style."
-			)
+			.setName(STRINGS.settings.structure.heading)
+			.setHeading();
+		new Setting(containerEl)
+			.setName(STRINGS.settings.structure.useStructuringHeadlinesName)
+			.setDesc(STRINGS.settings.structure.useStructuringHeadlinesDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useStructuringHeadlines)
@@ -483,10 +485,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Use folder name")
-			.setDesc(
-				"If enabled, uses the PDF's folder name (instead of the PDF-filename) for sorting"
-			)
+			.setName(STRINGS.settings.structure.useFolderNamesName)
+			.setDesc(STRINGS.settings.structure.useFolderNamesDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useFolderNames)
@@ -497,10 +497,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Sort by topic")
-			.setDesc(
-				"If enabled, uses the notes first line as topic for primary sorting"
-			)
+			.setName(STRINGS.settings.structure.sortByTopicName)
+			.setDesc(STRINGS.settings.structure.sortByTopicDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.sortByTopic)
@@ -510,24 +508,20 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl).setName("Note export").setHeading();
 		new Setting(containerEl)
-			.setName("Notes export path")
-			.setDesc(
-				"The path to which the notes, including the extracted annotations, will be exported. The path can be dynamic './' to create a note next to the PDF or it has to be relative to the vault root. Paths must end with a '/'. Leave blank to export to the vault root."
-			)
+			.setName(STRINGS.settings.noteExport.heading)
+			.setHeading();
+		new Setting(containerEl)
+			.setName(STRINGS.settings.noteExport.exportPathName)
+			.setDesc(STRINGS.settings.noteExport.exportPathDesc)
 			.addText((input) => this.buildValueInput(input, "exportPath"));
 		new Setting(containerEl)
-			.setName("Notes export name")
-			.setDesc(
-				"The name of the note to which the notes, including the extracted annotations, will be exported. You can use the variable '{{filename}}' to use the PDF's filename and combine it with prefix or suffix. If you don't use the variable all notes will be exported to the same file until you change the name."
-			)
+			.setName(STRINGS.settings.noteExport.exportNameName)
+			.setDesc(STRINGS.settings.noteExport.exportNameDesc)
 			.addText((input) => this.buildValueInput(input, "exportName"));
 		new Setting(containerEl)
-			.setName("One note per annotation")
-			.setDesc(
-				"If enabled, every annotation is exported to a separate note."
-			)
+			.setName(STRINGS.settings.noteExport.oneNotePerAnnotationName)
+			.setDesc(STRINGS.settings.noteExport.oneNotePerAnnotationDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.oneNotePerAnnotation)
@@ -538,19 +532,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 		const oneNotePerAnnotationExportName = new Setting(containerEl)
-			.setName("One note per annotation - export name")
+			.setName(
+				STRINGS.settings.noteExport.oneNotePerAnnotationExportNameName
+			)
 			.setDesc(
-				"The name of the notes to which each extracted annotation will be exported. You can use the variable '{{filename}}' to use the PDF's filename and combine it with prefix or suffix. Additionally you should use the variable '{{counter}}' to add the index of the exported annotation."
+				STRINGS.settings.noteExport.oneNotePerAnnotationExportNameDesc
 			)
 			.addText((input) => this.buildValueInput(input, "oneNotePerAnnotationExportName"));
 		oneNotePerAnnotationExportName.settingEl.toggleVisibility(
 			this.plugin.settings.oneNotePerAnnotation
 		);
 		new Setting(containerEl)
-			.setName("Overwrite existing note")
-			.setDesc(
-				"If enabled, the plugin will overwrite the content of an existing note with the same name."
-			)
+			.setName(STRINGS.settings.noteExport.overwriteExistingNoteName)
+			.setDesc(STRINGS.settings.noteExport.overwriteExistingNoteDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.overwriteExistingNote)
@@ -560,10 +554,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 			new Setting(containerEl)
-			.setName("Extract tags in annotations as Obsidian tags")
-			.setDesc(
-				"If enabled, the plugin will extract tags from the annotations and add them as Obsidian tags to the note's header."
-			)
+			.setName(STRINGS.settings.noteExport.extractTagsName)
+			.setDesc(STRINGS.settings.noteExport.extractTagsDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.extractTagsFromAnnotationsAsObsidianTags)
@@ -573,10 +565,10 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Export annotations from clipboard path to file")
-			.setDesc(
-				"When enabled, the clipboard path command saves annotations to a file using the export settings above, instead of inserting them into the note you are editing."
+			.setName(
+				STRINGS.settings.noteExport.exportClipboardExtractionName
 			)
+			.setDesc(STRINGS.settings.noteExport.exportClipboardExtractionDesc)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.exportClipboardExtraction)

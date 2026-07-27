@@ -4,12 +4,6 @@
 	height: 10em;
 }
 
-/* Plugin name and description at the top of the settings tab, a step above the
-   section headings below it. */
-.pdf-annotations-settings-header .setting-item-name {
-	font-size: var(--h3-size);
-}
-
 /* "Annotations to extract": heading, description and checkbox grid form a
    single card, stacked — the text always above, the checkboxes across the full
    width below it. */

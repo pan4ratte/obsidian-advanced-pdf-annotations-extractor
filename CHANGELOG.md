@@ -19,6 +19,10 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 - The template variables in the settings tab are a table now, each with a button
   that copies the variable to the clipboard.
+- Every user-facing string moved to `src/locale/en.ts`, so the plugin can be
+  translated without touching its logic, and the whole file is held to the
+  Obsidian sentence-case rule. The only wording that changed is the line written
+  into a note when a PDF has no annotations, now `*No annotations*`.
 
 - **Breaking:** the four templates are now two. The separate templates for PDFs
   inside and outside the vault differed only in how they linked the PDF, so that

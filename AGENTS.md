@@ -83,6 +83,7 @@ src/
   extractHighlight.ts — PDF text extraction via pdfjs-dist
   formatter.ts        — Handlebars template rendering
   settings.ts         — Settings class + settings tab UI
+  locale/en.ts        — every user-facing string
   types.ts            — PDFFile, annotation and pdf.js boundary types
 test/
   extractHighlight.test.ts  — glyph-level text extraction
@@ -136,3 +137,20 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
 - No inline UI styles — put CSS in `styles.css` and add a class.
 - Settings UI: headings via `new Setting(el).setName(...).setHeading()`, sentence
   case for all user-facing text, no plugin name in command names.
+- **No string literals in the UI** — command names, notices, setting names and
+  descriptions all come from `STRINGS` in `src/locale/en.ts`. Strings taking a
+  value are functions there, so an argument cannot go missing in translation.
+  Exempt: the annotation subtypes (spelled as the PDF format spells them) and
+  the `{{variable}}` names, which are interface, not wording.
+- The lint config uses `obsidianmd.configs.recommendedWithLocalesEn`, which
+  sentence-case checks every string in `locale/en.ts` and **bans the disable
+  comment** for that rule — there is no exempting a string, so write UI text
+  that passes. Two consequences worth knowing before adding a string:
+  - Write each one as a **single literal**. The rule walks object properties and
+    skips `"a" + "b"`, so a concatenated string is silently unchecked.
+  - No sentence fragments. Text that wraps a link is one whole sentence rendered
+    by `appendTextWithLink`, and a message that varies by case gets one complete
+    sentence per case (see `notices.templatesCollapsed`) rather than a word
+    spliced into a shared one.
+  - Proper nouns go in the rule's `ignoreWords` in `eslint.config.mjs`, which is
+    where `Handlebars` and the annotation subtypes live.

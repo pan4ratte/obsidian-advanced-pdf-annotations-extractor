@@ -62,7 +62,7 @@ describe('template variables', () => {
   });
 
   test('reports when there is nothing to render', () => {
-    expect(formatterWith('{{body}}').format([], false)).toBe('*No Annotations*');
+    expect(formatterWith('{{body}}').format([], false)).toBe('*No annotations*');
   });
 });
 
