@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-advanced-pdf-annotations-extractor",
+	"name": "advanced-pdf-extractor",
 	"version": "1.9.5",
-	"description": "Extract annotations from PDFs with advanced settings and user-friendly features.",
+	"description": "Import all types of annotations from PDFs inside and outside your vault with advanced settings and templates",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

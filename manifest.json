@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-advanced-pdf-annotations-extractor",
-	"name": "Advanced PDF Annotations Extractor",
+	"id": "advanced-pdf-extractor",
+	"name": "Advanced PDF Extractor",
 	"version": "1.9.5",
 	"minAppVersion": "1.8.7",
-	"description": "Extract annotations from PDFs with advanced settings and user-friendly features.",
+	"description": "Import all types of annotations from PDFs inside and outside your vault with advanced settings and templates",
 	"author": "pan4ratte",
 	"authorUrl": "https://github.com/pan4ratte/obsidian-advanced-pdf-annotations-extractor",
 	"isDesktopOnly": false

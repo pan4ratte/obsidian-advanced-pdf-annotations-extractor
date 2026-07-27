@@ -1198,12 +1198,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			cls: "pdf-annotations-collapsible",
 		});
 		showOneNoteName = this.createCollapsible(oneNoteNamePanel);
-		new Setting(oneNoteNamePanel)
+		const oneNoteNameSetting = new Setting(oneNoteNamePanel)
 			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
 			.addText((input) =>
 				this.buildValueInput(input, "oneNotePerAnnotationName")
 			);
+		oneNoteNameSetting.settingEl.addClass(
+			"pdf-annotations-stacked-setting"
+		);
 		syncOneNoteName(false);
 
 		new Setting(containerEl)
@@ -1221,10 +1224,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
-		new Setting(containerEl)
+		const noteNameSetting = new Setting(containerEl)
 			.setName(t.SETTING_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_NOTE_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "noteName"));
+		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
 		new Setting(containerEl)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)

@@ -97,10 +97,10 @@
 	line-height: 1.5;
 }
 
-/* Settings whose field wants the whole row: a vault path is long and a template
-   for one longer, so both would be typed through the sliver Obsidian leaves at
-   the end of a row. Name and description above, the field across the width
-   below. */
+/* Settings whose field wants the whole row: a vault path is long, a template for
+   one longer, and a naming pattern longer still, so all of them would be typed
+   through the sliver Obsidian leaves at the end of a row. Name and description
+   above, the field across the width below. */
 .pdf-annotations-stacked-setting {
 	flex-direction: column;
 	align-items: stretch;

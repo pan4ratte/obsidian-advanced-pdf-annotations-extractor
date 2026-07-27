@@ -2,16 +2,16 @@ export default {
     // ─── Plugin ──────────────────────────────────────────────────────────────────
     // Also in manifest.json, which the plugin browser reads and no translation
     // can reach. Change both together.
-    PLUGIN_NAME: "Advanced PDF Annotations Extractor",
-    PLUGIN_DESCRIPTION: "Extract annotations from PDFs with advanced settings and user-friendly features.",
+    PLUGIN_NAME: "Advanced PDF Extractor",
+    PLUGIN_DESCRIPTION: "Import all types of annotations from PDFs inside and outside your vault with advanced settings and templates.",
 
     // ─── Commands ────────────────────────────────────────────────────────────────
-    COMMAND_EXTRACT_CURRENT_FILE: "Extract from the current file",
-    COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION: "Extract from the current file into a note per annotation",
-    COMMAND_EXTRACT_CLIPBOARD_PATH: "Extract from the file path in the clipboard into the current note",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract from the file path in the clipboard into a new note",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Extract from the file path in the clipboard into a note per annotation",
-    COMMAND_EXTRACT_CURRENT_FOLDER: "Extract from every PDF in the current folder",
+    COMMAND_EXTRACT_CURRENT_FILE: "Extract annotations from the current file",
+    COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION: "Extract annotations from the current file into separate notes",
+    COMMAND_EXTRACT_CLIPBOARD_PATH: "Extract annotations from the clipboard path into the current note",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract annotations from the clipboard path into a new note",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Extract annotations from the clipboard path into separate notes",
+    COMMAND_EXTRACT_CURRENT_FOLDER: "Extract annotations from every PDF in the current folder",
 
     // ─── Notices ─────────────────────────────────────────────────────────────────
     NOTICE_CLIPBOARD_DESKTOP_ONLY: "Reading a PDF from a path outside the vault is only available in the desktop app.",
