@@ -16,8 +16,8 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 	* `Highlight`, `Underline` and `Text` are enabled by default
 	* Purely graphical annotations (drawings, shapes, stamps, attachments) are not offered — there is nothing in them a markdown note could show
 * Styling
-	* Two templates: one for annotations that mark up PDF text, one for those that only carry a comment. Both are used for PDFs inside and outside the vault alike — `{{filelink}}` renders a `[[wiki link]]` for a PDF in the vault and the `file://` path for one outside it. The following template variables are available and can be used by following the [Handlebars]('https://handlebarsjs.com/guide/expressions.html') syntax: 
-		- {{highlightedText}}: 'Highlighted text from PDF' (empty in the note template),
+	* One template card with a picker: the default template, which writes every annotation type, and a template of its own for any type you give one — chosen from the same picker, and left empty to hand the type back to the default. Templates are used for PDFs inside and outside the vault alike — `{{filelink}}` renders a `[[wiki link]]` for a PDF in the vault and the `file://` path for one outside it. The following template variables are available and can be used by following the [Handlebars]('https://handlebarsjs.com/guide/expressions.html') syntax: 
+		- {{highlightedText}}: 'Highlighted text from PDF' (empty for the types that mark up nothing),
 		- {{folder}}: 'Folder of PDF file',
 		- {{filename}}: 'File name of the PDF, without the extension',
 		- {{filepath}}: 'Path of PDF file',
@@ -26,12 +26,15 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 		- {{pageLabel}}: 'Page label (page number defined by author)',
 		- {{author}}: 'Author of annotation',
 		- {{body}}: 'Body of annotation',
+		- {{type}}: 'Annotation type as the PDF names it: `Highlight`, `Underline`, `Squiggly`, `StrikeOut`, `Text` or `FreeText`',
 		- {{topic}}: 'First line of the body. Grouping by topic also takes it out of `{{body}}`, since it is written as a heading instead',
 		- {{isExternal}}: 'True for PDFs outside the vault, for `{{#if isExternal}}`'
 		
 		The annotation itself is available as `{{annotation}}` for anything without a shortcut, e.g. `{{annotation.subtype}}`.
 		
 		Upgrading from a version with four templates: the two you had for PDFs inside the vault are carried over, with `[[{{filepath}}]]` rewritten to `{{filelink}}`. An external template you had customised differently is kept in `data.json` under `legacyExternalTemplates` so you can copy it back.
+
+		Upgrading from a version with two templates: the one that wrote plain comments becomes the default, and the one that wrote text markup becomes the template of `Highlight`, `Underline`, `Squiggly` and `StrikeOut` — unless the two said the same thing, in which case the default covers everything and no type needs one.
 	* Structure
 		* Use structuring headlines or not, if you only want to display annotations in the specified template
 		* Use the first line of the comment as 'Topic' (and sort accordingly), or not

@@ -486,14 +486,27 @@ export default class PDFAnnotationPlugin extends Plugin {
 				this.settings
 			);
 
-			// Written back at once, so data.json stops carrying the four
-			// template fields this version no longer reads.
+			// One entry per type this version knows, whatever data.json holds.
+			this.settings.annotationTemplates =
+				PDFAnnotationPluginSetting.normalizeAnnotationTemplates(
+					this.settings.annotationTemplates
+				);
+
+			// Written back at once, so data.json stops carrying the template
+			// fields this version no longer reads: first the four that became
+			// two, then the two that became one per type over a default.
 			const migration = PDFAnnotationPluginSetting.migrateTemplates(
 				settingsData,
 				this.settings
 			);
+			const typesMigrated =
+				PDFAnnotationPluginSetting.migrateTemplateTypes(
+					settingsData,
+					this.settings
+				);
 			if (
 				migration.migrated ||
+				typesMigrated ||
 				structureMigrated ||
 				pathMigrated ||
 				legacyNames

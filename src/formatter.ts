@@ -4,8 +4,8 @@ import {
 } from "handlebars";
 import { t } from "../lang/helpers";
 import {
-	ANNOTS_TREATED_AS_HIGHLIGHTS,
 	PDFAnnotationPluginSetting,
+	templateForAnnotation,
 } from "./settings";
 import { PDFAnnotation } from "./types";
 
@@ -131,27 +131,20 @@ export class PDFAnnotationPluginFormatter {
 				}
 			}
 
-			if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {
-				text += this.getContentForHighlight(anno, isExternalFile);
-			} else {
-				text += this.getContentForNote(anno, isExternalFile);
-			}
+			text += this.getContentFor(anno, isExternalFile);
 		});
 
 		if (grandtotal.length == 0) return t.NOTE_NO_ANNOTATIONS;
 		else return text;
 	}
 
-	get noteTemplate(): Template {
+	/**
+	 * The template this annotation is written with: the one its type was given,
+	 * or the default that covers the types without one.
+	 */
+	templateFor(annotation: PDFAnnotation): Template {
 		return compileTemplate(
-			this.settings.noteTemplate,
-			this.templateSettings
-		);
-	}
-
-	get highlightTemplate(): Template {
-		return compileTemplate(
-			this.settings.highlightTemplate,
+			templateForAnnotation(this.settings, annotation.subtype),
 			this.templateSettings
 		);
 	}
@@ -175,26 +168,17 @@ export class PDFAnnotationPluginFormatter {
 			pageLabel: annotation.pageLabel,
 			author: annotation.author,
 			body: annotation.body,
+			// As pdf.js names it, which is what the settings call the type and
+			// what a {{#if}} in a template can be written against.
+			type: annotation.subtype,
 			topic: annotation.topic,
 		};
 
 		return { annotation: annotation, ...shortcuts };
 	}
 
-	getContentForNote(
-		annotation: PDFAnnotation,
-		isExternalFile: boolean
-	): string {
-		return this.noteTemplate(
-			this.getTemplateVariablesForAnnotation(annotation, isExternalFile)
-		);
-	}
-
-	getContentForHighlight(
-		annotation: PDFAnnotation,
-		isExternalFile: boolean
-	): string {
-		return this.highlightTemplate(
+	getContentFor(annotation: PDFAnnotation, isExternalFile: boolean): string {
+		return this.templateFor(annotation)(
 			this.getTemplateVariablesForAnnotation(annotation, isExternalFile)
 		);
 	}

@@ -55,6 +55,7 @@ export default {
     VAR_PAGE_LABEL: "Page label of annotation (relative to number of defined page indexes)",
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Body of the annotation",
+    VAR_TYPE: "Annotation type, as the PDF names it: Highlight, Underline, Squiggly, StrikeOut, Text or FreeText",
     VAR_TOPIC: "First line of the body. Grouping by topic also takes it out of {{body}}, since it is written as a heading instead",
     VAR_CREATED: "Day the annotation was made, like 2024-01-15, empty when the PDF gives no date",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
@@ -74,10 +75,10 @@ export default {
     TABLE_VARIABLE: "Variable (click to copy)",
     TABLE_DESCRIPTION: "Description",
     COPY_TOOLTIP: "Copy to clipboard",
-    SETTING_HIGHLIGHT_TEMPLATE_NAME: "Formatting template for highlights",
-    SETTING_HIGHLIGHT_TEMPLATE_DESC: "Used for the annotation types: highlight, underline, squiggly and strikeout.",
-    SETTING_NOTE_TEMPLATE_NAME: "Formatting template for notes",
-    SETTING_NOTE_TEMPLATE_DESC: "Used for the annotation types: sticky note comment and free text.",
+    SETTING_TEMPLATE_NAME: "Formatting template",
+    SETTING_TEMPLATE_DESC: "The default template applies to every annotation type if no specific template is defined. Empty templates use the default one.",
+    OPTION_TEMPLATE_DEFAULT: "Default (applies to all types)",
+    PLACEHOLDER_TEMPLATE_DEFAULT: "Empty — this annotation type is written with the default template.",
 
     // ─── Settings: grouping ──────────────────────────────────────────────────────
     SECTION_GROUPING: "Annotations grouping",

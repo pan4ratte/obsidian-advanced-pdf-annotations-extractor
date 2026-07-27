@@ -17,13 +17,16 @@
 	margin-bottom: 16px;
 }
 
-/* Each card stacks: name and description above, the text area across the full
-   width below. min-width stops a text area's intrinsic width from pushing the
-   card wider than the row. */
+/* The card is a row that wraps: the text and the picker that says which
+   template it is showing sit side by side, and the editor takes the whole width
+   under them. Too narrow for the two, and the picker wraps onto a line of its
+   own rather than squeezing the description into a column of single words.
+   min-width stops a text area's intrinsic width from pushing the card wider
+   than the row. */
 .pdf-annotations-template-setting {
-	flex-direction: column;
-	align-items: stretch;
-	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
 	min-width: 0;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--setting-items-background);
@@ -31,21 +34,37 @@
 	padding: 16px;
 }
 
+/* Takes the room the picker leaves, down to the width below which the two no
+   longer belong on one line. */
 .pdf-annotations-template-setting .setting-item-info {
+	flex: 1 1 20em;
+	min-width: 0;
 	margin-right: 0;
 }
 
 .pdf-annotations-template-setting .setting-item-control {
-	width: 100%;
+	flex: 0 1 auto;
+	width: auto;
+	align-self: flex-end;
+}
+
+/* Never wider than the line it wrapped onto. */
+.pdf-annotations-template-picker {
+	max-width: 100%;
+}
+
+/* Always its own row, whether or not the two above it share one. */
+.pdf-annotations-template-setting .pdf-annotations-template-editor {
+	flex: 0 0 100%;
 }
 
 /* Gutter and text area share one box, which carries the input's frame so the
-   two read as a single field. Thirteen lines tall, as wide as its column. */
+   two read as a single field. Thirteen lines tall, as wide as its column; the
+   card's own row gap is what holds it off the row above. */
 .pdf-annotations-template-editor {
 	display: flex;
 	width: 100%;
 	height: 13em;
-	margin-top: 8px;
 	overflow: hidden;
 	background: var(--background-modifier-form-field);
 	border: var(--input-border-width) solid var(--background-modifier-border);

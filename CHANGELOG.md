@@ -9,6 +9,19 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Added
 
+- A template for every annotation type, over a default that writes the ones
+  without their own. The two templates — one for the annotations that marked up
+  text, one for the rest — are now a single card with a picker: *Default (all
+  annotation types)* writes everything, and picking a type writes that type
+  instead. Emptying a type's template hands it back to the default, which is
+  what the six start as, apart from the four that mark up text and would lose
+  their `{{highlightedText}}`. A `data.json` from the two-template version is
+  folded in: the note template becomes the default, the highlight template
+  becomes the template of `Highlight`, `Underline`, `Squiggly` and `StrikeOut`,
+  and a pair that said the same thing leaves every type on the default.
+- `{{type}}` template variable, holding the annotation's type as the PDF names
+  it — `Highlight`, `Underline`, `Squiggly`, `StrikeOut`, `Text` or `FreeText`.
+  Worth a `{{#if}}` in the default template, or a line saying what an entry is.
 - *Put the topic of the annotation to the note name*, for the commands that
   write a note per annotation. The note is named after the annotation's topic —
   its comment's first line — and the topic is then left out of the note itself,

@@ -8,6 +8,7 @@ import {
 	setIcon,
 	Setting,
 	setTooltip,
+	TextAreaComponent,
 	ToggleComponent,
 } from "obsidian";
 import { t } from "lang/helpers";
@@ -27,6 +28,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
 	pageLabel: t.VAR_PAGE_LABEL,
 	author: t.VAR_AUTHOR,
 	body: t.VAR_BODY,
+	type: t.VAR_TYPE,
 	topic: t.VAR_TOPIC,
 	created: t.VAR_CREATED,
 	isExternal: t.VAR_IS_EXTERNAL,
@@ -90,6 +92,39 @@ export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
 	(annotation) => annotation.marksUpText
 ).map((annotation) => annotation.subtype);
+
+/**
+ * The template picker's entry for the template every annotation type falls back
+ * on. Not a subtype, so it cannot collide with one.
+ */
+export const DEFAULT_TEMPLATE_KEY = "default";
+
+/**
+ * What each type is written with to begin with: nothing, so the default
+ * template covers them — except the ones that mark up text, which have
+ * `{{highlightedText}}` to show and would otherwise lose it.
+ */
+export function defaultAnnotationTemplates(): Record<string, string> {
+	return Object.fromEntries(
+		SUPPORTED_ANNOTS.map(({ subtype, marksUpText }) => [
+			subtype,
+			marksUpText ? t.DEFAULT_HIGHLIGHT_TEMPLATE : "",
+		])
+	);
+}
+
+/**
+ * The template an annotation of this type is written with: its own, or the
+ * default when it has none. Blank counts as none, so clearing a type's template
+ * hands it back to the default rather than writing nothing at all.
+ */
+export function templateForAnnotation(
+	settings: PDFAnnotationPluginSetting,
+	subtype: string
+): string {
+	const own = settings.annotationTemplates?.[subtype] ?? "";
+	return own.trim().length > 0 ? own : settings.defaultTemplate;
+}
 
 export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
 	(annotation) => annotation.desiredByDefault
@@ -284,8 +319,13 @@ export class PDFAnnotationPluginSetting {
 	public noteSubfolder: string;
 	public noteName: string;
 	public desiredAnnotations: string[];
-	public noteTemplate: string;
-	public highlightTemplate: string;
+	/** Written for every annotation type that has no template of its own. */
+	public defaultTemplate: string;
+	/**
+	 * A template per annotation subtype, empty where the type has none of its
+	 * own and is written with `defaultTemplate` instead.
+	 */
+	public annotationTemplates: Record<string, string>;
 	/**
 	 * Templates for PDFs outside the vault that `migrateTemplates` could not
 	 * fold in, keyed by the setting they came from. Nothing reads them; they are
@@ -315,8 +355,8 @@ export class PDFAnnotationPluginSetting {
 		this.noteSubfolder = "";
 		this.noteName = t.DEFAULT_NOTE_NAME;
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
-		this.noteTemplate = t.DEFAULT_NOTE_TEMPLATE;
-		this.highlightTemplate = t.DEFAULT_HIGHLIGHT_TEMPLATE;
+		this.defaultTemplate = t.DEFAULT_NOTE_TEMPLATE;
+		this.annotationTemplates = defaultAnnotationTemplates();
 		this.legacyExternalTemplates = {};
 		this.oneNotePerAnnotationName =
 			t.DEFAULT_ONE_NOTE_NAME;
@@ -361,7 +401,9 @@ export class PDFAnnotationPluginSetting {
 	 * stashed rather than discarded.
 	 *
 	 * `loaded` is the raw data.json, since the fields being read no longer exist
-	 * on this class. Templates already collapsed are left alone.
+	 * on this class — and the collapsed template is written back into it rather
+	 * than onto the settings, for `migrateTemplateTypes` to take from there.
+	 * Templates already collapsed are left alone.
 	 */
 	public static migrateTemplates(
 		loaded: Record<string, unknown>,
@@ -390,7 +432,7 @@ export class PDFAnnotationPluginSetting {
 
 			const collapsed = customInternal ?? customExternal;
 			if (collapsed) {
-				asIndexable(settings)[pair.field] = collapsed;
+				loaded[pair.field] = collapsed;
 			}
 
 			// Both were edited, and not into the same thing: the difference is
@@ -403,6 +445,44 @@ export class PDFAnnotationPluginSetting {
 		}
 
 		return migration;
+	}
+
+	/**
+	 * Templates used to come in two: one for the annotations that mark up text
+	 * and one for everything else. Now each type may have a template of its own
+	 * over a default that covers the ones that do not, so the pair becomes that
+	 * default — what the plain annotations were written with — and a template
+	 * of their own for the types that mark up text.
+	 *
+	 * A pair that says the same thing twice leaves the types with none, since
+	 * the default already says it. `loaded` is the raw data.json: neither field
+	 * exists on this class any more, and the fold above leaves its result there.
+	 */
+	public static migrateTemplateTypes(
+		loaded: Record<string, unknown>,
+		settings: PDFAnnotationPluginSetting
+	): boolean {
+		// Written by this version already; nothing to take from the old pair
+		// even if a hand-edited data.json still carries it.
+		if (typeof loaded.defaultTemplate === "string") return false;
+
+		const note = loaded.noteTemplate;
+		const highlight = loaded.highlightTemplate;
+		if (typeof note !== "string" && typeof highlight !== "string") {
+			return false;
+		}
+
+		if (typeof note === "string") settings.defaultTemplate = note;
+
+		for (const { subtype, marksUpText } of SUPPORTED_ANNOTS) {
+			const ownTemplate =
+				marksUpText &&
+				typeof highlight === "string" &&
+				highlight !== settings.defaultTemplate;
+			settings.annotationTemplates[subtype] = ownTemplate ? highlight : "";
+		}
+
+		return true;
 	}
 
 	/**
@@ -573,6 +653,28 @@ export class PDFAnnotationPluginSetting {
 			return subtypes.length === entries.length ? subtypes : null;
 		}
 		return null;
+	}
+
+	/**
+	 * One entry per supported type, whatever data.json holds: a template it
+	 * gives as a string is kept as it is — blank included, which is a type
+	 * handed back to the default — and anything else is read as no template of
+	 * its own. A type it says nothing about, because this version knows one the
+	 * last did not, has none either.
+	 */
+	public static normalizeAnnotationTemplates(
+		value: unknown
+	): Record<string, string> {
+		const held = (
+			value && typeof value === "object" ? value : {}
+		) as Record<string, unknown>;
+
+		return Object.fromEntries(
+			SUPPORTED_ANNOTS.map(({ subtype }) => [
+				subtype,
+				typeof held[subtype] === "string" ? held[subtype] : "",
+			])
+		);
 	}
 }
 
@@ -771,10 +873,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	 * Soft wrapping is turned off for this: a wrapped line occupies two rows on
 	 * screen but is still one line, and there is no honest number to put beside
 	 * the second row. Long template lines scroll sideways instead.
+	 *
+	 * Returns the box the two now share, for a caller that wants it somewhere
+	 * else in the card, and the redraw — for text put into the area by
+	 * something other than typing, such as switching which template is being
+	 * written, which fires no input event and would otherwise leave the numbers
+	 * counting the template before it.
 	 */
-	addLineNumbers(textarea: HTMLTextAreaElement): void {
+	addLineNumbers(textarea: HTMLTextAreaElement): {
+		editorEl: HTMLElement | null;
+		redraw: () => void;
+	} {
 		const parent = textarea.parentElement;
-		if (!parent) return;
+		if (!parent) return { editorEl: null, redraw: () => undefined };
 
 		const editor = createDiv({ cls: "pdf-annotations-template-editor" });
 		parent.insertBefore(editor, textarea);
@@ -796,6 +907,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			gutter.scrollTop = textarea.scrollTop;
 		});
 		drawLineNumbers();
+
+		return { editorEl: editor, redraw: drawLineNumbers };
 	}
 
 	/**
@@ -952,34 +1065,81 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			templateVariableRow.createEl("td", { text: description });
 		});
 
-		// A card per template, one above the other, each with its text above
-		// its input.
+		// One card, whose picker says which template is being written: the
+		// default that covers every type, or one type's own. Editing them one
+		// at a time keeps the card the size of a single template however many
+		// types there are.
 		const templateColumns = containerEl.createDiv({
 			cls: "pdf-annotations-template-columns",
 		});
-		const templateCards = [
-			{
-				name: t.SETTING_HIGHLIGHT_TEMPLATE_NAME,
-				desc: t.SETTING_HIGHLIGHT_TEMPLATE_DESC,
-				settingsKey: "highlightTemplate",
-			},
-			{
-				name: t.SETTING_NOTE_TEMPLATE_NAME,
-				desc: t.SETTING_NOTE_TEMPLATE_DESC,
-				settingsKey: "noteTemplate",
-			},
-		];
-		templateCards.forEach(({ name, desc, settingsKey }) => {
-			const card = new Setting(templateColumns)
-				.setName(name)
-				.setDesc(desc)
-				.addTextArea((input) => {
-					input.inputEl.addClass("pdf-annotations-template-input");
-					this.buildValueInput(input, settingsKey);
-					this.addLineNumbers(input.inputEl);
+
+		let editing = DEFAULT_TEMPLATE_KEY;
+		let editor!: TextAreaComponent;
+		let editorEl: HTMLElement | null = null;
+		let redrawLineNumbers: () => void = () => undefined;
+
+		const templateOf = (target: string) =>
+			target === DEFAULT_TEMPLATE_KEY
+				? this.plugin.settings.defaultTemplate
+				: (this.plugin.settings.annotationTemplates[target] ?? "");
+
+		// The default is the one template that is always written from, so it is
+		// the one that says nothing when left empty; a type's own says what
+		// happens to it instead.
+		const showTemplate = (target: string) => {
+			editor.setValue(templateOf(target));
+			editor.setPlaceholder(
+				target === DEFAULT_TEMPLATE_KEY
+					? ""
+					: t.PLACEHOLDER_TEMPLATE_DEFAULT
+			);
+			redrawLineNumbers();
+		};
+
+		const card = new Setting(templateColumns)
+			.setName(t.SETTING_TEMPLATE_NAME)
+			.setDesc(t.SETTING_TEMPLATE_DESC)
+			.addDropdown((dropdown) => {
+				dropdown.addOption(
+					DEFAULT_TEMPLATE_KEY,
+					t.OPTION_TEMPLATE_DEFAULT
+				);
+				for (const { subtype, description } of SUPPORTED_ANNOTS) {
+					dropdown.addOption(subtype, description);
+				}
+				dropdown.setValue(editing);
+				dropdown.onChange((value) => {
+					editing = value;
+					showTemplate(editing);
 				});
-			card.settingEl.addClass("pdf-annotations-template-setting");
-		});
+				dropdown.selectEl.addClass("pdf-annotations-template-picker");
+			})
+			.addTextArea((input) => {
+				editor = input;
+				input.inputEl.addClass("pdf-annotations-template-input");
+				const numbered = this.addLineNumbers(input.inputEl);
+				redrawLineNumbers = numbered.redraw;
+				// Out of the control the picker sits in and into the card
+				// itself, so the picker can sit beside the description while
+				// the editor keeps the whole width under both.
+				if (numbered.editorEl) editorEl = numbered.editorEl;
+				input.onChange(async (value) => {
+					if (editing === DEFAULT_TEMPLATE_KEY) {
+						this.plugin.settings.defaultTemplate = value;
+					} else {
+						this.plugin.settings.annotationTemplates[editing] =
+							value;
+					}
+					await this.plugin.saveSettings();
+				});
+				showTemplate(editing);
+			});
+		card.settingEl.addClass("pdf-annotations-template-setting");
+		// Last child of the card rather than of the picker's control, so the
+		// card is a row of text and picker with the editor across the width
+		// beneath it — and the two wrap onto lines of their own when the
+		// settings pane is too narrow to hold them side by side.
+		if (editorEl) card.settingEl.appendChild(editorEl);
 
 		// Two groups, in the order they take effect: what decides where an
 		// annotation lands, then what gets written above it.

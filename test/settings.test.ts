@@ -506,68 +506,68 @@ describe('migrateTemplates', () => {
       '> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filepath}}*\n\n',
   };
 
+  // The collapsed pair is written back into the loaded data.json, which is
+  // where the migration to a template per type reads it from.
   const migrate = (loaded: Record<string, unknown>) => {
     const settings = new PDFAnnotationPluginSetting();
     const result = PDFAnnotationPluginSetting.migrateTemplates(loaded, settings);
-    return {settings, ...result};
+    return {settings, loaded, ...result};
   };
 
   test('leaves a data.json without the old fields alone', () => {
-    const defaults = new PDFAnnotationPluginSetting();
-    const {settings, migrated, dropped} = migrate({sortByTopic: false});
+    const {loaded, migrated, dropped} = migrate({sortByTopic: false});
     expect(migrated).toBe(false);
     expect(dropped).toEqual([]);
-    expect(settings.noteTemplate).toBe(defaults.noteTemplate);
-    expect(settings.highlightTemplate).toBe(defaults.highlightTemplate);
+    expect(loaded.noteTemplate).toBeUndefined();
+    expect(loaded.highlightTemplate).toBeUndefined();
   });
 
-  test('untouched old defaults become the new defaults', () => {
-    const defaults = new PDFAnnotationPluginSetting();
-    const {settings, migrated, dropped} = migrate({...LEGACY_DEFAULTS});
+  test('untouched old defaults are left for the new defaults to cover', () => {
+    const {loaded, migrated, dropped, settings} = migrate({...LEGACY_DEFAULTS});
     expect(migrated).toBe(true);
     expect(dropped).toEqual([]);
-    expect(settings.noteTemplate).toBe(defaults.noteTemplate);
-    expect(settings.highlightTemplate).toBe(defaults.highlightTemplate);
+    expect(loaded.noteTemplate).toBeUndefined();
+    expect(loaded.highlightTemplate).toBeUndefined();
     expect(settings.legacyExternalTemplates).toEqual({});
   });
 
   test('a customised internal template keeps its edit, with the link folded in', () => {
-    const {settings, dropped} = migrate({
+    const {loaded, dropped} = migrate({
       ...LEGACY_DEFAULTS,
       noteTemplateInternalPDFs: '{{body}} — [[{{filepath}}]] p{{pageNumber}}',
     });
-    expect(settings.noteTemplate).toBe('{{body}} — {{filelink}} p{{pageNumber}}');
+    expect(loaded.noteTemplate).toBe('{{body}} — {{filelink}} p{{pageNumber}}');
     expect(dropped).toEqual([]);
   });
 
   test('a customised external template is adopted when the internal one is untouched', () => {
-    const {settings, dropped} = migrate({
+    const {loaded, dropped} = migrate({
       ...LEGACY_DEFAULTS,
       highlightTemplateExternalPDFs: '> {{highlightedText}} ({{filepath}})',
     });
-    expect(settings.highlightTemplate).toBe('> {{highlightedText}} ({{filelink}})');
+    expect(loaded.highlightTemplate).toBe('> {{highlightedText}} ({{filelink}})');
     expect(dropped).toEqual([]);
   });
 
   test('a pair edited the same way apart from the link loses nothing', () => {
-    const {settings, dropped} = migrate({
+    const {loaded, dropped, settings} = migrate({
       ...LEGACY_DEFAULTS,
       noteTemplateInternalPDFs: '{{body}} @[[{{filepath}}]]',
       noteTemplateExternalPDFs: '{{body}} @{{filepath}}',
     });
-    expect(settings.noteTemplate).toBe('{{body}} @{{filelink}}');
+    expect(loaded.noteTemplate).toBe('{{body}} @{{filelink}}');
     expect(dropped).toEqual([]);
     expect(settings.legacyExternalTemplates).toEqual({});
   });
 
   test('an external template saying something else is stashed, not discarded', () => {
-    const {settings, migrated, dropped} = migrate({
+    const {loaded, migrated, dropped, settings} = migrate({
       ...LEGACY_DEFAULTS,
       noteTemplateInternalPDFs: '{{body}} @[[{{filepath}}]]',
       noteTemplateExternalPDFs: 'EXTERNAL {{body}} @{{filepath}}',
     });
     expect(migrated).toBe(true);
-    expect(settings.noteTemplate).toBe('{{body}} @{{filelink}}');
+    expect(loaded.noteTemplate).toBe('{{body}} @{{filelink}}');
     expect(dropped).toEqual(['notes']);
     expect(settings.legacyExternalTemplates).toEqual({
       noteTemplateExternalPDFs: 'EXTERNAL {{body}} @{{filepath}}',
@@ -575,15 +575,120 @@ describe('migrateTemplates', () => {
   });
 
   test('does not run twice over an already collapsed data.json', () => {
-    const {settings, migrated} = migrate({
+    const {loaded, migrated} = migrate({
       noteTemplate: 'mine {{filelink}}',
       highlightTemplate: 'mine too {{filelink}}',
       noteTemplateInternalPDFs: '{{body}} stale [[{{filepath}}]]',
     });
-    // The loader copies the collapsed fields itself; migration must not
-    // overwrite them with the leftovers of the old ones.
+    // The collapsed fields are what the next migration reads; the leftovers of
+    // the four they came from must not overwrite them.
     expect(migrated).toBe(false);
-    expect(settings.noteTemplate).not.toContain('stale');
+    expect(loaded.noteTemplate).toBe('mine {{filelink}}');
+  });
+});
+
+describe('migrateTemplateTypes', () => {
+  const migrate = (loaded: Record<string, unknown>) => {
+    const settings = new PDFAnnotationPluginSetting();
+    const migrated = PDFAnnotationPluginSetting.migrateTemplateTypes(
+      loaded,
+      settings
+    );
+    return {settings, migrated};
+  };
+
+  test('leaves a data.json without the old pair alone', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    const {settings, migrated} = migrate({sortByTopic: false});
+    expect(migrated).toBe(false);
+    expect(settings.defaultTemplate).toBe(defaults.defaultTemplate);
+    expect(settings.annotationTemplates).toEqual(defaults.annotationTemplates);
+  });
+
+  test('the note template becomes the default every type falls back on', () => {
+    const {settings, migrated} = migrate({
+      noteTemplate: 'NOTE {{body}}',
+      highlightTemplate: 'HIGH {{highlightedText}}',
+    });
+    expect(migrated).toBe(true);
+    expect(settings.defaultTemplate).toBe('NOTE {{body}}');
+  });
+
+  test('the highlight template becomes the template of the types marking up text', () => {
+    const {settings} = migrate({
+      noteTemplate: 'NOTE {{body}}',
+      highlightTemplate: 'HIGH {{highlightedText}}',
+    });
+    expect(settings.annotationTemplates).toEqual({
+      Highlight: 'HIGH {{highlightedText}}',
+      Underline: 'HIGH {{highlightedText}}',
+      Squiggly: 'HIGH {{highlightedText}}',
+      StrikeOut: 'HIGH {{highlightedText}}',
+      Text: '',
+      FreeText: '',
+    });
+  });
+
+  test('a pair saying the same thing leaves every type on the default', () => {
+    const {settings} = migrate({
+      noteTemplate: 'BOTH {{body}}',
+      highlightTemplate: 'BOTH {{body}}',
+    });
+    expect(settings.defaultTemplate).toBe('BOTH {{body}}');
+    expect(Object.values(settings.annotationTemplates)).toEqual(
+      Object.values(settings.annotationTemplates).map(() => '')
+    );
+  });
+
+  test('a highlight template on its own is kept over the untouched default', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    const {settings, migrated} = migrate({highlightTemplate: 'HIGH'});
+    expect(migrated).toBe(true);
+    expect(settings.defaultTemplate).toBe(defaults.defaultTemplate);
+    expect(settings.annotationTemplates.Highlight).toBe('HIGH');
+    expect(settings.annotationTemplates.Text).toBe('');
+  });
+
+  test('does not run over a data.json this version has already written', () => {
+    const {settings, migrated} = migrate({
+      defaultTemplate: 'MINE {{body}}',
+      noteTemplate: 'stale',
+      highlightTemplate: 'stale too',
+    });
+    // The loader copies defaultTemplate itself; the leftovers of the pair it
+    // replaced must not overwrite it.
+    expect(migrated).toBe(false);
+    expect(settings.defaultTemplate).not.toContain('stale');
+  });
+});
+
+describe('normalizeAnnotationTemplates', () => {
+  const normalize = (value: unknown) =>
+    PDFAnnotationPluginSetting.normalizeAnnotationTemplates(value);
+
+  test('keeps the templates data.json holds, blanks and all', () => {
+    expect(normalize({Highlight: 'H', Text: ''})).toEqual({
+      Highlight: 'H',
+      Underline: '',
+      Squiggly: '',
+      StrikeOut: '',
+      Text: '',
+      FreeText: '',
+    });
+  });
+
+  test('a type this version knows and the file does not has none of its own', () => {
+    expect(normalize({}).FreeText).toBe('');
+  });
+
+  test('anything that is not a template is read as none', () => {
+    expect(normalize({Highlight: 42, Text: null}).Highlight).toBe('');
+    expect(normalize(null).Text).toBe('');
+    expect(normalize('a template').Highlight).toBe('');
+  });
+
+  test('a type the file knows and this version does not is dropped', () => {
+    expect(normalize({Ink: 'drawn'})).not.toHaveProperty('Ink');
   });
 });
 

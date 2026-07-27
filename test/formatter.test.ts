@@ -24,8 +24,14 @@ function formatterWith(template: string) {
   const settings = new PDFAnnotationPluginSetting();
   settings.topicHeading = false;
   settings.fileHeading = 'none';
-  settings.noteTemplate = template;
-  settings.highlightTemplate = `HIGHLIGHT ${template}`;
+  settings.defaultTemplate = template;
+  settings.annotationTemplates = {
+    ...settings.annotationTemplates,
+    Highlight: `HIGHLIGHT ${template}`,
+    Underline: '',
+    Squiggly: '',
+    StrikeOut: '',
+  };
   return new PDFAnnotationPluginFormatter(settings);
 }
 
@@ -54,12 +60,26 @@ describe('template variables', () => {
     expect(formatter.format([annotation()], false)).toBe('Text/Paper.pdf');
   });
 
-  test('highlighted text uses the highlight template, comments the note template', () => {
+  test('a type with a template of its own is written with it', () => {
+    const formatter = formatterWith('{{body}}');
+    expect(
+      formatter.format([annotation({subtype: 'Highlight', highlightedText: 'marked'})], false)
+    ).toBe('HIGHLIGHT a comment');
+  });
+
+  test('a type without one is written with the default', () => {
     const formatter = formatterWith('{{body}}');
     expect(formatter.format([annotation()], false)).toBe('a comment');
+    // Blanked above, so it falls back however it used to be written.
     expect(
       formatter.format([annotation({subtype: 'StrikeOut', highlightedText: 'gone'})], false)
-    ).toBe('HIGHLIGHT a comment');
+    ).toBe('a comment');
+  });
+
+  test('the annotation type is a variable of its own', () => {
+    const formatter = formatterWith('{{type}}');
+    expect(formatter.format([annotation({subtype: 'FreeText'})], false))
+      .toBe('FreeText');
   });
 
   test('reports when there is nothing to render', () => {
@@ -72,7 +92,7 @@ describe('headings', () => {
 
   function format(over: Partial<PDFAnnotationPluginSetting>, annotations: PDFAnnotation[]) {
     const settings = new PDFAnnotationPluginSetting();
-    settings.noteTemplate = '-\n';
+    settings.defaultTemplate = '-\n';
     Object.assign(settings, over);
     return new PDFAnnotationPluginFormatter(settings).format(annotations, false);
   }
@@ -242,7 +262,7 @@ describe('a note holding one annotation and nothing else', () => {
     anno: PDFAnnotation
   ) {
     const settings = new PDFAnnotationPluginSetting();
-    settings.noteTemplate = '-\n';
+    settings.defaultTemplate = '-\n';
     Object.assign(settings, over);
     return new PDFAnnotationPluginFormatter(settings).format(
       [anno],
@@ -281,7 +301,7 @@ describe('a note holding one annotation and nothing else', () => {
 
   test('is written with every heading when it is not that kind of note', () => {
     const settings = new PDFAnnotationPluginSetting();
-    settings.noteTemplate = '-\n';
+    settings.defaultTemplate = '-\n';
     Object.assign(settings, {groupByDate: true, fileHeading: 'folder'});
     expect(
       new PDFAnnotationPluginFormatter(settings).format([dated], false)
