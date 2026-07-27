@@ -93,6 +93,7 @@ src/
   types.ts                    — PDFFile, annotation and pdf.js boundary types
 lang/
   en.ts               — every user-facing string, flat UPPER_SNAKE keys
+  ru.ts               — the same keys, in the same order, translated
   helpers.ts          — picks the locale, exports `t`
 test/
   extractHighlight.test.ts  — glyph-level text extraction
@@ -154,7 +155,12 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
   grouped under `// ─── Section ───` banners; values are plain strings, and
   anything variable is interpolated at the call site
   (`` new Notice(`${t.NOTICE_COPIED}: ${variable}`) ``). A new language is a
-  copy of `en.ts` listed in `helpers.ts`'s `localeMap`.
+  copy of `en.ts` listed in `helpers.ts`'s `localeMap`; `ru.ts` is the worked
+  example, and every locale file must carry all of `en.ts`'s keys, since `t` is
+  typed as `typeof en`. Three of them are not free prose: `HANDLEBARS_LINK` must
+  appear verbatim inside `SECTION_TEMPLATES_DESC` for the link to be woven in,
+  `DATE_FORMAT` is a moment format string, and the `DEFAULT_*_TEMPLATE` values
+  may only have the words around their `{{variables}}` translated.
   Exempt, and to stay exempt: the annotation subtypes (spelled as the PDF format
   spells them), the `{{variable}}` names, the command IDs (persisted, so hotkeys
   survive), and the markdown and YAML syntax the formatter writes.

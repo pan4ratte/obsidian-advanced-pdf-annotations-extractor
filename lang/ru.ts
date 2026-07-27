@@ -1,0 +1,161 @@
+export default {
+    // ─── Plugin ──────────────────────────────────────────────────────────────────
+    // The name is the plugin's own and is left as manifest.json spells it, which
+    // no translation can reach anyway.
+    PLUGIN_NAME: "Advanced PDF Extractor",
+    PLUGIN_DESCRIPTION: "Импорт всех типов аннотаций из PDF внутри и снаружи хранилища с расширенными настройками и шаблонами.",
+
+    // ─── Commands ────────────────────────────────────────────────────────────────
+    COMMAND_EXTRACT_CURRENT_FILE: "Извлечь аннотации из текущего файла",
+    COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION: "Извлечь аннотации из текущего файла в отдельные заметки",
+    COMMAND_EXTRACT_CLIPBOARD_PATH: "Извлечь аннотации по пути из буфера обмена в текущую заметку",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Извлечь аннотации по пути из буфера обмена в новую заметку",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Извлечь аннотации по пути из буфера обмена в отдельные заметки",
+    COMMAND_EXTRACT_CURRENT_FOLDER: "Извлечь аннотации из всех PDF в текущей папке",
+    COMMAND_EXTRACT_ADVANCED: "Извлечь аннотации с расширенными настройками",
+
+    // ─── Advanced extraction modal ───────────────────────────────────────────────
+    MODAL_ADVANCED_TITLE: "Расширенные настройки извлечения",
+    MODAL_FILE_NAME: "Найдите PDF или вставьте путь",
+    MODAL_FILE_PLACEHOLDER: "Поиск по хранилищу или полный путь, если файл вне его",
+    MODAL_PAGES_NAME: "Укажите страницы для извлечения",
+    // The field carries no description, so the example is where the shape of an
+    // answer is shown: single pages, ranges, roman numerals, all at once.
+    MODAL_PAGES_PLACEHOLDER: "Например: 25-50, 55 или i-viii (пусто — все страницы)",
+    MODAL_PAGE_LABELS_NAME: "Искать по меткам страниц, а не по физическим",
+    MODAL_DATES_NAME: "Выбрать даты для извлечения",
+    MODAL_DATES_DESC: "Показывает все дни, в которые были созданы аннотации внутри файла.",
+    MODAL_DATES_NONE: "В этом файле нечего извлекать.",
+    MODAL_READING: "Чтение файла…",
+    MODAL_TARGET_NAME: "Тип извлечения",
+    MODAL_TARGET_CURRENT: "В текущую заметку",
+    MODAL_TARGET_SINGLE: "В новую заметку",
+    MODAL_TARGET_SEPARATE: "В отдельные заметки",
+    MODAL_EXTRACT: "Извлечь аннотации",
+    /**
+     * A moment format. `D MMMM YYYY` renders "25 июля 2026" — moment's own `LL`
+     * adds the "г." that Russian dates carry in prose but not in a list. The
+     * days are sorted as `YYYY-MM-DD` whatever this says.
+     */
+    DATE_FORMAT: "D MMMM YYYY",
+
+    // ─── Notices ─────────────────────────────────────────────────────────────────
+    // A path reaches these from the clipboard and from the advanced extraction's
+    // own field alike, so neither says where it came from.
+    NOTICE_PATH_DESKTOP_ONLY: "Чтение PDF по пути вне хранилища доступно только в десктопном приложении.",
+    NOTICE_PATH_NOT_A_FILE: "Указанный путь не является файлом.",
+    NOTICE_PATH_UNREADABLE: "Указанный путь не удалось прочитать как файл.",
+    NOTICE_EXTRACTION_FAILED: "Не удалось извлечь аннотации из этого PDF.",
+    NOTICE_NOTE_PATH_INVALID: "Не удалось создать заметку с аннотациями: хранилище не принимает такой путь. Проверьте папку, подпапку и имя заметки в настройках.",
+    NOTICE_NO_CURRENT_FILE: "Не удалось создать заметку с аннотациями: нет открытого файла, рядом с которым её положить. Откройте файл или выберите конкретную папку хранилища для создаваемых заметок.",
+    NOTICE_PAGES_UNREADABLE: "Не удалось разобрать часть указанных страниц",
+    NOTICE_NOTHING_SELECTED: "На выбранных страницах и датах аннотаций не найдено.",
+    NOTICE_NO_NOTE_TO_INSERT_INTO: "Не удалось вставить аннотации: нет открытой заметки, куда их поместить. Откройте заметку или извлеките в новую.",
+    NOTICE_COPIED: "Скопировано в буфер обмена",
+    NOTICE_COPY_FAILED: "Не удалось скопировать в буфер обмена.",
+
+    // ─── Written into exported notes ─────────────────────────────────────────────
+    // The {{variables}} are names the formatter resolves; only the words around
+    // them may be translated.
+    NOTE_NO_ANNOTATIONS: "*Нет аннотаций*",
+    NOTE_VAULT_ROOT: "Корень хранилища",
+    NOTE_NO_DATE: "Без даты",
+    DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *выделено {{author}} на странице {{pageNumber}} в {{filelink}}*\n\n",
+    DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *заметка {{author}} на странице {{pageNumber}} в {{filelink}}*\n\n",
+    DEFAULT_NOTE_NAME: "Аннотации из {{filename}}",
+    DEFAULT_ONE_NOTE_NAME: "Аннотации из {{filename}}-{{counter}}",
+    /** Names a note whose annotation has no comment to take a topic from. */
+    NAME_NO_TOPIC: "Без темы {{counter}}",
+
+    // ─── Annotation types ────────────────────────────────────────────────────────
+    ANNOT_HIGHLIGHT: "Выделенный текст",
+    ANNOT_UNDERLINE: "Подчёркнутый текст",
+    ANNOT_SQUIGGLY: "Текст с волнистым подчёркиванием",
+    ANNOT_STRIKEOUT: "Зачёркнутый текст",
+    ANNOT_TEXT: "Комментарий-стикер",
+    ANNOT_FREE_TEXT: "Свободный текст на странице",
+
+    // ─── Template variables ──────────────────────────────────────────────────────
+    VAR_HIGHLIGHTED_TEXT: "Выделенный текст из PDF",
+    VAR_FOLDER: "Папка PDF-файла",
+    VAR_FILENAME: "Имя PDF-файла (без расширения)",
+    VAR_FILEPATH: "Путь к PDF-файлу",
+    VAR_FILELINK: "[[Вики-ссылка]] для PDF внутри хранилища и путь file:// для тех, что вне его",
+    VAR_PAGE_NUMBER: "Номер страницы с аннотацией (по числу физических страниц)",
+    VAR_PAGE_LABEL: "Метка страницы с аннотацией (по разметке страниц, заданной автором)",
+    VAR_AUTHOR: "Автор аннотации",
+    VAR_BODY: "Текст аннотации",
+    VAR_TYPE: "Тип аннотации, как его называет PDF: Highlight, Underline, Squiggly, StrikeOut, Text или FreeText",
+    VAR_TOPIC: "Первая строка текста аннотации. При группировке по темам она убирается из {{body}}, так как пишется отдельным заголовком",
+    VAR_CREATED: "День создания аннотации, например 2024-01-15; пусто, если PDF не хранит дату",
+    VAR_IS_EXTERNAL: "Истина для PDF вне хранилища, для {{#if isExternal}} в шаблоне",
+
+    // ─── Settings: annotations ───────────────────────────────────────────────────
+    SETTING_ANNOTATIONS_NAME: "Выберите типы аннотаций для извлечения",
+
+    // ─── Settings: templates ─────────────────────────────────────────────────────
+    // One sentence, not the pieces either side of the link: the link is woven in
+    // by looking for HANDLEBARS_LINK inside it, so this sentence has to contain
+    // that word literally.
+    SECTION_TEMPLATES: "Шаблоны импорта",
+    SECTION_TEMPLATES_DESC: "Шаблоны задают вид импортируемых аннотаций. В таблице переменных ниже перечислены доступные конструкции синтаксиса Handlebars: при импорте эти переменные заменяются соответствующими значениями.",
+    HANDLEBARS_LINK: "Handlebars",
+    SHOW_VARIABLES_TABLE: "Показать таблицу переменных",
+    HIDE_VARIABLES_TABLE: "Скрыть таблицу переменных",
+    TABLE_VARIABLE: "Переменная (нажмите, чтобы скопировать)",
+    TABLE_DESCRIPTION: "Описание",
+    COPY_TOOLTIP: "Скопировать в буфер обмена",
+    SETTING_TEMPLATE_NAME: "Шаблон форматирования",
+    SETTING_TEMPLATE_DESC: "Шаблон по умолчанию применяется ко всем типам аннотаций, у которых нет своего. Пустые шаблоны используют его же.",
+    OPTION_TEMPLATE_DEFAULT: "По умолчанию (для всех типов)",
+    PLACEHOLDER_TEMPLATE_DEFAULT: "Пусто — этот тип аннотаций пишется шаблоном по умолчанию.",
+
+    // ─── Settings: grouping ──────────────────────────────────────────────────────
+    SECTION_GROUPING: "Группировка аннотаций",
+    SETTING_SORT_BY_TOPIC_NAME: "Группировать по темам",
+    SETTING_SORT_BY_TOPIC_DESC: "Считает первую строку каждого комментария его темой и группирует по ней в первую очередь, выше папки и файла.",
+    SETTING_GROUP_BY_DATE_NAME: "Группировать по дате создания",
+    SETTING_GROUP_BY_DATE_DESC: "Группирует аннотации по дню создания — аннотации без даты идут последними.",
+    SETTING_GROUP_BY_FOLDER_NAME: "Группировать по папкам",
+    SETTING_GROUP_BY_FOLDER_DESC: "Держит вместе все PDF из одной папки, прежде чем аннотации будут упорядочены по файлам.",
+
+    // ─── Settings: headings ──────────────────────────────────────────────────────
+    SECTION_HEADINGS: "Заголовки",
+    SETTING_DATE_HEADING_NAME: "Добавлять заголовки дат",
+    SETTING_DATE_HEADING_DESC: "Добавляет заголовок для каждой даты, когда аннотации сгруппированы по дате создания.",
+    SETTING_TOPIC_HEADING_NAME: "Собирать заметки с одной темой под общим заголовком",
+    SETTING_TOPIC_HEADING_DESC: "Добавляет заголовок для каждой темы и собирает под ним заметки с этой темой.",
+    SETTING_FILE_HEADING_NAME: "Добавлять заголовки файлов",
+    SETTING_FILE_HEADING_DESC: "Добавляет заголовок перед аннотациями каждого файла.",
+    OPTION_FILE_HEADING_FOLDER: "Добавлять имя папки",
+    OPTION_FILE_HEADING_FILE: "Добавлять имя файла",
+    OPTION_FILE_HEADING_NONE: "Без заголовка",
+
+    // ─── Settings: notes ─────────────────────────────────────────────────────────
+    SECTION_NOTES: "Создание заметок",
+    SETTING_NOTE_LOCATION_NAME: "Расположение создаваемых заметок",
+    SETTING_NOTE_LOCATION_DESC: "Выберите, куда будут помещены создаваемые заметки.",
+    OPTION_NOTE_LOCATION_CURRENT: "В папку текущего файла",
+    OPTION_NOTE_LOCATION_VAULT: "В конкретную папку хранилища",
+    SETTING_NOTE_FOLDER_NAME: "Укажите папку в хранилище",
+    SETTING_NOTE_FOLDER_DESC: "Начните вводить, чтобы увидеть подсказки, или оставьте пустым для корня хранилища.",
+    SETTING_NOTE_SUBFOLDER_NAME: "Подпапка (необязательно)",
+    SETTING_NOTE_SUBFOLDER_DESC: "Если заполнено, по этому шаблону имени будет создана подпапка для заметок.",
+    PLACEHOLDER_VAULT_ROOT: "Например, {{filename}} или другая переменная с любым префиксом или суффиксом",
+    PLACEHOLDER_NO_SUBFOLDER: "Если пусто, подпапка не создаётся",
+    SETTING_TOPIC_TO_NAME_NAME: "Использовать тему аннотации как имя заметки",
+    SETTING_TOPIC_TO_NAME_DESC: "Включите, чтобы избежать дублирования {{topic}}, если он есть в вашем шаблоне. Заметки, созданные режимом «заметка на аннотацию», будут названы по теме аннотации.",
+    SETTING_ONE_NOTE_NAME_NAME: "Шаблон имени для аннотаций, импортируемых в отдельные заметки",
+    SETTING_ONE_NOTE_NAME_DESC: "Используйте уникальные переменные, например {{counter}}, иначе все аннотации попадут в одну заметку.",
+    SETTING_EXTRACT_TAGS_NAME: "Извлекать теги из аннотаций в свойство тегов",
+    SETTING_EXTRACT_TAGS_DESC: "Найденные в аннотациях теги автоматически переносятся в свойство тегов заметки. Выберите, для каких извлечений это происходит.",
+    OPTION_EXTRACT_TAGS_NEVER: "Никогда",
+    OPTION_EXTRACT_TAGS_ALWAYS: "Всегда",
+    OPTION_EXTRACT_TAGS_SINGLE: "При извлечении в одну заметку",
+    OPTION_EXTRACT_TAGS_SEPARATE: "При извлечении в отдельные заметки",
+    SETTING_NOTE_NAME_NAME: "Шаблон имени для аннотаций, импортируемых в одну заметку",
+    SETTING_NOTE_NAME_DESC: "Используйте уникальные переменные, например {{filename}}, иначе все PDF будут писать аннотации в одну заметку.",
+    SETTING_OVERWRITE_NAME: "Разрешить перезапись",
+    SETTING_OVERWRITE_DESC: "Если заметка с таким именем уже есть, она будет заменена, а не дополнена.",
+
+};

@@ -33,6 +33,7 @@ Please note: the fork has a plugin id of its own, so it starts from its own sett
 * **Commands for a note per annotation.** *Extract from the current file into a note per annotation* and *Extract from the file path in the clipboard into a note per annotation*, replacing the setting that decided this for every command at once.
 * **Extract a PDF outside the vault into a new note.** *Extract from the file path in the clipboard into a new note*, which needs no note open, alongside the command that inserts into the one being edited.
 * **A subfolder named by a template.** Set *Notes export subfolder* to `{{filename}}` and every PDF's notes go in a folder of their own. Missing folders are created.
+* **Russian translation.** The interface follows Obsidian's own language, English otherwise. Dates in the list read as *25 июля 2026*, and the default templates write their notes in Russian too.
 * **Tag extraction is a choice of four.** *Never*, *always*, *single note extraction* or *extraction to separate notes* — a tag means the PDF's subject on a note holding every annotation, and the one comment's subject on a note per annotation.
 
 ### UI/UX enhancements and bug fixes
