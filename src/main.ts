@@ -95,6 +95,25 @@ export default class PDFAnnotationPlugin extends Plugin {
 		};
 	}
 
+	/**
+	 * Sorts what an extraction gathered into the note being edited, which is
+	 * what the commands taking an editor do — reached here without one, since
+	 * the advanced extraction is asked for from the palette rather than from
+	 * inside a note.
+	 */
+	async insertLoadedAnnotations(
+		loaded: LoadedAnnotations,
+		view: MarkdownView
+	): Promise<void> {
+		this.sort(loaded.annotations);
+		await this.insertIntoNote(
+			view.editor,
+			view,
+			loaded.annotations,
+			loaded.isExternalFile
+		);
+	}
+
 	/** Sorts and files what an extraction gathered, however it was gathered. */
 	async writeLoadedAnnotations(
 		loaded: LoadedAnnotations,

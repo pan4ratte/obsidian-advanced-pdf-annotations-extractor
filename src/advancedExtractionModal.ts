@@ -2,6 +2,7 @@ import {
 	AbstractInputSuggest,
 	App,
 	ButtonComponent,
+	MarkdownView,
 	Modal,
 	moment,
 	normalizePath,
@@ -35,6 +36,20 @@ const ABSOLUTE_PATH = /^(?:[a-zA-Z]:[\\/]|\\\\|\/|~[\\/])/;
 type ExtractionSource =
 	| { kind: "vault"; file: TFile }
 	| { kind: "external"; path: string };
+
+/**
+ * Where an extraction puts what it gathered — the choice the ordinary commands
+ * each make for themselves, asked here instead. Separate notes to begin with:
+ * a reader who has narrowed an extraction down to certain pages, days and types
+ * is picking annotations apart, not filing them together.
+ */
+const EXTRACTION_TARGETS = {
+	separate: t.MODAL_TARGET_SEPARATE,
+	single: t.MODAL_TARGET_SINGLE,
+	current: t.MODAL_TARGET_CURRENT,
+};
+
+type ExtractionTarget = keyof typeof EXTRACTION_TARGETS;
 
 /**
  * Tells one source from another, so a PDF already read is not read again and a
@@ -106,6 +121,7 @@ export class AdvancedExtractionModal extends Modal {
 	private pages = "";
 	private byPageLabel = false;
 	private byDate = false;
+	private target: ExtractionTarget = "separate";
 
 	/**
 	 * The days still ticked in the list. Null until the list has been built,
@@ -253,6 +269,17 @@ export class AdvancedExtractionModal extends Modal {
 			cls: "pdf-annotations-date-list",
 		});
 		this.showDateList = createCollapsible(datePanel);
+
+		new Setting(this.card())
+			.setName(t.MODAL_TARGET_NAME)
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOptions(EXTRACTION_TARGETS)
+					.setValue(this.target)
+					.onChange((value) => {
+						this.target = value as ExtractionTarget;
+					});
+			});
 
 		// A plain row rather than a setting: a setting row draws a rule above
 		// itself and pads for a name and description this one does not have, all
@@ -498,7 +525,28 @@ export class AdvancedExtractionModal extends Modal {
 			return;
 		}
 
+		// Asked for from the palette, so there need be no note open at all —
+		// and nothing to insert into is a choice to change rather than an
+		// extraction to lose, which is why the modal is still here to change it
+		// in.
+		const view =
+			this.target === "current"
+				? this.app.workspace.getActiveViewOfType(MarkdownView)
+				: null;
+		if (this.target === "current" && !view) {
+			new Notice(t.NOTICE_NO_NOTE_TO_INSERT_INTO);
+			return;
+		}
+
 		this.close();
-		await this.plugin.writeLoadedAnnotations({ ...loaded, annotations });
+		const extraction = { ...loaded, annotations };
+		if (view) {
+			await this.plugin.insertLoadedAnnotations(extraction, view);
+		} else {
+			await this.plugin.writeLoadedAnnotations(
+				extraction,
+				this.target === "separate"
+			);
+		}
 	}
 }

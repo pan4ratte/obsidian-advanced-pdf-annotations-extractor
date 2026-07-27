@@ -27,6 +27,10 @@ export default {
     MODAL_DATES_DESC: "Lists every day the annotations inside the file were created.",
     MODAL_DATES_NONE: "There is nothing to extract from this file.",
     MODAL_READING: "Reading the file…",
+    MODAL_TARGET_NAME: "Extraction type",
+    MODAL_TARGET_CURRENT: "To the current note",
+    MODAL_TARGET_SINGLE: "To a new note",
+    MODAL_TARGET_SEPARATE: "To separate notes",
     MODAL_EXTRACT: "Extract annotations",
     /**
      * How a day is spelled in the list of dates, as a moment format. `LL` is
@@ -48,6 +52,7 @@ export default {
     NOTICE_NO_CURRENT_FILE: "Could not create the note with the annotations: no file is open for it to be put beside. Open one, or choose a specific folder in the vault as the created notes destination.",
     NOTICE_PAGES_UNREADABLE: "Could not read part of the pages that were given",
     NOTICE_NOTHING_SELECTED: "No annotations were found on the pages and dates that were selected.",
+    NOTICE_NO_NOTE_TO_INSERT_INTO: "Could not insert the annotations: no note is open for them to go into. Open one, or extract to a new note instead.",
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard.",
     NOTICE_TEMPLATES_COLLAPSED: "The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. A template of yours for PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.",
@@ -145,7 +150,7 @@ export default {
     SETTING_TOPIC_TO_NAME_DESC: "Enable if you want to avoid duplication of the {{topic}} if your template has it. The notes made by the 'note per annotation' will be named after the annotation's topic.",
     SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported to separate notes",
     SETTING_ONE_NOTE_NAME_DESC: "Use unique variables, such as {{counter}} or all annotation will be put in the same note.",
-    SETTING_EXTRACT_TAGS_NAME: "Extract tags from annotations to the notes property",
+    SETTING_EXTRACT_TAGS_NAME: "Extract tags from annotations to the tags property",
     SETTING_EXTRACT_TAGS_DESC: "Tags found in the annotations will be automatically moved to the note's tags property.",
     SETTING_NOTE_NAME_NAME: "Naming pattern for annotations imported to a single note",
     SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}} or every PDF will write annotations to the same note.",

@@ -27,7 +27,10 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
   *July 25, 2026* — while staying sorted by the calendar, and annotations the PDF
   dated not at all are listed as their own entry. The file is read as soon as one
   is named, in the background and only once, so the list of dates is already
-  there when it is asked for and extracting does not read the file again.
+  there when it is asked for and extracting does not read the file again. Last
+  is *Extraction type*, which is the choice each of the other commands makes for
+  itself — the current note, a new note, or a note per annotation — asked here
+  instead, and set to separate notes to begin with.
 
 - A template for every annotation type, over a default that writes the ones
   without their own. The two templates — one for the annotations that marked up
