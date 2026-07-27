@@ -9,6 +9,26 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Added
 
+- **Extraction with advanced settings**, a command that asks what to extract
+  instead of deciding it beforehand. It opens a modal whose first card is the
+  annotation types, ticked as the settings have them — ticking one here settles
+  that extraction and leaves the setting behind every other command alone. Below
+  it is a field that searches
+  the PDFs in the vault and takes a path from outside it as well — a path already
+  in the clipboard is filled in for you when it names a PDF that can be read. A
+  second field takes the pages: single pages, ranges, or both, as `25-50`,
+  `25, 26, 30`, `25-50, 55, 88` or `i-viii`. *Look for page labels, not physical
+  pages* reads those against the labels the author gave the pages, so `i-viii`
+  finds the front matter rather than the first eight pages of the file — and an
+  arabic range never matches a roman label, since a PDF labelling both `xxv` and
+  `25` means two different pages by them. *Select dates for extraction* reads the
+  file and lists every day its annotations were made on, each of which can be
+  left out; the days are written the way the reader's language writes one —
+  *July 25, 2026* — while staying sorted by the calendar, and annotations the PDF
+  dated not at all are listed as their own entry. The file is read as soon as one
+  is named, in the background and only once, so the list of dates is already
+  there when it is asked for and extracting does not read the file again.
+
 - A template for every annotation type, over a default that writes the ones
   without their own. The two templates — one for the annotations that marked up
   text, one for the rest — are now a single card with a picker: *Default (all

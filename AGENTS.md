@@ -5,7 +5,7 @@
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | esbuild watch mode (no typecheck) |
-| `npm test` | Jest (ts-jest) — 41 tests, all passing |
+| `npm test` | Jest (ts-jest) — 219 tests, all passing |
 | `npm run lint` / `npm run lint:fix` | ESLint flat config with the official Obsidian ruleset |
 | `npm run build` | `tsc -noEmit -skipLibCheck && node esbuild.config.mjs production` |
 
@@ -79,11 +79,14 @@ against byte-exact — a mismatch makes an untouched default look customised.
 
 ```
 src/
-  main.ts             — Plugin class, 3 commands, settings load/save
-  extractHighlight.ts — PDF text extraction via pdfjs-dist
-  formatter.ts        — Handlebars template rendering
-  settings.ts         — Settings class + settings tab UI
-  types.ts            — PDFFile, annotation and pdf.js boundary types
+  main.ts                     — Plugin class, 7 commands, settings load/save
+  extractHighlight.ts         — PDF text extraction via pdfjs-dist
+  formatter.ts                — Handlebars template rendering
+  settings.ts                 — Settings class + settings tab UI
+  advancedExtractionModal.ts  — the "advanced settings" modal
+  extractionFilter.ts         — page expressions and the page/date/type filter
+  collapsible.ts              — the show/hide animation, shared by tab and modal
+  types.ts                    — PDFFile, annotation and pdf.js boundary types
 lang/
   en.ts               — every user-facing string, flat UPPER_SNAKE keys
   helpers.ts          — picks the locale, exports `t`
@@ -92,6 +95,7 @@ test/
   loadPDFFile.test.ts       — extraction pipeline, against a fake pdf.js
   formatter.test.ts         — template variables and template selection
   settings.test.ts          — annotation types, checkbox round-trip
+  extractionFilter.test.ts  — page expressions, days, filtering
   mocks/obsidian.ts
 styles.css            — settings tab CSS (release asset)
 CHANGELOG.md          — release notes source for the workflow

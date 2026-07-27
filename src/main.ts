@@ -28,10 +28,12 @@ import { assignTopics, takeTopicForNoteName } from "src/topics";
 import {
 	asIndexable,
 	FileMeta,
+	LoadedAnnotations,
 	PDFAnnotation,
 	PDFFile,
 	PDFJsLib,
 } from "src/types";
+import { AdvancedExtractionModal } from "src/advancedExtractionModal";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
@@ -62,11 +64,22 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal.sort(compareAnnotations(settings));
 	}
 
-	async loadSinglePDFFile(pdfFile: TFile, onePerAnnotation = false) {
+	/**
+	 * Reads one PDF in the vault, without writing anything: the advanced
+	 * extraction reads it to find out what days its annotations were made on,
+	 * long before it knows which of them it is going to write.
+	 *
+	 * Which types to read is asked for rather than taken from the settings, so
+	 * the advanced extraction can read them all once and answer a type being
+	 * ticked off out of what it already holds.
+	 */
+	async loadAnnotationsFromVaultFile(
+		pdfFile: TFile,
+		desiredAnnotations: string[] = this.settings.desiredAnnotations
+	): Promise<LoadedAnnotations> {
 		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 		const containingFolder = pdfFile.parent.name;
 		const grandtotal: PDFAnnotation[] = [];
-		const desiredAnnotations = this.settings.desiredAnnotations;
 		const content = await this.app.vault.readBinary(pdfFile);
 		await loadPDFFile(
 			PDFFile.convertTFileToPDFFile(pdfFile, content),
@@ -75,8 +88,30 @@ export default class PDFAnnotationPlugin extends Plugin {
 			grandtotal,
 			desiredAnnotations
 		);
-		this.sort(grandtotal);
-		await this.writeNotes(pdfFile, grandtotal, false, onePerAnnotation);
+		return {
+			fileMeta: pdfFile,
+			annotations: grandtotal,
+			isExternalFile: false,
+		};
+	}
+
+	/** Sorts and files what an extraction gathered, however it was gathered. */
+	async writeLoadedAnnotations(
+		loaded: LoadedAnnotations,
+		onePerAnnotation = false
+	): Promise<void> {
+		this.sort(loaded.annotations);
+		await this.writeNotes(
+			loaded.fileMeta,
+			loaded.annotations,
+			loaded.isExternalFile,
+			onePerAnnotation
+		);
+	}
+
+	async loadSinglePDFFile(pdfFile: TFile, onePerAnnotation = false) {
+		const loaded = await this.loadAnnotationsFromVaultFile(pdfFile);
+		await this.writeLoadedAnnotations(loaded, onePerAnnotation);
 	}
 	/**
 	 * Add the tags to the note's own properties, rather than writing a block of
@@ -230,12 +265,13 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal: PDFAnnotation[];
 		pdfFile: PDFFile | null;
 	} {
-		new Notice(t.NOTICE_CLIPBOARD_DESKTOP_ONLY);
+		new Notice(t.NOTICE_PATH_DESKTOP_ONLY);
 		return { grandtotal: [], pdfFile: null };
 	}
 
 	async loadAnnotationsFromSinglePDFFileFromClipboardPath(
-		filePathFromClipboard: string
+		filePathFromClipboard: string,
+		desiredAnnotations: string[] = this.settings.desiredAnnotations
 	): Promise<{ grandtotal: PDFAnnotation[]; pdfFile: PDFFile | null }> {
 		if (!Platform.isDesktop) {
 			return this.noticeClipboardPathIsDesktopOnly();
@@ -281,7 +317,6 @@ export default class PDFAnnotationPlugin extends Plugin {
 					0,
 					filePathWithSlashs.lastIndexOf("/")
 				);
-				const desiredAnnotations = this.settings.desiredAnnotations;
 				await loadPDFFile(
 					pdfFile,
 					pdfjsLib,
@@ -290,10 +325,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 					desiredAnnotations
 				);
 			} else {
-				new Notice(t.NOTICE_CLIPBOARD_NOT_A_FILE);
+				new Notice(t.NOTICE_PATH_NOT_A_FILE);
 			}
 		} catch (error) {
-			new Notice(t.NOTICE_CLIPBOARD_UNREADABLE);
+			new Notice(t.NOTICE_PATH_UNREADABLE);
 			console.error(error);
 		}
 		return { grandtotal, pdfFile };
@@ -344,6 +379,17 @@ export default class PDFAnnotationPlugin extends Plugin {
 				} else {
 					return false;
 				}
+			},
+		});
+
+		// Nothing needs to be open for this one: which PDF to read is one of the
+		// things the modal asks about, rather than something the command had to
+		// have decided before it ran.
+		this.addCommand({
+			id: "extract-annotations-advanced",
+			name: t.COMMAND_EXTRACT_ADVANCED,
+			callback: () => {
+				new AdvancedExtractionModal(this.app, this).open();
 			},
 		});
 

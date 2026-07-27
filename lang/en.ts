@@ -12,14 +12,42 @@ export default {
     COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract annotations from the clipboard path into a new note",
     COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Extract annotations from the clipboard path into separate notes",
     COMMAND_EXTRACT_CURRENT_FOLDER: "Extract annotations from every PDF in the current folder",
+    COMMAND_EXTRACT_ADVANCED: "Extract annotations with advanced settings",
+
+    // ─── Advanced extraction modal ───────────────────────────────────────────────
+    MODAL_ADVANCED_TITLE: "Advanced extraction settings",
+    MODAL_FILE_NAME: "Search for PDF or paste the path",
+    MODAL_FILE_PLACEHOLDER: "Search the vault, or paste full path if outside the vault",
+    MODAL_PAGES_NAME: "Specify pages for extraction",
+    // The field carries no description, so the example is where the shape of an
+    // answer is shown: single pages, ranges, roman numerals, all at once.
+    MODAL_PAGES_PLACEHOLDER: "Examples: 25-50, 55 or i-viii (leave empty for all pages)",
+    MODAL_PAGE_LABELS_NAME: "Look for page labels, not physical pages",
+    MODAL_DATES_NAME: "Select dates for extraction",
+    MODAL_DATES_DESC: "Lists every day the annotations inside the file were created.",
+    MODAL_DATES_NONE: "There is nothing to extract from this file.",
+    MODAL_READING: "Reading the file…",
+    MODAL_EXTRACT: "Extract annotations",
+    /**
+     * How a day is spelled in the list of dates, as a moment format. `LL` is
+     * moment's own long date for the locale, which is "July 25, 2026" here and
+     * the right word order and month name in every language it knows. A
+     * translation may spell it some other way; the days are sorted as
+     * `YYYY-MM-DD` whatever this says.
+     */
+    DATE_FORMAT: "LL",
 
     // ─── Notices ─────────────────────────────────────────────────────────────────
-    NOTICE_CLIPBOARD_DESKTOP_ONLY: "Reading a PDF from a path outside the vault is only available in the desktop app.",
-    NOTICE_CLIPBOARD_NOT_A_FILE: "The path in the clipboard is not a file.",
-    NOTICE_CLIPBOARD_UNREADABLE: "The clipboard does not contain a readable file path.",
+    // A path reaches these from the clipboard and from the advanced extraction's
+    // own field alike, so neither says where it came from.
+    NOTICE_PATH_DESKTOP_ONLY: "Reading a PDF from a path outside the vault is only available in the desktop app.",
+    NOTICE_PATH_NOT_A_FILE: "The path that was given is not a file.",
+    NOTICE_PATH_UNREADABLE: "The path that was given could not be read as a file.",
     NOTICE_EXTRACTION_FAILED: "Could not extract the annotations of this PDF.",
     NOTICE_NOTE_PATH_INVALID: "Could not create the note with the annotations: the vault will not take that path. Check the note folder, subfolder and name in the settings.",
     NOTICE_NO_CURRENT_FILE: "Could not create the note with the annotations: no file is open for it to be put beside. Open one, or choose a specific folder in the vault as the created notes destination.",
+    NOTICE_PAGES_UNREADABLE: "Could not read part of the pages that were given",
+    NOTICE_NOTHING_SELECTED: "No annotations were found on the pages and dates that were selected.",
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard.",
     NOTICE_TEMPLATES_COLLAPSED: "The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. A template of yours for PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.",
@@ -61,7 +89,7 @@ export default {
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
     // ─── Settings: annotations ───────────────────────────────────────────────────
-    SETTING_ANNOTATIONS_NAME: "Choose, which annotation types will be extracted",
+    SETTING_ANNOTATIONS_NAME: "Select annotation types to be extracted",
 
     // ─── Settings: templates ─────────────────────────────────────────────────────
     // One sentence, not the pieces either side of the link: the link is woven in

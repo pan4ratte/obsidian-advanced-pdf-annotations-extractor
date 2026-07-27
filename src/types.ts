@@ -42,6 +42,17 @@ export class PDFFile implements FileMeta {
 	}
 }
 
+/**
+ * One PDF, read: everything writing the notes needs, so an extraction can be
+ * handed around — narrowed down, held on to — between being read and being
+ * written.
+ */
+export interface LoadedAnnotations {
+	fileMeta: FileMeta;
+	annotations: PDFAnnotation[];
+	isExternalFile: boolean;
+}
+
 /** Index access for the settings object, which is keyed by setting name. */
 export interface IIndexable {
 	[key: string]: unknown;

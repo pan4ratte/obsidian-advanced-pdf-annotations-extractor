@@ -136,6 +136,16 @@
 
 .pdf-annotations-stacked-setting .setting-item-control input[type="text"] {
 	width: 100%;
+	margin-top: 4px;
+}
+
+
+
+/* A search field is an input inside a container of its own, and Obsidian sizes
+   both for the sliver at the end of a setting row. Both take the width here. */
+.pdf-annotations-stacked-setting .setting-item-control .search-input-container,
+.pdf-annotations-stacked-setting .setting-item-control input[type="search"] {
+	width: 100%;
 }
 
 /* Settings that another setting has taken the question out of: they open and
@@ -353,4 +363,87 @@
 
 .setting-item-description.pdf-annotations-template-instructions {
     padding-top: 12px;
+}
+
+/* One question of the advanced extraction, carded like the settings tab's own
+   groups. A flex column rather than a plain box, so a part of it that is hidden
+   leaves no gap where it was. */
+.pdf-annotations-modal-card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--setting-items-background);
+	border-radius: var(--setting-items-radius);
+	padding: 16px;
+}
+
+/* Obsidian's setting rows separate themselves with a rule and their own
+   padding, which inside a card would draw a line across it and pad it twice.
+   The card's gap does that job here. */
+.pdf-annotations-modal-card .setting-item {
+	border-top: none;
+	padding: 0;
+}
+
+/* The search field sits straight under its name with no description between
+   them, so it takes a little air of its own. */
+.pdf-annotations-modal-card .search-input-container {
+	margin-top: 4px;
+}
+
+/* The toggle that asks for the dates has the list of them under it, which the
+   card's own gap already holds off; the row's padding would space the two twice
+   over. Named twice to outweigh Obsidian's own padding for a toggle row. */
+.pdf-annotations-modal-card.pdf-annotations-dates-card .setting-item.mod-toggle {
+	padding-bottom: 0;
+}
+
+/* Nothing on the left of the row for the button to sit beside, so it takes the
+   whole width rather than the sliver a setting row would leave it. */
+.pdf-annotations-modal-actions button {
+	width: 100%;
+	margin: 0;
+}
+
+/* The dates, inside the panel the toggle opens. The scrolling column is here
+   rather than on the panel itself: the panel is hidden by a class, which a
+   `display` of its own would be read after and override. A date is short, and a
+   PDF read over a year has more of them than a row would hold — so the list
+   scrolls instead of pushing the extract button off the modal. */
+.pdf-annotations-date-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 14em;
+	overflow-y: auto;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Same row as the annotation type checkboxes of the settings tab: the box next
+   to its label, both ordinary text rather than a heading's. */
+.pdf-annotations-date-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-normal);
+	color: var(--text-normal);
+}
+
+/* Obsidian sizes checkboxes for full-width setting rows; here one sits next to
+   its label. */
+.pdf-annotations-date-option input[type="checkbox"] {
+	margin: 0;
+	flex-shrink: 0;
+}
+
+/* What stands in the list while the PDF is being read, and for a PDF that had
+   nothing to list. */
+.pdf-annotations-date-message {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
 }

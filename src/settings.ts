@@ -13,6 +13,7 @@ import {
 } from "obsidian";
 import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
+import { createCollapsible } from "src/collapsible";
 import { asIndexable } from "src/types";
 
 // The variable names are the interface — what a template types — so they live
@@ -807,65 +808,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * A panel that shows and hides with the motion the accordion opens with:
-	 * height and opacity over the same 180ms. Returns the function that puts it
-	 * one way or the other, which takes `animate` — the first showing, when the
-	 * tab is drawn, has nothing to animate from.
-	 *
-	 * Hidden is `display: none` once the animation has finished rather than a
-	 * height of zero, so a hidden panel leaves nothing behind: no gap in the
-	 * settings it sits between, and nothing for a tab key to land in. Reversing
-	 * mid-animation picks up from the height on screen, and anyone who has asked
-	 * for less motion is simply shown the panel or not.
-	 */
-	createCollapsible(
-		panel: HTMLElement
-	): (shown: boolean, animate: boolean) => void {
-		let animation: Animation | null = null;
-
-		return (shown: boolean, animate: boolean) => {
-			const reduceMotion = window.matchMedia(
-				"(prefers-reduced-motion: reduce)"
-			).matches;
-
-			if (!animate || reduceMotion) {
-				animation?.cancel();
-				animation = null;
-				panel.toggleClass("pdf-annotations-collapsed", !shown);
-				return;
-			}
-
-			// Measured before cancelling, while it is still the height on
-			// screen rather than the natural one.
-			const interrupted = animation !== null;
-			const onScreen = interrupted
-				? panel.getBoundingClientRect().height
-				: 0;
-			animation?.cancel();
-
-			// Shown before it is measured: `display: none` has no height. The
-			// animation writes no style of its own, so what is measured is the
-			// natural height either way.
-			panel.removeClass("pdf-annotations-collapsed");
-			const full = panel.scrollHeight;
-			const from = interrupted ? onScreen : shown ? 0 : full;
-			const to = shown ? full : 0;
-
-			animation = panel.animate(
-				{
-					height: [`${from}px`, `${to}px`],
-					opacity: shown ? [0, 1] : [1, 0],
-				},
-				{ duration: 180, easing: "ease-in-out" }
-			);
-			animation.onfinish = () => {
-				animation = null;
-				if (!shown) panel.addClass("pdf-annotations-collapsed");
-			};
-		};
-	}
-
-	/**
 	 * Put a numbered gutter beside a template's text area. The text area is
 	 * wrapped in a box it now shares with the gutter, which is redrawn as lines
 	 * come and go and scrolled in step with it.
@@ -1304,20 +1246,23 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		const noteTargetPanel = containerEl.createDiv({
 			cls: "pdf-annotations-collapsible",
 		});
-		showNoteTarget = this.createCollapsible(noteTargetPanel);
+		showNoteTarget = createCollapsible(noteTargetPanel);
 		const noteFolderSetting = new Setting(noteTargetPanel)
 			.setName(t.SETTING_NOTE_FOLDER_NAME)
 			.setDesc(t.SETTING_NOTE_FOLDER_DESC)
 			.addText((input) => {
 				input.setPlaceholder(t.PLACEHOLDER_VAULT_ROOT);
 				this.buildValueInput(input, "noteFolder");
-				new FolderSuggest(this.app, input.inputEl).onSelect(
-					async (folder) => {
-						input.setValue(folder);
-						this.plugin.settings.noteFolder = folder;
-						await this.plugin.saveSettings();
-					}
-				);
+				const suggest = new FolderSuggest(this.app, input.inputEl);
+				suggest.onSelect(async (folder) => {
+					input.setValue(folder);
+					this.plugin.settings.noteFolder = folder;
+					await this.plugin.saveSettings();
+					// Registering a callback takes the selection over, closing
+					// the popover included: left to itself it stays open over
+					// the field it has just answered.
+					suggest.close();
+				});
 			});
 		noteFolderSetting.settingEl.addClass("pdf-annotations-stacked-setting");
 		const noteSubfolderSetting = new Setting(noteTargetPanel)
@@ -1357,7 +1302,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		const oneNoteNamePanel = containerEl.createDiv({
 			cls: "pdf-annotations-collapsible",
 		});
-		showOneNoteName = this.createCollapsible(oneNoteNamePanel);
+		showOneNoteName = createCollapsible(oneNoteNamePanel);
 		const oneNoteNameSetting = new Setting(oneNoteNamePanel)
 			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
