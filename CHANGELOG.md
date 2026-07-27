@@ -17,6 +17,23 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Changed
 
+- The template variables in the settings tab are a table now, each with a button
+  that copies the variable to the clipboard.
+
+- **Breaking:** the four templates are now two. The separate templates for PDFs
+  inside and outside the vault differed only in how they linked the PDF, so that
+  job moved to a new `{{filelink}}` variable — a `[[wiki link]]` for a PDF in the
+  vault, the `file://` path for one outside it. What is left is one template for
+  annotations that mark up PDF text and one for annotations that only carry a
+  comment. `{{isExternal}}` is there for templates that need to word the two
+  cases differently.
+  On first load, `data.json` is folded into the new pair: your template for PDFs
+  inside the vault wins, with `[[{{filepath}}]]` rewritten to `{{filelink}}`. A
+  template for external PDFs that was customised on its own is adopted instead;
+  one that disagreed with a customised internal template is kept under
+  `legacyExternalTemplates` and reported with a notice, rather than dropped.
+  `{{filepath}}` still works everywhere it did.
+
 - The annotation types to extract are picked from a grid of checkboxes instead
   of being typed into a text field, so the type names can no longer be
   misspelled. Each checkbox is labelled with what the type means

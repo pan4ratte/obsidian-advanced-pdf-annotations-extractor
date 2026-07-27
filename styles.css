@@ -61,6 +61,98 @@
 	flex-shrink: 0;
 }
 
+/* Table of template variables. The name column is only as wide as its longest
+   variable, leaving the rest of the row to the description. */
+.pdf-annotations-variable-table {
+	width: 100%;
+    margin-bottom: 16px;
+    font-size: var(--font-ui-small);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--setting-items-radius);
+    padding: 0px 16px;
+    background: var(--setting-items-background);
+}
+
+.pdf-annotations-variable-table th {
+	text-align: left;
+	color: var(--text-muted);
+	font-weight: var(--font-medium);
+}
+
+.pdf-annotations-variable-table th,
+.pdf-annotations-variable-table td {
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding: 6px 12px 6px 0;
+	vertical-align: top;
+}
+
+.pdf-annotations-variable-table tr:last-child td {
+	border-bottom: none;
+}
+
+/* The name column is as narrow as its content: 1% is the shrink-to-fit idiom,
+   and nothing in it may wrap. */
+.pdf-annotations-variable-name {
+	width: 1%;
+	white-space: nowrap;
+}
+
+/* Variable and its copy button on one line, as a pill that fills with the
+   accent colour under the pointer. The whole pill copies, so the whole pill
+   takes the pointer cursor. */
+.pdf-annotations-variable {
+	display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: -8px;
+    padding: 4px 8px 4px 8px;
+    border-radius: var(--radius-l);
+    cursor: pointer;
+}
+
+.pdf-annotations-variable:hover,
+.pdf-annotations-variable:focus-within {
+	background-color: var(--tag-background-hover);
+    color: var(--tag-color-hover);
+    border-radius: 100px;
+}
+
+/* clickable-icon sizes for Obsidian's own toolbars, which is bulky in a table
+   row; shrink it to the line it sits on. It keeps its space when hidden, so
+   revealing it does not shift the pill. */
+.pdf-annotations-copy-button.clickable-icon {
+	padding: 2px;
+    height: 18px;
+    width: 18px;
+    flex-shrink: 0;
+    opacity: 0;
+}
+
+.pdf-annotations-variable:hover .pdf-annotations-copy-button,
+.pdf-annotations-variable:focus-within .pdf-annotations-copy-button {
+	opacity: 1;
+}
+
+/* Nothing hovers on a touch screen, so there the button is simply always on. */
+@media (hover: none) {
+	.pdf-annotations-copy-button.clickable-icon {
+		opacity: 1;
+	}
+}
+
+/* The pill is the hover surface; the button inside it takes the pill's colour
+   rather than painting its own background over it. */
+.pdf-annotations-copy-button.clickable-icon,
+.pdf-annotations-copy-button.clickable-icon:hover {
+	background-color: transparent;
+	color: inherit;
+}
+
+.pdf-annotations-copy-button .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
 /* Obsidian's heading rows are not meant to carry a description, so it sits
    tight under the name — the two here need the gap. Scoped to this plugin's own
    rows, since styles.css is loaded app-wide. */

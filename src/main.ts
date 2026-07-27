@@ -332,6 +332,24 @@ export default class PDFAnnotationPlugin extends Plugin {
 				);
 			this.settings.desiredAnnotations =
 				desiredAnnotations ?? [...DEFAULT_DESIRED_ANNOTATIONS];
+
+			// Written back at once, so data.json stops carrying the four
+			// template fields this version no longer reads.
+			const migration = PDFAnnotationPluginSetting.migrateTemplates(
+				loadedSettings,
+				this.settings
+			);
+			if (migration.migrated) {
+				await this.saveSettings();
+			}
+			if (migration.dropped.length > 0) {
+				new Notice(
+					`The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. Your template for ${migration.dropped.join(
+						" and "
+					)} of PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.`,
+					15000
+				);
+			}
 		}
 	}
 

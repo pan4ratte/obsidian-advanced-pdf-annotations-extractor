@@ -16,18 +16,22 @@ It can be used on single PDF files (see [`Extract from the current file` and `Ex
 	* `Highlight`, `Underline` and `Text` are enabled by default
 	* Purely graphical annotations (drawings, shapes, stamps, attachments) are not offered — there is nothing in them a markdown note could show
 * Styling
-	* Templates for different types of notes: notes from internal or external PDFs and highlights from internal or external PDFs. The distinction between internal and external exists, if one wants to use different links (internal `[[]]` links vs. external `file://` links). The following template variables are available and can be used by following the [Handlebars]('https://handlebarsjs.com/guide/expressions.html') syntax: 
-		- {{highlightedText}}: 'Highlighted text from PDF',
+	* Two templates: one for annotations that mark up PDF text, one for those that only carry a comment. Both are used for PDFs inside and outside the vault alike — `{{filelink}}` renders a `[[wiki link]]` for a PDF in the vault and the `file://` path for one outside it. The following template variables are available and can be used by following the [Handlebars]('https://handlebarsjs.com/guide/expressions.html') syntax: 
+		- {{highlightedText}}: 'Highlighted text from PDF' (empty in the note template),
 		- {{folder}}: 'Folder of PDF file',
 		- {{filename}}: 'File name of the PDF, without the extension',
 		- {{filepath}}: 'Path of PDF file',
+		- {{filelink}}: 'Link to the PDF, bracketed for the vault and plain for outside it',
 		- {{pageNumber}}: 'Page number of annotation with reference to PDF pages',
 		- {{pageLabel}}: 'Page label (page number defined by author)',
 		- {{author}}: 'Author of annotation',
 		- {{body}}: 'Body of annotation',
-		- {{topic}}: 'First line of the body, when sorting by topic is enabled'
+		- {{topic}}: 'First line of the body, when sorting by topic is enabled',
+		- {{isExternal}}: 'True for PDFs outside the vault, for `{{#if isExternal}}`'
 		
 		The annotation itself is available as `{{annotation}}` for anything without a shortcut, e.g. `{{annotation.subtype}}`.
+		
+		Upgrading from a version with four templates: the two you had for PDFs inside the vault are carried over, with `[[{{filepath}}]]` rewritten to `{{filelink}}`. An external template you had customised differently is kept in `data.json` under `legacyExternalTemplates` so you can copy it back.
 	* Structure
 		* Use structuring headlines or not, if you only want to display annotations in the specified template
 		* Use the first line of the comment as 'Topic' (and sort accordingly), or not

@@ -57,8 +57,23 @@ Two flags drive everything else, so nothing needs updating in parallel:
   highlight or the note template is used.
 - `desiredByDefault` — derives `DEFAULT_DESIRED_ANNOTATIONS`.
 
-The settings tab renders one checkbox per entry, so adding a subtype is a
-one-line change. `desiredAnnotations` is persisted as a list of subtype strings.
+The settings tab renders one checkbox per entry, labelled with `description`, so
+adding a subtype is a one-line change. `desiredAnnotations` is persisted as a
+list of subtype strings.
+
+## Templates
+
+Two, not four: `highlightTemplate` for the `marksUpText` subtypes and
+`noteTemplate` for the rest. Location is a template variable, not a setting —
+`{{filelink}}` renders `[[path]]` inside the vault and the bare `file://` path
+outside it, and `{{isExternal}}` is exposed for templates that need more than
+the link to differ. `isExternalFile` reaches the formatter from the command:
+true only for the clipboard path command.
+
+`PDFAnnotationPluginSetting.migrateTemplates` folds a `data.json` written by the
+four-template versions into the pair, reading the old keys off the raw loaded
+object since they are no longer fields. Keep the legacy defaults it compares
+against byte-exact — a mismatch makes an untouched default look customised.
 
 ## Source layout (flat, not a monorepo)
 

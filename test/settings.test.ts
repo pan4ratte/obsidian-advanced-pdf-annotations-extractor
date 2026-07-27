@@ -93,6 +93,100 @@ describe('desired annotation checkboxes', () => {
   });
 });
 
+describe('migrateTemplates', () => {
+  // The four fields as the versions before {{filelink}} wrote them.
+  const LEGACY_DEFAULTS = {
+    noteTemplateInternalPDFs:
+      '{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n',
+    noteTemplateExternalPDFs:
+      '{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} on {{filepath}}*\n\n',
+    highlightTemplateInternalPDFs:
+      '> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on [[{{filepath}}]]*\n\n',
+    highlightTemplateExternalPDFs:
+      '> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} on {{filepath}}*\n\n',
+  };
+
+  const migrate = (loaded: Record<string, unknown>) => {
+    const settings = new PDFAnnotationPluginSetting();
+    const result = PDFAnnotationPluginSetting.migrateTemplates(loaded, settings);
+    return {settings, ...result};
+  };
+
+  test('leaves a data.json without the old fields alone', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    const {settings, migrated, dropped} = migrate({sortByTopic: false});
+    expect(migrated).toBe(false);
+    expect(dropped).toEqual([]);
+    expect(settings.noteTemplate).toBe(defaults.noteTemplate);
+    expect(settings.highlightTemplate).toBe(defaults.highlightTemplate);
+  });
+
+  test('untouched old defaults become the new defaults', () => {
+    const defaults = new PDFAnnotationPluginSetting();
+    const {settings, migrated, dropped} = migrate({...LEGACY_DEFAULTS});
+    expect(migrated).toBe(true);
+    expect(dropped).toEqual([]);
+    expect(settings.noteTemplate).toBe(defaults.noteTemplate);
+    expect(settings.highlightTemplate).toBe(defaults.highlightTemplate);
+    expect(settings.legacyExternalTemplates).toEqual({});
+  });
+
+  test('a customised internal template keeps its edit, with the link folded in', () => {
+    const {settings, dropped} = migrate({
+      ...LEGACY_DEFAULTS,
+      noteTemplateInternalPDFs: '{{body}} — [[{{filepath}}]] p{{pageNumber}}',
+    });
+    expect(settings.noteTemplate).toBe('{{body}} — {{filelink}} p{{pageNumber}}');
+    expect(dropped).toEqual([]);
+  });
+
+  test('a customised external template is adopted when the internal one is untouched', () => {
+    const {settings, dropped} = migrate({
+      ...LEGACY_DEFAULTS,
+      highlightTemplateExternalPDFs: '> {{highlightedText}} ({{filepath}})',
+    });
+    expect(settings.highlightTemplate).toBe('> {{highlightedText}} ({{filelink}})');
+    expect(dropped).toEqual([]);
+  });
+
+  test('a pair edited the same way apart from the link loses nothing', () => {
+    const {settings, dropped} = migrate({
+      ...LEGACY_DEFAULTS,
+      noteTemplateInternalPDFs: '{{body}} @[[{{filepath}}]]',
+      noteTemplateExternalPDFs: '{{body}} @{{filepath}}',
+    });
+    expect(settings.noteTemplate).toBe('{{body}} @{{filelink}}');
+    expect(dropped).toEqual([]);
+    expect(settings.legacyExternalTemplates).toEqual({});
+  });
+
+  test('an external template saying something else is stashed, not discarded', () => {
+    const {settings, migrated, dropped} = migrate({
+      ...LEGACY_DEFAULTS,
+      noteTemplateInternalPDFs: '{{body}} @[[{{filepath}}]]',
+      noteTemplateExternalPDFs: 'EXTERNAL {{body}} @{{filepath}}',
+    });
+    expect(migrated).toBe(true);
+    expect(settings.noteTemplate).toBe('{{body}} @{{filelink}}');
+    expect(dropped).toEqual(['notes']);
+    expect(settings.legacyExternalTemplates).toEqual({
+      noteTemplateExternalPDFs: 'EXTERNAL {{body}} @{{filepath}}',
+    });
+  });
+
+  test('does not run twice over an already collapsed data.json', () => {
+    const {settings, migrated} = migrate({
+      noteTemplate: 'mine {{filelink}}',
+      highlightTemplate: 'mine too {{filelink}}',
+      noteTemplateInternalPDFs: '{{body}} stale [[{{filepath}}]]',
+    });
+    // The loader copies the collapsed fields itself; migration must not
+    // overwrite them with the leftovers of the old ones.
+    expect(migrated).toBe(false);
+    expect(settings.noteTemplate).not.toContain('stale');
+  });
+});
+
 describe('normalizeDesiredAnnotations', () => {
   const normalize = (value: unknown) =>
     PDFAnnotationPluginSetting.normalizeDesiredAnnotations(value);

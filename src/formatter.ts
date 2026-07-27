@@ -51,17 +51,9 @@ export class PDFAnnotationPluginFormatter {
 			}
 
 			if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {
-				if (isExternalFile) {
-					text += this.getContentForHighlightFromExternalPDF(anno);
-				} else {
-					text += this.getContentForHighlightFromInternalPDF(anno);
-				}
+				text += this.getContentForHighlight(anno, isExternalFile);
 			} else {
-				if (isExternalFile) {
-					text += this.getContentForNoteFromExternalPDF(anno);
-				} else {
-					text += this.getContentForNoteFromInternalPDF(anno);
-				}
+				text += this.getContentForNote(anno, isExternalFile);
 			}
 		});
 
@@ -69,42 +61,35 @@ export class PDFAnnotationPluginFormatter {
 		else return text;
 	}
 
-	get noteFromExternalPDFsTemplate(): Template {
+	get noteTemplate(): Template {
 		return compileTemplate(
-			this.settings.noteTemplateExternalPDFs,
+			this.settings.noteTemplate,
 			this.templateSettings
 		);
 	}
 
-	get noteFromInternalPDFsTemplate(): Template {
+	get highlightTemplate(): Template {
 		return compileTemplate(
-			this.settings.noteTemplateInternalPDFs,
-			this.templateSettings
-		);
-	}
-
-	get highlightFromExternalPDFsTemplate(): Template {
-		return compileTemplate(
-			this.settings.highlightTemplateExternalPDFs,
-			this.templateSettings
-		);
-	}
-
-	get highlightFromInternalPDFsTemplate(): Template {
-		return compileTemplate(
-			this.settings.highlightTemplateInternalPDFs,
+			this.settings.highlightTemplate,
 			this.templateSettings
 		);
 	}
 
 	getTemplateVariablesForAnnotation(
-		annotation: PDFAnnotation
+		annotation: PDFAnnotation,
+		isExternalFile: boolean
 	): Record<string, unknown> {
 		const shortcuts = {
 			highlightedText: annotation.highlightedText,
 			folder: annotation.folder,
 			filename: annotation.file.basename,
 			filepath: annotation.filepath,
+			// One template serves both locations: a PDF in the vault is worth a
+			// wiki link, one outside it is already a file:// URL.
+			filelink: isExternalFile
+				? annotation.filepath
+				: `[[${annotation.filepath}]]`,
+			isExternal: isExternalFile,
 			pageNumber: annotation.pageNumber,
 			pageLabel: annotation.pageLabel,
 			author: annotation.author,
@@ -115,27 +100,21 @@ export class PDFAnnotationPluginFormatter {
 		return { annotation: annotation, ...shortcuts };
 	}
 
-	getContentForNoteFromExternalPDF(annotation: PDFAnnotation): string {
-		return this.noteFromExternalPDFsTemplate(
-			this.getTemplateVariablesForAnnotation(annotation)
+	getContentForNote(
+		annotation: PDFAnnotation,
+		isExternalFile: boolean
+	): string {
+		return this.noteTemplate(
+			this.getTemplateVariablesForAnnotation(annotation, isExternalFile)
 		);
 	}
 
-	getContentForNoteFromInternalPDF(annotation: PDFAnnotation): string {
-		return this.noteFromInternalPDFsTemplate(
-			this.getTemplateVariablesForAnnotation(annotation)
-		);
-	}
-
-	getContentForHighlightFromExternalPDF(annotation: PDFAnnotation): string {
-		return this.highlightFromExternalPDFsTemplate(
-			this.getTemplateVariablesForAnnotation(annotation)
-		);
-	}
-
-	getContentForHighlightFromInternalPDF(annotation: PDFAnnotation): string {
-		return this.highlightFromInternalPDFsTemplate(
-			this.getTemplateVariablesForAnnotation(annotation)
+	getContentForHighlight(
+		annotation: PDFAnnotation,
+		isExternalFile: boolean
+	): string {
+		return this.highlightTemplate(
+			this.getTemplateVariablesForAnnotation(annotation, isExternalFile)
 		);
 	}
 }

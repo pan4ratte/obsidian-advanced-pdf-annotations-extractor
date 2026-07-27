@@ -23,8 +23,8 @@ function annotation(over: Partial<PDFAnnotation> = {}): PDFAnnotation {
 function formatterWith(template: string) {
   const settings = new PDFAnnotationPluginSetting();
   settings.useStructuringHeadlines = false;
-  settings.noteTemplateInternalPDFs = template;
-  settings.highlightTemplateInternalPDFs = `HIGHLIGHT ${template}`;
+  settings.noteTemplate = template;
+  settings.highlightTemplate = `HIGHLIGHT ${template}`;
   return new PDFAnnotationPluginFormatter(settings);
 }
 
@@ -63,5 +63,29 @@ describe('template variables', () => {
 
   test('reports when there is nothing to render', () => {
     expect(formatterWith('{{body}}').format([], false)).toBe('*No Annotations*');
+  });
+});
+
+describe('filelink', () => {
+  test('is a wiki link for a PDF in the vault, the plain path for one outside', () => {
+    const formatter = formatterWith('{{filelink}}');
+    expect(formatter.format([annotation()], false)).toBe('[[refs/Paper.pdf]]');
+    expect(
+      formatter.format([annotation({filepath: 'file://C:/Books/Paper.pdf'})], true)
+    ).toBe('file://C:/Books/Paper.pdf');
+  });
+
+  test('isExternal lets one template still word the two cases differently', () => {
+    const formatter = formatterWith('{{#if isExternal}}outside{{else}}inside{{/if}}');
+    expect(formatter.format([annotation()], false)).toBe('inside');
+    expect(formatter.format([annotation()], true)).toBe('outside');
+  });
+
+  test('the defaults link the PDF both ways without being edited', () => {
+    const settings = new PDFAnnotationPluginSetting();
+    settings.useStructuringHeadlines = false;
+    const formatter = new PDFAnnotationPluginFormatter(settings);
+    expect(formatter.format([annotation()], false)).toContain('[[refs/Paper.pdf]]');
+    expect(formatter.format([annotation()], true)).toContain(' on refs/Paper.pdf');
   });
 });
