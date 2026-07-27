@@ -34,7 +34,20 @@ export class PDFAnnotationPluginFormatter {
 		this.settings = settings;
 	}
 
-	format(grandtotal: PDFAnnotation[], isExternalFile: boolean): string {
+	/**
+	 * `onePerNote` says the note being written holds this one annotation and
+	 * nothing else, as the 'note per annotation' commands write them. The
+	 * headings that group have nothing to group there — a day, a folder and a
+	 * file heading over a single annotation say what the note is, one line at a
+	 * time, before it has said anything itself — so they are left out. The topic
+	 * heading is not: a topic is what the annotation is about rather than where
+	 * it came from, and it has a setting of its own for going into the name.
+	 */
+	format(
+		grandtotal: PDFAnnotation[],
+		isExternalFile: boolean,
+		onePerNote = false
+	): string {
 		// now iterate over the annotations printing topics, then folder, then comments...
 		let text = "";
 		let topic = "";
@@ -63,13 +76,16 @@ export class PDFAnnotationPluginFormatter {
 		const headingTopics =
 			this.settings.topicHeading && this.settings.sortByTopic;
 		const headingDates =
-			this.settings.dateHeading && this.settings.groupByDate;
+			this.settings.dateHeading &&
+			this.settings.groupByDate &&
+			!onePerNote;
+		const headingFiles =
+			this.settings.fileHeading !== "none" && !onePerNote;
 
 		// So one unchanging label heads the note rather than marking a place
 		// inside it: written once, above everything rather than under the first
 		// of them.
-		const headsTheNote =
-			!labelVaries && this.settings.fileHeading !== "none";
+		const headsTheNote = !labelVaries && headingFiles;
 
 		// Whichever heading encloses the others takes the first level, so the
 		// note reads as an outline whichever of them are written: the one file
@@ -79,7 +95,7 @@ export class PDFAnnotationPluginFormatter {
 			headsTheNote,
 			headingDates,
 			headingTopics,
-			!headsTheNote && this.settings.fileHeading !== "none",
+			!headsTheNote && headingFiles,
 		]);
 
 		if (headsTheNote && grandtotal.length > 0) {
@@ -107,7 +123,7 @@ export class PDFAnnotationPluginFormatter {
 				}
 			}
 
-			if (this.settings.fileHeading !== "none") {
+			if (headingFiles) {
 				const label = labelFor(anno);
 				if (currentLabel != label) {
 					currentLabel = label;

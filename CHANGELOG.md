@@ -62,6 +62,15 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Changed
 
+- The notes made by the 'note per annotation' commands are written without the
+  headings that group: the day under *Add date headings* and the folder or file
+  under *Add file headings*. A note holding one annotation has nothing to group
+  by them, so they only said what the note was — a day, then a folder, then the
+  annotation — one heading at a time before it said anything itself. The topic
+  heading stays: a topic is what the annotation is about rather than where it
+  came from, and *Put the topic of the annotation to the note name* is there for
+  taking it out. What is left takes the first heading level, as it does in any
+  note whose outer groupings are not written.
 - `{{topic}}` holds the comment's first line whether or not *Group by topic* is
   on. It was read only while grouping, so a template asking for it — in a note,
   a highlight, or the name of a note per annotation — rendered nothing at all

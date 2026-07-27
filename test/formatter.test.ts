@@ -235,6 +235,60 @@ describe('headings', () => {
   });
 });
 
+describe('a note holding one annotation and nothing else', () => {
+  /** As the 'note per annotation' commands write one. */
+  function alone(
+    over: Partial<PDFAnnotationPluginSetting>,
+    anno: PDFAnnotation
+  ) {
+    const settings = new PDFAnnotationPluginSetting();
+    settings.noteTemplate = '-\n';
+    Object.assign(settings, over);
+    return new PDFAnnotationPluginFormatter(settings).format(
+      [anno],
+      false,
+      true
+    );
+  }
+
+  const dated = annotation({topic: 'Method', created: '2024-01-15'});
+
+  test('is headed by neither the day nor the folder it was grouped by', () => {
+    expect(alone({groupByDate: true, fileHeading: 'folder'}, dated))
+      .toBe('# Method\n\n-\n');
+  });
+
+  test('is headed by neither the day nor the file it came from', () => {
+    expect(alone({groupByDate: true, fileHeading: 'file'}, dated))
+      .toBe('# Method\n\n-\n');
+  });
+
+  test('keeps the topic heading, which says what it is about', () => {
+    expect(alone({fileHeading: 'none'}, dated)).toBe('# Method\n\n-\n');
+  });
+
+  test('takes the first heading level once the groupings are gone', () => {
+    // The topic was a third-level heading under the day and the folder.
+    expect(alone({groupByDate: true, fileHeading: 'folder'}, dated))
+      .not.toContain('###');
+  });
+
+  test('is nothing but the template when the topic heads it no more', () => {
+    expect(
+      alone({groupByDate: true, fileHeading: 'folder', topicHeading: false}, dated)
+    ).toBe('-\n');
+  });
+
+  test('is written with every heading when it is not that kind of note', () => {
+    const settings = new PDFAnnotationPluginSetting();
+    settings.noteTemplate = '-\n';
+    Object.assign(settings, {groupByDate: true, fileHeading: 'folder'});
+    expect(
+      new PDFAnnotationPluginFormatter(settings).format([dated], false)
+    ).toBe('# refs\n\n## 2024-01-15\n\n### Method\n\n-\n');
+  });
+});
+
 describe('filelink', () => {
   test('is a wiki link for a PDF in the vault, the plain path for one outside', () => {
     const formatter = formatterWith('{{filelink}}');

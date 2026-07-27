@@ -166,7 +166,11 @@ export default class PDFAnnotationPlugin extends Plugin {
 				const topic = this.settings.topicToNoteName
 					? takeTopicForNoteName(anno, !this.settings.sortByTopic)
 					: null;
-				const note = this.formatter.format([anno], isExternalFile);
+				const note = this.formatter.format(
+					[anno],
+					isExternalFile,
+					true
+				);
 				const fileNameOfNote =
 					(topic === null
 						? this.getResolvedOneNotePerAnnotationName(
