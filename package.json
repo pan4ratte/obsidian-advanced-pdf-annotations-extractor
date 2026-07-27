@@ -1,5 +1,5 @@
 {
-	"name": "advanced-pdf-extractor",
+	"name": "advanced-annotations-extractor",
 	"version": "1.9.5",
 	"description": "Import all types of annotations from PDFs inside and outside your vault with advanced settings and templates",
 	"main": "main.js",
