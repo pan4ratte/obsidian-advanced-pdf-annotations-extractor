@@ -214,6 +214,11 @@ version number in the same commit that bumps `manifest.json` and `package.json`.
 
 ### Fixed
 
+- A command asked to write its notes beside the current file when no file is
+  open writes nothing and says so, rather than putting them in the vault root.
+  The commands that read a PDF from the path in the clipboard need nothing open
+  to run, so they were the ones that could be asked to follow a file that was
+  not there — and the notes landed at the root of the vault without a word.
 - Topics, folders and file names are ordered as a reader would order them
   rather than by the code points they are written from. `>` and `<` read every
   alphabet as if it were ASCII: `ё` fell after `я` instead of beside the `е` it

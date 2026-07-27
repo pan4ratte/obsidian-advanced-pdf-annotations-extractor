@@ -141,6 +141,19 @@ export default class PDFAnnotationPlugin extends Plugin {
 		isExternalFile: boolean,
 		onePerAnnotation = false
 	): Promise<void> {
+		// Notes that follow the file being looked at need one to follow. The
+		// commands that read a PDF from the clipboard need nothing open to run,
+		// so this is the case where there is no folder meant at all — and
+		// writing to the vault root instead would scatter notes somewhere
+		// nobody asked for, quietly.
+		if (
+			this.settings.noteLocation === "current" &&
+			!this.app.workspace.getActiveFile()
+		) {
+			new Notice(t.NOTICE_NO_CURRENT_FILE);
+			return;
+		}
+
 		const currentFolder = this.currentFolder();
 		const extractTags =
 			this.settings.extractTagsFromAnnotationsAsObsidianTags;
@@ -206,8 +219,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 	/**
 	 * The folder of the file being looked at, which the notes follow when they
-	 * are not going to a folder of their own. Empty for the vault root, and for
-	 * a command run with nothing open at all.
+	 * are not going to a folder of their own. Empty for the vault root — and
+	 * for nothing open at all, which `writeNotes` turns away before it asks.
 	 */
 	private currentFolder(): string {
 		return this.app.workspace.getActiveFile()?.parent?.path ?? "";

@@ -19,6 +19,7 @@ export default {
     NOTICE_CLIPBOARD_UNREADABLE: "The clipboard does not contain a readable file path.",
     NOTICE_EXTRACTION_FAILED: "Could not extract the annotations of this PDF.",
     NOTICE_NOTE_PATH_INVALID: "Could not create the note with the annotations: the vault will not take that path. Check the note folder, subfolder and name in the settings.",
+    NOTICE_NO_CURRENT_FILE: "Could not create the note with the annotations: no file is open for it to be put beside. Open one, or choose a specific folder in the vault as the created notes destination.",
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard.",
     NOTICE_TEMPLATES_COLLAPSED: "The templates for PDFs inside and outside the vault are now one per annotation kind — {{filelink}} links whichever the PDF is. A template of yours for PDFs outside the vault differed by more than the link, so it was kept in data.json under legacyExternalTemplates instead of being merged.",
