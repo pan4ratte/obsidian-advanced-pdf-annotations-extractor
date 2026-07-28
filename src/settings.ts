@@ -584,22 +584,27 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		const gutter = editor.createDiv({
 			cls: "pdf-annotations-template-gutter",
 		});
-		// The text area sits over a copy of its own text, which is what the
-		// marks are drawn on. The two share a box and their metrics, so a mark
-		// lands under exactly the characters it belongs to.
-		const field = editor.createDiv({
-			cls: "pdf-annotations-template-field",
-		});
-		const overlay = field.createDiv({
+		// A copy of the text area's own text for the marks to be drawn on. It
+		// is taken out of the flow entirely rather than made a box beside the
+		// gutter: the row it would join is laid out by Obsidian's own rules,
+		// which differ on a phone, and a layer that is not in the row cannot
+		// disturb them.
+		const overlay = editor.createDiv({
 			cls: "pdf-annotations-template-overlay",
 		});
-		field.appendChild(textarea);
+		editor.appendChild(textarea);
 		textarea.setAttr("wrap", "off");
 
 		const drawLineNumbers = () => {
 			const lines = textarea.value.split("\n").length;
 			gutter.setText(
 				Array.from({ length: lines }, (_, i) => i + 1).join("\n")
+			);
+			// The overlay starts where the numbers end, and they widen by a
+			// digit at every tenth line.
+			editor.style.setProperty(
+				"--pdf-annotations-gutter-width",
+				`${gutter.offsetWidth}px`
 			);
 		};
 
@@ -930,6 +935,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		const templateColumns = containerEl.createDiv({
 			cls: "pdf-annotations-template-columns",
 		});
+		// The card is a box of ours holding a setting row and the editor
+		// under it, rather than a setting row the editor is put inside. A
+		// setting row is Obsidian's to lay out, and how it lays one out on a
+		// phone is not how it lays one out on a desktop: an editor added to
+		// the row was carried off the side of the card there, and no rule
+		// here could reach past the one doing it.
+		const templateCard = templateColumns.createDiv({
+			cls: "pdf-annotations-template-card",
+		});
 
 		let editing = DEFAULT_TEMPLATE_KEY;
 		let editor!: TextAreaComponent;
@@ -959,7 +973,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			showUnfilledVariables(target);
 		};
 
-		const card = new Setting(templateColumns)
+		const card = new Setting(templateCard)
 			.setName(t.SETTING_TEMPLATE_NAME)
 			.setDesc(t.SETTING_TEMPLATE_DESC)
 			.addDropdown((dropdown) => {
@@ -999,14 +1013,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				showTemplate(editing);
 			});
 		card.settingEl.addClass("pdf-annotations-template-setting");
-		// Last child of the card, not of the picker's control: text and picker
-		// share a row with the editor across the width beneath them.
-		if (editorEl) card.settingEl.appendChild(editorEl);
+		// Under the setting row rather than inside it: text and picker share
+		// the row, the editor takes the width of the card beneath it.
+		if (editorEl) templateCard.appendChild(editorEl);
 		if (overlayEl) {
 			showUnfilledVariables = this.addVariableWarnings(
 				editor.inputEl,
 				overlayEl,
-				card.settingEl
+				templateCard
 			);
 			// The template on screen was shown before there was anything to
 			// mark it with.
