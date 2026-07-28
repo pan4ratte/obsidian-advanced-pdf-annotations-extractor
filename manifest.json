@@ -3,8 +3,8 @@
 	"name": "Classy PDF Extractor",
 	"version": "1.9.5",
 	"minAppVersion": "1.8.7",
-	"description": "Import all types of annotations from PDFs inside and outside your vault, with flexible settings and templates",
-	"author": "pan4ratte",
+	"description": "Allows you to import all types of annotations from PDFs inside and outside your vault, with flexible settings and templates",
+	"author": "pan4ratte"
 	"authorUrl": "https://github.com/pan4ratte/obsidian-classy-pdf-extractor",
 	"isDesktopOnly": false
 }
