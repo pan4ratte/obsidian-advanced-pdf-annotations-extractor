@@ -347,6 +347,18 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 	border-radius: var(--input-radius);
 }
 
+.is-mobile .pdf-annotations-template-editor {
+	/* What the layer of marks is placed against. */
+	position: relative;
+	display: flex;
+	width: 100%;
+	height: 13em;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	border: var(--input-border-width) solid var(--background-modifier-border);
+	border-radius: 8px;
+}
+
 .pdf-annotations-template-editor:focus-within {
 	border-color: var(--background-modifier-border-focus);
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
