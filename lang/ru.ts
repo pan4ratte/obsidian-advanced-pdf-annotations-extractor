@@ -60,8 +60,9 @@ export default {
     NOTE_NO_ANNOTATIONS: "*Аннотации не найдены*",
     NOTE_VAULT_ROOT: "Корень хранилища",
     NOTE_NO_DATE: "Без даты",
-    DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *выделено {{author}} на странице {{pageNumber}} в {{filelink}}*\n\n",
-    DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *заметка {{author}} на странице {{pageNumber}} в {{filelink}}*\n\n",
+    // The one template every annotation type starts on. `{{highlightedText}}`
+    // renders empty for the types that mark up nothing.
+    DEFAULT_NOTE_TEMPLATE: "{{highlightedText}}\n\n[с. {{pageLabel}}]\n\n{{body}}\n\n",
     DEFAULT_NOTE_NAME: "Аннотации из {{filename}}",
     DEFAULT_ONE_NOTE_NAME: "Аннотации из {{filename}}-{{counter}}",
     /** Names a note whose annotation has no comment to take a topic from. */

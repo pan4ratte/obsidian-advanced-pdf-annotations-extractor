@@ -16,7 +16,7 @@ We build on top of the other project, but we change literally verthing. This rel
 * **Any PDF, from the modal.** The file field searches the vault's PDFs and takes a path from outside it as well; a path already in the clipboard is filled in when it names a readable PDF.
 * **Pages by range or by label.** Type `25-50`, `25, 26, 30`, `25-50, 55, 88` or `i-viii`. *Look for page labels, not physical pages* reads them as the labels the author gave, so an arabic range never matches a roman label.
 * **Extract only certain days.** *Select dates for extraction* lists every day the file's annotations were made on, each of which can be left out. Undated annotations are their own entry.
-* **A template for every annotation type.** One card with a picker: *Default* writes every type, and picking a type writes that type instead. Emptying a type's template hands it back to the default.
+* **A template for every annotation type.** One card with a picker: *Default* writes every type, and picking a type writes that type instead. Emptying a type's template hands it back to the default. Out of the box every type is on the default, which writes the highlighted text, the page label and the comment.
 * **Group by creation date.** Keeps the annotations made on the same day together, with *Heading above each date* writing the day above them. Off by default.
 * **Name a note after its annotation's topic.** *Put the topic of the annotation to the note name* names each note per annotation after its comment's first line, and leaves that line out of the note.
 * **Ordering and headings are separate settings.** *Group by folder* decides the order, *Heading above each file* decides what is written between the annotations.

@@ -96,15 +96,13 @@ export const ANNOTS_TREATED_AS_HIGHLIGHTS = SUPPORTED_ANNOTS.filter(
 export const DEFAULT_TEMPLATE_KEY = "default";
 
 /**
- * Nothing to begin with, so the default covers every type — except those
- * marking up text, which would otherwise lose their `{{highlightedText}}`.
+ * Nothing to begin with, so `defaultTemplate` covers every type. It carries a
+ * `{{highlightedText}}` of its own, which renders empty for the types that mark
+ * up nothing, so none of them needs a template to start on.
  */
 export function defaultAnnotationTemplates(): Record<string, string> {
 	return Object.fromEntries(
-		SUPPORTED_ANNOTS.map(({ subtype, marksUpText }) => [
-			subtype,
-			marksUpText ? t.DEFAULT_HIGHLIGHT_TEMPLATE : "",
-		])
+		SUPPORTED_ANNOTS.map(({ subtype }) => [subtype, ""])
 	);
 }
 

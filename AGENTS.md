@@ -53,8 +53,7 @@ Two flags drive everything else, so nothing needs updating in parallel:
 - `marksUpText` — the four subtypes carrying `QuadPoints` (`Highlight`,
   `Underline`, `Squiggly`, `StrikeOut`, matching pdf.js's own
   `overlaysTextContent`). `ANNOTS_TREATED_AS_HIGHLIGHTS` is derived from it, and
-  it decides both whether the PDF text underneath is extracted and whether the
-  highlight or the note template is used.
+  it decides whether the PDF text underneath is extracted.
 - `desiredByDefault` — derives `DEFAULT_DESIRED_ANNOTATIONS`.
 
 The settings tab renders one checkbox per entry, labelled with `description`, so
@@ -64,11 +63,16 @@ list of subtype strings.
 ## Templates
 
 One per annotation type over a `defaultTemplate` that covers the types with
-none of their own; a blank entry means "use the default". Location is a template
-variable, not a setting — `{{filelink}}` renders `[[path]]` inside the vault and
-the bare `file://` path outside it, and `{{isExternal}}` is exposed for
-templates that need more than the link to differ. `isExternalFile` reaches the
-formatter from the command: true only for the clipboard path commands.
+none of their own; a blank entry means "use the default". **Every type starts
+blank**, so `DEFAULT_NOTE_TEMPLATE` in the locale is the only template a fresh
+install has — it carries a `{{highlightedText}}` that simply renders empty for
+the types marking up nothing. Don't reintroduce a second shipped template.
+
+Location is a template variable, not a setting — `{{filelink}}` renders
+`[[path]]` inside the vault and the bare `file://` path outside it, and
+`{{isExternal}}` is exposed for templates that need more than the link to
+differ. `isExternalFile` reaches the formatter from the command: true only for
+the clipboard path commands.
 
 ## Settings loading
 

@@ -62,8 +62,9 @@ export default {
     NOTE_NO_ANNOTATIONS: "*No annotations found*",
     NOTE_VAULT_ROOT: "Vault root",
     NOTE_NO_DATE: "No date",
-    DEFAULT_HIGHLIGHT_TEMPLATE: "> {{highlightedText}}\n\n{{body}}\n\n* *highlighted by {{author}} at page {{pageNumber}} in {{filelink}}*\n\n",
-    DEFAULT_NOTE_TEMPLATE: "{{body}}\n\n* *noted by {{author}} at page {{pageNumber}} in {{filelink}}*\n\n",
+    // The one template every annotation type starts on. `{{highlightedText}}`
+    // renders empty for the types that mark up nothing.
+    DEFAULT_NOTE_TEMPLATE: "{{highlightedText}}\n\n[p. {{pageLabel}}]\n\n{{body}}\n\n",
     DEFAULT_NOTE_NAME: "Annotations from {{filename}}",
     DEFAULT_ONE_NOTE_NAME: "Annotations from {{filename}}-{{counter}}",
     /** Names a note whose annotation has no comment to take a topic from. */

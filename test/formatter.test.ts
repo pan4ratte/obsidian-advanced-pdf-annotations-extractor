@@ -1,7 +1,7 @@
 import {describe, expect, test} from '@jest/globals';
 import {t} from '../lang/helpers';
 import {PDFAnnotationPluginFormatter} from '../src/formatter';
-import {PDFAnnotationPluginSetting} from '../src/settings';
+import {PDFAnnotationPluginSetting, SUPPORTED_ANNOTS} from '../src/settings';
 import {PDFAnnotation} from '../src/types';
 
 function annotation(over: Partial<PDFAnnotation> = {}): PDFAnnotation {
@@ -326,16 +326,19 @@ describe('filelink', () => {
     expect(formatter.format([annotation()], true)).toBe('outside');
   });
 
-  test('the defaults link the PDF both ways without being edited', () => {
+  test('every annotation type starts on the default template', () => {
+    // Nothing is pinned to a template of its own, so editing the default is
+    // enough to change how every type is written.
     const settings = new PDFAnnotationPluginSetting();
     settings.topicHeading = false;
-  settings.fileHeading = 'none';
+    settings.fileHeading = 'none';
+    settings.defaultTemplate = '{{type}} {{filelink}}\n';
     const formatter = new PDFAnnotationPluginFormatter(settings);
-    expect(formatter.format([annotation()], false)).toContain('[[refs/Paper.pdf]]');
-    // The bare path, and no wiki link anywhere around it. Asserted without the
-    // words either side, which belong to the template and so to the locale.
-    const external = formatter.format([annotation()], true);
-    expect(external).toContain('refs/Paper.pdf');
-    expect(external).not.toContain('[[');
+
+    for (const {subtype} of SUPPORTED_ANNOTS) {
+      expect(settings.annotationTemplates[subtype]).toBe('');
+      expect(formatter.format([annotation({subtype})], false))
+        .toBe(`${subtype} [[refs/Paper.pdf]]\n`);
+    }
   });
 });
