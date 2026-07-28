@@ -8,9 +8,9 @@ package.json. -->
 
 ## Unreleased
 
-### Initial release of the fork: advanced extraction, a template per annotation type, grouping by date
+### Initial release of the the plugin
 
-This release reworks how an extraction is asked for and what it writes. The choice of what to extract moved out of the settings and into the moment you ask for it, templates are now per annotation type, and the annotations can be grouped by the day they were made:
+We build on top of the other project, but we change literally verthing. This release reworks how an extraction is asked for and what it writes. The choice of what to extract moved out of the settings and into the moment you ask for it, templates are now per annotation type, and the annotations can be grouped by the day they were made:
 
 * **Extract annotations with advanced settings.** A command opening a modal that asks what to extract: the annotation types, the PDF, the pages, the dates and where the notes go.
 * **Any PDF, from the modal.** The file field searches the vault's PDFs and takes a path from outside it as well; a path already in the clipboard is filled in when it names a readable PDF.
