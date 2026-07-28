@@ -4,7 +4,7 @@ export default {
     // ─── Plugin ──────────────────────────────────────────────────────────────────
     // Also in manifest.json, which the plugin browser reads and no translation
     // can reach. Change both together.
-    PLUGIN_NAME: "Advanced PDF Extractor",
+    PLUGIN_NAME: "Classy PDF Extractor",
     PLUGIN_DESCRIPTION: "Import all types of annotations from PDFs inside and outside your vault, with flexible settings and templates.",
 
     // ─── Commands ────────────────────────────────────────────────────────────────

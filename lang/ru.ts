@@ -2,7 +2,7 @@ export default {
     // ─── Plugin ──────────────────────────────────────────────────────────────────
     // The name is the plugin's own and is left as manifest.json spells it, which
     // no translation can reach anyway.
-    PLUGIN_NAME: "Advanced PDF Extractor",
+    PLUGIN_NAME: "Classy PDF Extractor",
     PLUGIN_DESCRIPTION: "Импорт всех типов аннотаций из PDF внутри и вне вашего хранилища с гибкими настройками и шаблонами.",
 
     // ─── Commands ────────────────────────────────────────────────────────────────

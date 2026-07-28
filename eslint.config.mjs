@@ -84,7 +84,7 @@ export default defineConfig([
 				"warn",
 				{
 					brands: [
-						"Advanced PDF Annotations Extractor",
+						"Classy PDF Extractor",
 						"Obsidian",
 					],
 					ignoreWords: [

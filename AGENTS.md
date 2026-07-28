@@ -1,11 +1,11 @@
-# AGENTS.md — obsidian-extract-pdf-annotations
+# AGENTS.md — classy-pdf-extractor
 
 ## Commands
 
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | esbuild watch mode (no typecheck) |
-| `npm test` | Jest (ts-jest) — 187 tests, all passing |
+| `npm test` | Jest (ts-jest) — 192 tests, all passing |
 | `npm run lint` / `npm run lint:fix` | ESLint flat config with the official Obsidian ruleset |
 | `npm run build` | `tsc -noEmit -skipLibCheck && node esbuild.config.mjs production` |
 
