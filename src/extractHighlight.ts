@@ -7,10 +7,70 @@ import {
 	TextItem,
 } from "pdfjs-dist/types/src/display/api";
 
-/** A corner of a quad, in PDF user space. */
-interface QuadPoint {
-	x: number;
-	y: number;
+/** The box one quad covers, in PDF user space. */
+interface QuadBounds {
+	minx: number;
+	maxx: number;
+	miny: number;
+	maxy: number;
+}
+
+/**
+ * The box of quad `index`. A quad is four corners, which the spec orders
+ * tL, tR, bL, bR — but writers disagree, so the box is taken from the extremes
+ * rather than from named corners. That is what makes a highlight dragged right
+ * to left read the same as one dragged left to right.
+ */
+function quadBounds(quadPoints: ArrayLike<number>, index: number): QuadBounds {
+	const xs: number[] = [];
+	const ys: number[] = [];
+	for (let corner = 0; corner < 8; corner += 2) {
+		xs.push(quadPoints[index * 8 + corner]);
+		ys.push(quadPoints[index * 8 + corner + 1]);
+	}
+	return {
+		minx: Math.min(...xs),
+		maxx: Math.max(...xs),
+		miny: Math.min(...ys),
+		maxy: Math.max(...ys),
+	};
+}
+
+/**
+ * The quads in reading order: down the page, then left to right along each
+ * line. A PDF need not list them that way — a highlight dragged upwards is
+ * written bottom line first by some writers, which would otherwise join the
+ * lines back to front.
+ *
+ * Grouped into lines before being sorted within one, rather than compared
+ * pairwise against a tolerance: a comparator whose idea of "the same line"
+ * depends on the pair it is given is not transitive, and sorts by it come out
+ * arbitrary.
+ */
+function inReadingOrder(quads: QuadBounds[]): QuadBounds[] {
+	if (quads.length < 2) return quads;
+
+	// PDF y grows upwards, so the top of the page is the largest.
+	const down = [...quads].sort((a, b) => b.maxy - a.maxy);
+	// Half a line of the tallest quad: enough to keep the lines apart, loose
+	// enough that two quads on one line are not read as two.
+	const line = Math.max(...quads.map((quad) => quad.maxy - quad.miny)) / 2;
+
+	const lines: QuadBounds[][] = [];
+	for (const quad of down) {
+		const current = lines[lines.length - 1];
+		if (current && current[0].maxy - quad.maxy <= line) {
+			current.push(quad);
+		} else {
+			lines.push([quad]);
+		}
+	}
+
+	const ordered: QuadBounds[] = [];
+	for (const one of lines) {
+		ordered.push(...one.sort((a, b) => a.minx - b.minx));
+	}
+	return ordered;
 }
 
 /**
@@ -81,37 +141,20 @@ export function extractHighlight(
 	if (!annot.quadPoints) return "";
 
 	const quadPoints = annot.quadPoints;
-	const legacyQuadPoints: QuadPoint[][] = [];
-	// Recreate legacy quadPoints array, with the form [[{x: 1, y: 2}, {x: 3, y: 4}, {x: 5, y: 6}, {x: 7, y: 8}], ...]
-	// One quad is 4 points (x,y) in the order tL, tR, bL, bR, multiple quads for multiple lines
-	for (let i = 0; i < quadPoints.length / 8; i++) {
-		const oneQuad: QuadPoint[] = [];
-		for (let j = 0; j < 8; j = j + 2) {
-			oneQuad.push({
-				x: quadPoints[j + i * 8],
-				y: quadPoints[j + 1 + i * 8],
-			});
-		}
-		legacyQuadPoints.push(oneQuad);
+	// One quad per line of marked up text, four corners each.
+	const quads: QuadBounds[] = [];
+	for (let index = 0; index < quadPoints.length / 8; index++) {
+		quads.push(quadBounds(quadPoints, index));
 	}
-	const highlight = legacyQuadPoints.reduce((txt: string, quad: QuadPoint[]) => {
-		const minx = quad.reduce(
-			(prev: number, curr: QuadPoint) => Math.min(prev, curr.x),
-			quad[0].x
+
+	const highlight = inReadingOrder(quads).reduce((txt: string, quad) => {
+		const res = searchQuad(
+			quad.minx,
+			quad.maxx,
+			quad.miny,
+			quad.maxy,
+			items
 		);
-		const maxx = quad.reduce(
-			(prev: number, curr: QuadPoint) => Math.max(prev, curr.x),
-			quad[0].x
-		);
-		const miny = quad.reduce(
-			(prev: number, curr: QuadPoint) => Math.min(prev, curr.y),
-			quad[0].y
-		);
-		const maxy = quad.reduce(
-			(prev: number, curr: QuadPoint) => Math.max(prev, curr.y),
-			quad[0].y
-		);
-		const res = searchQuad(minx, maxx, miny, maxy, items);
 		// if the last character of txt (previous lines) is not a hyphen, we concatenate the lines, by adding a blank
 		if (txt != "" && txt.substring(txt.length - 1) != "-") {
 			return txt + " " + res;

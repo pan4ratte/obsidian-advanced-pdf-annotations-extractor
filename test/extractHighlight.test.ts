@@ -161,6 +161,54 @@ describe('extractHighlight - simple text', () => {
     expect(result).toBe('die');
   });
 });
+describe('extractHighlight - the order the quads arrive in', () => {
+  // Three lines of a page, 20 units apart. PDF y grows upwards, so the first
+  // of them is the highest number.
+  const items = [
+    {str: 'first line', transform: [12, 0, 0, 12, 70, 700], width: 55},
+    {str: 'second line', transform: [12, 0, 0, 12, 70, 680], width: 60},
+    {str: 'third line', transform: [12, 0, 0, 12, 70, 660], width: 55},
+  ];
+
+  /** One quad, corner by corner: tL, tR, bL, bR. */
+  const quad = (x1: number, x2: number, top: number, bottom: number) =>
+    [x1, top, x2, top, x1, bottom, x2, bottom];
+
+  const one = quad(70, 125, 706, 698);
+  const two = quad(70, 130, 686, 678);
+  const three = quad(70, 125, 666, 658);
+
+  test('reads the lines down the page when the quads already are', () => {
+    expect(extractHighlight({quadPoints: [...one, ...two, ...three]}, items))
+      .toBe('first line second line third line');
+  });
+
+  test('reads them down the page when the quads run bottom to top', () => {
+    // What some writers produce for a highlight dragged upwards. Read in the
+    // order given, this used to come out with the lines reversed.
+    expect(extractHighlight({quadPoints: [...three, ...two, ...one]}, items))
+      .toBe('first line second line third line');
+  });
+
+  test('reads them down the page when the quads are in no order at all', () => {
+    expect(extractHighlight({quadPoints: [...two, ...three, ...one]}, items))
+      .toBe('first line second line third line');
+  });
+
+  test('a quad drawn from its right edge covers the same text', () => {
+    // tR, tL, bR, bL — the same rectangle as `one`, corners the other way.
+    const backwards = [125, 706, 70, 706, 125, 698, 70, 698];
+    expect(extractHighlight({quadPoints: backwards}, items)).toBe('first line');
+  });
+
+  test('two quads on one line are read left to right, whichever came first', () => {
+    const left = quad(70, 95, 706, 698);
+    const right = quad(95, 125, 706, 698);
+    expect(extractHighlight({quadPoints: [...right, ...left]}, items))
+      .toBe(extractHighlight({quadPoints: [...left, ...right]}, items));
+  });
+});
+
 describe('extractHighlight - malformed annotations', () => {
   test('returns no text when pdf.js reports no usable quadPoints', () => {
     expect(extractHighlight({quadPoints: null}, [])).toBe('');

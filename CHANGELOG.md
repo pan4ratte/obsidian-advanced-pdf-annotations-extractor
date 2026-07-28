@@ -62,6 +62,7 @@ Please note: the fork has a plugin id of its own, so it starts from its own sett
 * Fixed heading levels, which put an `h2` over the `h1`s in a note headed by its file. Whichever heading encloses the other takes the first level now.
 * Fixed a bug where `{{file}}` rendered `[object Object]`. Replaced by `{{filename}}`; `{{annotation.file}}` still holds the file itself.
 * Fixed a bug where highlights covering one or two characters returned the neighbouring letter — `Word,` highlighted on `o` yielded `r`.
+* Fixed a bug where a highlight spanning several lines came out with its lines reversed. Some readers write the quads of a highlight dragged upwards bottom line first, and they were joined in the order given; they are now put into reading order — down the page, then left to right along each line.
 * Fixed a bug where a text markup annotation with `QuadPoints` pdf.js cannot use failed the extraction of the whole file.
 * Fixed a bug where notes were written without being awaited for a note per annotation, so concurrent writes could race and failures were swallowed.
 * Fixed a bug where reading a PDF from a path outside the vault tried to use Node's `fs` on mobile instead of reporting the command as desktop only.
