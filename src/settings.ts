@@ -77,11 +77,11 @@ export const SUPPORTED_ANNOTS: SupportedAnnotation[] = [
 		subtype: "StrikeOut",
 		description: t.ANNOT_STRIKEOUT,
 		marksUpText: true,
+		desiredByDefault: true,
 	},
 	{
 		subtype: "Text",
 		description: t.ANNOT_TEXT,
-		desiredByDefault: true,
 	},
 	{ subtype: "FreeText", description: t.ANNOT_FREE_TEXT },
 ];
@@ -309,11 +309,19 @@ export class PDFAnnotationPluginSetting {
 	constructor() {
 		this.topicHeading = true;
 		this.dateHeading = true;
-		this.fileHeading = "folder";
-		this.groupByFolder = true;
+		// One PDF at a time is the usual extraction, and a heading naming the
+		// one folder or the one file it came from says nothing the reader did
+		// not already know.
+		this.fileHeading = "none";
+		this.groupByFolder = false;
 		// Off, so an upgrade does not reorder notes nobody asked to reorder.
 		this.groupByDate = false;
 		this.sortByTopic = true;
+		// A folder of the vault's own, which is somewhere whether or not
+		// anything is open: an extraction from a path in the clipboard, run
+		// from the command palette with no file in front of the reader, has
+		// nowhere to go if the notes are to follow what is open. Empty until
+		// a folder is named, which is the vault's root.
 		this.noteLocation = "vault";
 		this.noteFolder = "";
 		this.noteSubfolder = "";
@@ -323,10 +331,17 @@ export class PDFAnnotationPluginSetting {
 		this.annotationTemplates = defaultAnnotationTemplates();
 		this.oneNotePerAnnotationName =
 			t.DEFAULT_ONE_NOTE_NAME;
-		// Off, so the name template keeps naming the notes it named before.
-		this.topicToNoteName = false;
-		this.overwriteExistingNote = false;
-		this.extractTags = "never";
+		// A note per annotation is worth finding by what it is about, and the
+		// first line of the comment is what the reader wrote to say so.
+		this.topicToNoteName = true;
+		// A second extraction of the same PDF is nearly always a corrected
+		// first one, so it replaces what it corrects rather than piling up
+		// beside it.
+		this.overwriteExistingNote = true;
+		// On a note per annotation a tag in the comment is that annotation's
+		// own subject, which is exactly what a note property is for. On one
+		// note holding all of them the same tag would claim the whole PDF.
+		this.extractTags = "separate";
 	}
 
 	/**

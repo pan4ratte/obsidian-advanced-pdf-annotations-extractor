@@ -124,12 +124,14 @@ describe('findVariableUses', () => {
 });
 
 describe('desired annotation checkboxes', () => {
-  test('defaults to notes, highlights and underlines', () => {
+  test('defaults to the marked up text: highlights, underlines, strikeouts', () => {
     const s = new PDFAnnotationPluginSetting();
-    expect(s.desiredAnnotations).toEqual(['Highlight', 'Underline', 'Text']);
+    expect(s.desiredAnnotations).toEqual([
+      'Highlight', 'Underline', 'StrikeOut',
+    ]);
     expect(s.desiredAnnotations).toEqual(DEFAULT_DESIRED_ANNOTATIONS);
-    expect(s.isAnnotationDesired('Text')).toBe(true);
-    expect(s.isAnnotationDesired('StrikeOut')).toBe(false);
+    expect(s.isAnnotationDesired('StrikeOut')).toBe(true);
+    expect(s.isAnnotationDesired('Text')).toBe(false);
   });
 
   test('the default array is not shared between instances', () => {
@@ -140,19 +142,28 @@ describe('desired annotation checkboxes', () => {
     expect(DEFAULT_DESIRED_ANNOTATIONS).not.toContain('Squiggly');
   });
 
+  test('every default is a type the plugin actually supports', () => {
+    const subtypes = SUPPORTED_ANNOTS.map((a) => a.subtype);
+    for (const desired of DEFAULT_DESIRED_ANNOTATIONS) {
+      expect(subtypes).toContain(desired);
+    }
+  });
+
   test('checking a box keeps the listed type order', () => {
     const s = new PDFAnnotationPluginSetting();
+    // One appended and one inserted in the middle, so an order that only
+    // happened to hold at the end would not pass.
     s.setAnnotationDesired('FreeText', true);
-    s.setAnnotationDesired('StrikeOut', true);
+    s.setAnnotationDesired('Squiggly', true);
     expect(s.desiredAnnotations).toEqual([
-      'Highlight', 'Underline', 'StrikeOut', 'Text', 'FreeText',
+      'Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'FreeText',
     ]);
   });
 
   test('unchecking removes only that type', () => {
     const s = new PDFAnnotationPluginSetting();
     s.setAnnotationDesired('Highlight', false);
-    expect(s.desiredAnnotations).toEqual(['Underline', 'Text']);
+    expect(s.desiredAnnotations).toEqual(['Underline', 'StrikeOut']);
   });
 
   test('checking a box twice does not duplicate it', () => {
@@ -179,8 +190,8 @@ describe('desired annotation checkboxes', () => {
 });
 
 describe('naming a note per annotation after its topic', () => {
-  test('is off, so the name template keeps naming what it named', () => {
-    expect(new PDFAnnotationPluginSetting().topicToNoteName).toBe(false);
+  test('is on, so a note is found by what its comment says it is about', () => {
+    expect(new PDFAnnotationPluginSetting().topicToNoteName).toBe(true);
   });
 
   test('names a note whose annotation has no comment by number', () => {
@@ -329,8 +340,15 @@ describe('tag extraction', () => {
   const normalize = (value: unknown) =>
     PDFAnnotationPluginSetting.normalizeTagExtraction(value);
 
-  test('starts off', () => {
-    expect(new PDFAnnotationPluginSetting().extractTags).toBe('never');
+  test('starts on the notes where a tag is that annotation\'s own subject', () => {
+    expect(new PDFAnnotationPluginSetting().extractTags).toBe('separate');
+  });
+
+  // The default and the fallback are separate choices: an unreadable value is
+  // not an invitation to start moving tags the reader never asked to move.
+  test('an unreadable value still falls back to never, not to the default', () => {
+    expect(normalize('sometimes')).toBe('never');
+    expect(new PDFAnnotationPluginSetting().extractTags).not.toBe('never');
   });
 
   test('a mode this version knows is kept', () => {
