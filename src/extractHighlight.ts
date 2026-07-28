@@ -98,6 +98,36 @@ export function pdfDateToDay(raw: string | null | undefined): string | undefined
 }
 
 /**
+ * The hours and minutes following a whole `D:YYYYMMDD`. Nothing shorter is
+ * read: in a date cut off before the day, four more digits would be the day
+ * and month of something else, not a time.
+ */
+const PDF_TIME = /^(?:D:)?\d{8}(\d{2})(\d{2})?/;
+
+/**
+ * The time of day a PDF date names, as `HH:mm`, read as the writer wrote it.
+ * The zone that may follow is left alone for the reason the day leaves it
+ * alone: applying it would move the annotation depending on where it is read,
+ * and then the time would no longer be the one on the reader's own screen when
+ * they made the note. Undefined when the date carries no time, which many
+ * writers omit.
+ */
+export function pdfDateToTime(
+	raw: string | null | undefined
+): string | undefined {
+	if (!raw) return undefined;
+	const parsed = PDF_TIME.exec(raw.trim());
+	if (!parsed) return undefined;
+
+	const [, hour, minute = "00"] = parsed;
+	// 24 is midnight in some writers' output, but not a time to print.
+	if (Number(hour) > 23) return undefined;
+	if (Number(minute) > 59) return undefined;
+
+	return `${hour}:${minute}`;
+}
+
+/**
  * What the extraction reads off a pdf.js text item. A `TextItem` satisfies it;
  * the matrix is restated because pdf.js types `transform` as `any[]`.
  */
@@ -215,6 +245,7 @@ async function loadPage(
 			author: raw.titleObj.str,
 			body: raw.contentsObj.str,
 			created: pdfDateToDay(raw.creationDate),
+			createdTime: pdfDateToTime(raw.creationDate),
 		};
 
 		if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {

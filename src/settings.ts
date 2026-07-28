@@ -32,6 +32,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
 	type: t.VAR_TYPE,
 	topic: t.VAR_TOPIC,
 	created: t.VAR_CREATED,
+	createdTime: t.VAR_CREATED_TIME,
 	isExternal: t.VAR_IS_EXTERNAL,
 };
 
@@ -116,6 +117,49 @@ export function templateForAnnotation(
 ): string {
 	const own = settings.annotationTemplates?.[subtype] ?? "";
 	return own.trim().length > 0 ? own : settings.defaultTemplate;
+}
+
+/**
+ * The variables this type leaves empty however a template asks for them, and
+ * the type's own name to say so with. Only the text markup types carry the PDF
+ * text under them; a sticky note and free text bring nothing but what the
+ * reader typed into them.
+ *
+ * The default template is written for every type at once and deliberately asks
+ * for more than any one of them answers, so it is held to none of their
+ * limits: `DEFAULT_TEMPLATE_KEY` is no subtype and finds nothing here.
+ */
+export function unfilledVariablesFor(subtype: string): {
+	names: string[];
+	description: string;
+} {
+	const annot = SUPPORTED_ANNOTS.find((one) => one.subtype === subtype);
+	if (!annot || annot.marksUpText) return { names: [], description: "" };
+	return { names: ["highlightedText"], description: annot.description };
+}
+
+/**
+ * Where any of `names` is written in `template`, in the order it appears.
+ * Handlebars ignores whitespace inside the braces, so `{{ topic }}` names the
+ * same variable as `{{topic}}` and is found here too. A name that is the start
+ * of a longer one does not stand in for it: the braces have to close on it.
+ */
+export function findVariableUses(
+	template: string,
+	names: string[]
+): { start: number; end: number; text: string; name: string }[] {
+	if (names.length === 0) return [];
+
+	const pattern = new RegExp(`\\{\\{\\s*(${names.join("|")})\\s*\\}\\}`, "g");
+	return Array.from(template.matchAll(pattern), (match) => {
+		const start = match.index ?? 0;
+		return {
+			start,
+			end: start + match[0].length,
+			text: match[0],
+			name: match[1],
+		};
+	});
 }
 
 export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
@@ -221,6 +265,13 @@ export function resolveNotePath(
 }
 
 const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
+
+/**
+ * Rows of the variables table on screen at once; the rest are scrolled to. Six
+ * is about as tall as the panel can be without pushing the templates it
+ * describes off the screen.
+ */
+const VISIBLE_VARIABLE_ROWS = 6;
 
 export class PDFAnnotationPluginSetting {
 	public topicHeading: boolean;
@@ -437,7 +488,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	createAccordion(
 		parent: HTMLElement,
 		showText: string,
-		hideText: string
+		hideText: string,
+		onOpen?: () => void
 	): HTMLElement {
 		const details = parent.createEl("details", {
 			cls: "pdf-annotations-accordion",
@@ -455,6 +507,13 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 
 		let animation: Animation | null = null;
+
+		// Anything sizing itself against the panel has to measure while the
+		// panel has a size, which a closed `details` does not. This covers the
+		// path that opens natively; the animated one calls it in step below.
+		details.addEventListener("toggle", () => {
+			if (details.open) onOpen?.();
+		});
 
 		summary.addEventListener("click", (event) => {
 			const opening = !details.open;
@@ -475,6 +534,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			animation?.cancel();
 
 			if (opening) details.open = true;
+			// Before the height is read, or the panel would animate open to a
+			// size the callback is about to change.
+			if (opening) onOpen?.();
 			const full = content.scrollHeight;
 			const from = interrupted ? onScreen : opening ? 0 : full;
 			const to = opening ? full : 0;
@@ -506,17 +568,32 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	 */
 	addLineNumbers(textarea: HTMLTextAreaElement): {
 		editorEl: HTMLElement | null;
+		overlayEl: HTMLElement | null;
 		redraw: () => void;
 	} {
 		const parent = textarea.parentElement;
-		if (!parent) return { editorEl: null, redraw: () => undefined };
+		if (!parent)
+			return {
+				editorEl: null,
+				overlayEl: null,
+				redraw: () => undefined,
+			};
 
 		const editor = createDiv({ cls: "pdf-annotations-template-editor" });
 		parent.insertBefore(editor, textarea);
 		const gutter = editor.createDiv({
 			cls: "pdf-annotations-template-gutter",
 		});
-		editor.appendChild(textarea);
+		// The text area sits over a copy of its own text, which is what the
+		// marks are drawn on. The two share a box and their metrics, so a mark
+		// lands under exactly the characters it belongs to.
+		const field = editor.createDiv({
+			cls: "pdf-annotations-template-field",
+		});
+		const overlay = field.createDiv({
+			cls: "pdf-annotations-template-overlay",
+		});
+		field.appendChild(textarea);
 		textarea.setAttr("wrap", "off");
 
 		const drawLineNumbers = () => {
@@ -529,10 +606,139 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		textarea.addEventListener("input", drawLineNumbers);
 		textarea.addEventListener("scroll", () => {
 			gutter.scrollTop = textarea.scrollTop;
+			// A mark travels with the text it marks, sideways included: with
+			// wrapping off, a long line scrolls out of the box either way.
+			overlay.scrollTop = textarea.scrollTop;
+			overlay.scrollLeft = textarea.scrollLeft;
 		});
 		drawLineNumbers();
 
-		return { editorEl: editor, redraw: drawLineNumbers };
+		return {
+			editorEl: editor,
+			overlayEl: overlay,
+			redraw: drawLineNumbers,
+		};
+	}
+
+	/**
+	 * Marks every variable the type being edited never fills, and says why.
+	 * Returns the call that switches the marks to another type.
+	 *
+	 * The marks lie under the text area rather than in it, so nothing about
+	 * the typing changes; the pointer never reaches them, and is measured
+	 * against where they landed instead. The message hangs off `host` because
+	 * the editor clips what leaves its frame.
+	 *
+	 * Where there is no pointer to hover with there is nothing to wait for, so
+	 * the message stands under the editor from the moment a mark appears. The
+	 * marks themselves are the same either way.
+	 */
+	addVariableWarnings(
+		textarea: HTMLTextAreaElement,
+		overlay: HTMLElement,
+		host: HTMLElement
+	): (subtype: string) => void {
+		const tooltip = host.createDiv({
+			cls: "pdf-annotations-template-tooltip",
+		});
+		tooltip.hide();
+
+		// A tablet with a keyboard case can gain and lose a pointer while the
+		// tab is open, so this is asked each time rather than once.
+		const hovers = window.matchMedia("(hover: hover)");
+
+		let unfilled: string[] = [];
+		let description = "";
+
+		/** The warning about `name`, or about all of them at once. */
+		const explain = (name?: string) =>
+			t.WARNING_VARIABLE_UNFILLED.replace(
+				"{{variable}}",
+				(name ? [name] : unfilled).map((one) => `{{${one}}}`).join(", ")
+			).replace("{{type}}", description);
+
+		const paint = () => {
+			overlay.empty();
+			tooltip.hide();
+			tooltip.toggleClass(
+				"pdf-annotations-template-tooltip-static",
+				!hovers.matches
+			);
+			if (unfilled.length === 0) return;
+
+			const text = textarea.value;
+			let written = 0;
+			let marked = 0;
+			for (const use of findVariableUses(text, unfilled)) {
+				overlay.appendText(text.slice(written, use.start));
+				overlay.createSpan({
+					cls: "pdf-annotations-template-unfilled",
+					text: use.text,
+					// Which variable this mark is, for the message to name
+					// when the pointer stops on it.
+					attr: { "data-variable": use.name },
+				});
+				written = use.end;
+				marked++;
+			}
+			// The tail matters as much as the marks: without it the last line
+			// is short, and a mark on the line below sits at the wrong height.
+			overlay.appendText(text.slice(written));
+
+			// Nothing to hover, and nothing to explain until the template
+			// actually asks for one of them.
+			if (hovers.matches || marked === 0) return;
+			// Placed by the stylesheet from here on, not against a mark.
+			tooltip.setCssProps({ left: "", top: "" });
+			tooltip.setText(explain());
+			tooltip.show();
+		};
+
+		textarea.addEventListener("input", paint);
+		// The pointer that comes and goes takes the message's place with it.
+		hovers.addEventListener("change", paint);
+
+		textarea.addEventListener("mouseleave", () => {
+			if (hovers.matches) tooltip.hide();
+		});
+		textarea.addEventListener("mousemove", (event) => {
+			if (!hovers.matches) return;
+
+			const marks = Array.from(
+				overlay.querySelectorAll<HTMLElement>(
+					".pdf-annotations-template-unfilled"
+				)
+			);
+			const under = marks.find((mark) => {
+				const rect = mark.getBoundingClientRect();
+				return (
+					event.clientX >= rect.left &&
+					event.clientX <= rect.right &&
+					event.clientY >= rect.top &&
+					event.clientY <= rect.bottom
+				);
+			});
+			if (!under) {
+				tooltip.hide();
+				return;
+			}
+
+			const mark = under.getBoundingClientRect();
+			const box = host.getBoundingClientRect();
+			tooltip.setText(explain(under.dataset.variable));
+			tooltip.setCssProps({
+				left: `${mark.left - box.left}px`,
+				top: `${mark.bottom - box.top + 6}px`,
+			});
+			tooltip.show();
+		});
+
+		return (subtype: string) => {
+			const unfilledHere = unfilledVariablesFor(subtype);
+			unfilled = unfilledHere.names;
+			description = unfilledHere.description;
+			paint();
+		};
 	}
 
 	/**
@@ -647,12 +853,18 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		// Folded away by default: the table is a reference to look something up
 		// in, not something to read past on the way to the templates.
+		// `sizeVariableTable` is assigned below, once there is a table to size.
+		let sizeVariableTable: () => void = () => undefined;
 		const variablesContent = this.createAccordion(
 			containerEl,
 			t.SHOW_VARIABLES_TABLE,
-			t.HIDE_VARIABLES_TABLE
+			t.HIDE_VARIABLES_TABLE,
+			() => sizeVariableTable()
 		);
-		const templateVariableTable = variablesContent.createEl("table", {
+		const variableScroll = variablesContent.createDiv({
+			cls: "pdf-annotations-variable-scroll",
+		});
+		const templateVariableTable = variableScroll.createEl("table", {
 			cls: "pdf-annotations-variable-table",
 		});
 		const templateVariableHead = templateVariableTable
@@ -685,6 +897,34 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			templateVariableRow.createEl("td", { text: description });
 		});
 
+		/**
+		 * Caps the table at its first `VISIBLE_VARIABLE_ROWS` rows and scrolls
+		 * the rest under a header that stays put. Measured rather than counted
+		 * in ems: a description wraps to a second line on a narrow pane, and a
+		 * height guessed from the font would then cut a row in half.
+		 */
+		sizeVariableTable = () => {
+			const rows = Array.from(templateVariableBody.rows);
+			if (rows.length <= VISIBLE_VARIABLE_ROWS) return;
+
+			// From the top of the table, so the header the rows scroll under is
+			// counted in as well.
+			const last = rows[VISIBLE_VARIABLE_ROWS - 1];
+			const height =
+				last.getBoundingClientRect().bottom -
+				templateVariableTable.getBoundingClientRect().top;
+			// Zero while the panel is still closed, and there is nothing to
+			// measure against; the next open calls this again.
+			if (height <= 0) return;
+
+			// The height goes to the stylesheet as a property rather than as a
+			// rule of its own: what to do with it is the stylesheet's to say.
+			variableScroll.style.setProperty(
+				"--pdf-annotations-variable-rows-height",
+				`${Math.ceil(height)}px`
+			);
+		};
+
 		// One card whose picker says which template is being written. Editing
 		// them one at a time keeps the card one template tall.
 		const templateColumns = containerEl.createDiv({
@@ -694,7 +934,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		let editing = DEFAULT_TEMPLATE_KEY;
 		let editor!: TextAreaComponent;
 		let editorEl: HTMLElement | null = null;
+		let overlayEl: HTMLElement | null = null;
 		let redrawLineNumbers: () => void = () => undefined;
+		// Assigned once there is a card to hang the tooltip off, which is after
+		// the first template has already been shown without one.
+		let showUnfilledVariables: (subtype: string) => void = () => undefined;
 
 		const templateOf = (target: string) =>
 			target === DEFAULT_TEMPLATE_KEY
@@ -712,6 +956,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					: t.PLACEHOLDER_TEMPLATE_DEFAULT
 			);
 			redrawLineNumbers();
+			showUnfilledVariables(target);
 		};
 
 		const card = new Setting(templateColumns)
@@ -741,6 +986,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				// itself, so the picker can sit beside the description while
 				// the editor keeps the whole width under both.
 				if (numbered.editorEl) editorEl = numbered.editorEl;
+				overlayEl = numbered.overlayEl;
 				input.onChange(async (value) => {
 					if (editing === DEFAULT_TEMPLATE_KEY) {
 						this.plugin.settings.defaultTemplate = value;
@@ -756,6 +1002,16 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// Last child of the card, not of the picker's control: text and picker
 		// share a row with the editor across the width beneath them.
 		if (editorEl) card.settingEl.appendChild(editorEl);
+		if (overlayEl) {
+			showUnfilledVariables = this.addVariableWarnings(
+				editor.inputEl,
+				overlayEl,
+				card.settingEl
+			);
+			// The template on screen was shown before there was anything to
+			// mark it with.
+			showUnfilledVariables(editing);
+		}
 
 		// Two groups, in the order they take effect: where an annotation lands,
 		// then what is written above it.

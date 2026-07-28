@@ -193,6 +193,11 @@ export default class PDFAnnotationPlugin extends Plugin {
 		const currentFolder = this.currentFolder();
 		const extractTags = this.settings.extractsTags(onePerAnnotation);
 
+		// Every annotation of one read came out of the same PDF, so the first
+		// of them speaks for the file. A read with nothing in it still writes
+		// its note, and that note's name has no folder to go by.
+		const pdfFolder = grandtotal[0]?.folder ?? "";
+
 		/** Taken out before rendering, so a tag lands in the properties only. */
 		const takeTags = (annotations: PDFAnnotation[]) =>
 			extractTags ? takeTagsFromAnnotations(annotations) : [];
@@ -225,7 +230,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 								topic,
 								this.getResolvedNoTopicName(fileMeta, counter)
 							)) + ".md";
-				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
+				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder);
 				// A note per annotation is a great many notes; opening each of
 				// them buries whatever the reader was looking at.
 				const written = await this.saveHighlightsToFile(filePathOfNote, note, this.settings.overwriteExistingNote, false);
@@ -237,8 +242,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			const tags = takeTags(grandtotal);
 			const finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
 			const fileNameOfNote =
-				this.getResolvedNoteName(fileMeta) + ".md";
-			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote);
+				this.getResolvedNoteName(fileMeta, pdfFolder) + ".md";
+			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder);
 			const written = await this.saveHighlightsToFile(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote, true);
 			if (written) {
 				await this.addTagsToNoteProperties(written, tags);
@@ -521,11 +526,18 @@ export default class PDFAnnotationPlugin extends Plugin {
 		return compileTemplate(this.settings.oneNotePerAnnotationName, this.templateSettings);
 	}
 
+	/**
+	 * `folder` is the annotations' own, so `{{folder}}` names the same place
+	 * here as it does inside a template. It is empty when the read found
+	 * nothing to say where it came from.
+	 */
 	getTemplateVariablesForNoteName(
-		file: FileMeta
+		file: FileMeta,
+		folder = ""
 	): Record<string, unknown> {
 		const shortcuts = {
-			filename: file.basename
+			filename: file.basename,
+			folder: folder,
 		};
 
 		return { file: file, ...shortcuts };
@@ -566,9 +578,11 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
-	getResolvedNoteName(file: FileMeta): string {
+	getResolvedNoteName(file: FileMeta, folder = ""): string {
 		return this.usableNoteName(
-			this.noteNameTemplate(this.getTemplateVariablesForNoteName(file)),
+			this.noteNameTemplate(
+				this.getTemplateVariablesForNoteName(file, folder)
+			),
 			file.basename
 		);
 	}
@@ -612,23 +626,24 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
-	getResolvedNoteSubfolder(file: FileMeta): string {
+	getResolvedNoteSubfolder(file: FileMeta, folder = ""): string {
 		if (!this.settings.noteSubfolder.trim()) return "";
 		return this.noteSubfolderTemplate(
-			this.getTemplateVariablesForNoteName(file)
+			this.getTemplateVariablesForNoteName(file, folder)
 		);
 	}
 
 	getResolvedNotePath(
 		pdfFile: FileMeta,
 		currentFolder: string,
-		fileNameOfNote: string
+		fileNameOfNote: string,
+		folder = ""
 	): string {
 		return resolveNotePath(
 			this.settings,
 			currentFolder,
 			fileNameOfNote,
-			this.getResolvedNoteSubfolder(pdfFile)
+			this.getResolvedNoteSubfolder(pdfFile, folder)
 		);
 	}
 

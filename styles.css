@@ -129,22 +129,44 @@
 	overflow: hidden;
 }
 
+/* The frame moved off the table and onto the box that scrolls it, so the rows
+   pass under the border rather than through it. Its height is set from the
+   script, to the first six rows measured. */
+.pdf-annotations-variable-scroll {
+	margin-bottom: 16px;
+	/* Set from the script once the rows have a height to measure; until then
+	   the table stands at its full length. */
+	max-height: var(--pdf-annotations-variable-rows-height, none);
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--setting-items-radius);
+	background: var(--setting-items-background);
+}
+
 /* The name column is only as wide as its longest variable, leaving the rest of
    the row to the description. */
 .pdf-annotations-variable-table {
 	width: 100%;
-	margin-bottom: 16px;
 	font-size: var(--font-ui-small);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--setting-items-radius);
 	padding: 0px 16px;
-	background: var(--setting-items-background);
 }
 
+/* Stays in view while the rows move under it, and brings its own background so
+   they do not show through. */
 .pdf-annotations-variable-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 	text-align: left;
 	color: var(--text-muted);
 	font-weight: var(--font-medium);
+	background: var(--setting-items-background);
+}
+
+/* Its own label is the widest thing in the column when the variables are
+   short, and wrapping it would set the column narrower than the words in it. */
+.pdf-annotations-variable-table th:first-child {
+	white-space: nowrap;
 }
 
 .pdf-annotations-variable-table th,
@@ -231,6 +253,9 @@
    under them. Too narrow, and the picker takes a line of its own. min-width
    stops a text area's intrinsic width from widening the card. */
 .pdf-annotations-template-setting {
+	/* The warning tooltip is placed against this card, which the editor's own
+	   clipped frame could not hold. */
+	position: relative;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px 16px;
@@ -295,10 +320,73 @@
 	user-select: none;
 }
 
-/* The frame belongs to the box around it, so the text area brings none. */
-.pdf-annotations-template-input {
+/* Holds the text area and the layer of marks under it, one on top of the
+   other. */
+.pdf-annotations-template-field {
+	position: relative;
 	flex: 1;
 	min-width: 0;
+	height: 100%;
+}
+
+/* A copy of the template with the flagged variables wrapped. Its own text is
+   never seen — the text area's sits over it, character for character — and
+   only what is drawn around the marks shows through. Scrolled from the text
+   area's handler, so hidden rather than auto. */
+.pdf-annotations-template-overlay {
+	position: absolute;
+	inset: 0;
+	padding: 8px;
+	overflow: hidden;
+	white-space: pre;
+	color: transparent;
+	pointer-events: none;
+}
+
+/* A variable the type being edited never fills, so the template writing it
+   leaves a hole. Warned about rather than corrected: the template is still
+   the reader's to write. */
+.pdf-annotations-template-unfilled {
+	border-radius: var(--radius-s);
+	background-color: rgba(var(--color-orange-rgb), 0.24);
+	box-shadow: 0 0 0 1px rgba(var(--color-orange-rgb), 0.5);
+}
+
+/* Placed from the script against the mark it explains. It hangs off the card
+   rather than the editor, which clips what leaves its frame. */
+.pdf-annotations-template-tooltip {
+	position: absolute;
+	z-index: 1;
+	max-width: 24em;
+	padding: 6px 8px;
+	border-radius: var(--radius-s);
+	background: var(--background-secondary-alt);
+	box-shadow: var(--shadow-s);
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.4;
+	pointer-events: none;
+}
+
+/* No pointer to hover with, so the message takes a row of its own under the
+   editor and stays there. Floating it over the text would cover the template
+   on the screens with the least room to spare, with no way to wave it off. */
+.pdf-annotations-template-tooltip-static {
+	position: static;
+	flex: 0 0 100%;
+	max-width: none;
+	box-shadow: none;
+	/* The same colour as the marks it explains, so the two read as one
+	   warning rather than two. */
+	background: rgba(var(--color-orange-rgb), 0.12);
+	border-left: 2px solid rgba(var(--color-orange-rgb), 0.6);
+}
+
+/* The frame belongs to the box around it, so the text area brings none. The
+   background stays clear for the marks underneath to read through. */
+.pdf-annotations-template-input {
+	position: relative;
+	width: 100%;
 	height: 100%;
 	padding: 8px;
 	border: none;
@@ -314,8 +402,10 @@
 	box-shadow: none;
 }
 
-/* The numbers only line up while both share a line height. */
+/* The numbers only line up while both share a line height, and a mark only
+   lands on its variable while the layer under the text area shares the rest. */
 .pdf-annotations-template-gutter,
+.pdf-annotations-template-overlay,
 .pdf-annotations-template-input {
 	font-family: var(--font-monospace);
 	font-size: var(--font-ui-smaller);

@@ -1,7 +1,11 @@
 import {describe, expect, test} from '@jest/globals';
 import {t} from '../lang/helpers';
 import {PDFAnnotationPluginFormatter} from '../src/formatter';
-import {PDFAnnotationPluginSetting, SUPPORTED_ANNOTS} from '../src/settings';
+import {
+  PDFAnnotationPluginSetting,
+  SUPPORTED_ANNOTS,
+  TEMPLATE_VARIABLES,
+} from '../src/settings';
 import {PDFAnnotation} from '../src/types';
 
 function annotation(over: Partial<PDFAnnotation> = {}): PDFAnnotation {
@@ -44,6 +48,46 @@ describe('template variables', () => {
     const out = formatter.format([annotation({topic: 'Method'})], false);
     expect(out).toBe('Paper|refs/Paper.pdf|refs|Mark|a comment|Method|4|iv');
     expect(out).not.toContain('[object Object]');
+  });
+
+  // The settings show this table above the editor, so a row it lists is a
+  // promise to the reader. `created` was listed for a while without the
+  // formatter ever putting it on the context, and rendered empty.
+  test('the variables table promises nothing the formatter leaves empty', () => {
+    const anno = annotation({
+      topic: 'Method',
+      created: '2024-01-15',
+      createdTime: '14:30',
+      highlightedText: 'marked words',
+    });
+    const unresolved = Object.keys(TEMPLATE_VARIABLES).filter(
+      (name) => formatterWith(`[{{${name}}}]`).format([anno], true) === '[]'
+    );
+    expect(unresolved).toEqual([]);
+  });
+
+  test('created is the day the annotation was made', () => {
+    const formatter = formatterWith('{{created}}');
+    expect(formatter.format([annotation({created: '2024-01-15'})], false))
+      .toBe('2024-01-15');
+  });
+
+  test('created renders empty when the PDF stored no date', () => {
+    const formatter = formatterWith('[{{created}}]');
+    expect(formatter.format([annotation({created: undefined})], false))
+      .toBe('[]');
+  });
+
+  test('createdTime is the time of day, apart from the day itself', () => {
+    const formatter = formatterWith('{{created}} {{createdTime}}');
+    const anno = annotation({created: '2024-01-15', createdTime: '14:30'});
+    expect(formatter.format([anno], false)).toBe('2024-01-15 14:30');
+  });
+
+  test('createdTime renders empty when the date carried no time', () => {
+    const formatter = formatterWith('[{{createdTime}}]');
+    const anno = annotation({created: '2024-01-15', createdTime: undefined});
+    expect(formatter.format([anno], false)).toBe('[]');
   });
 
   test('filename is the PDF name without its extension', () => {

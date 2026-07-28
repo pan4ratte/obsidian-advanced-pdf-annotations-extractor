@@ -4,9 +4,13 @@ import {
   ANNOTS_TREATED_AS_HIGHLIGHTS,
   cleanNoteName,
   DEFAULT_DESIRED_ANNOTATIONS,
+  DEFAULT_TEMPLATE_KEY,
+  findVariableUses,
   PDFAnnotationPluginSetting,
   resolveNotePath,
   SUPPORTED_ANNOTS,
+  TEMPLATE_VARIABLES,
+  unfilledVariablesFor,
 } from '../src/settings';
 
 describe('supported annotation types', () => {
@@ -24,6 +28,84 @@ describe('supported annotation types', () => {
     ]) {
       expect(subtypes).not.toContain(graphical);
     }
+  });
+
+  test('only the types marking up no text leave a variable unfilled', () => {
+    for (const {subtype, marksUpText} of SUPPORTED_ANNOTS) {
+      expect(unfilledVariablesFor(subtype).names).toEqual(
+        marksUpText ? [] : ['highlightedText']
+      );
+    }
+  });
+
+  test('an unfilled variable is named as the table names it', () => {
+    // The editor looks the flagged names up in the template it is marking, so
+    // one spelled differently here would never be found.
+    for (const {subtype} of SUPPORTED_ANNOTS) {
+      for (const name of unfilledVariablesFor(subtype).names) {
+        expect(Object.keys(TEMPLATE_VARIABLES)).toContain(name);
+      }
+    }
+  });
+
+  test('a type that cannot fill one is named, to say so with', () => {
+    expect(unfilledVariablesFor('Text').description).toBe(t.ANNOT_TEXT);
+    expect(unfilledVariablesFor('FreeText').description).toBe(t.ANNOT_FREE_TEXT);
+  });
+
+  test('the default template is held to no one type\'s limits', () => {
+    expect(unfilledVariablesFor(DEFAULT_TEMPLATE_KEY).names).toEqual([]);
+    expect(unfilledVariablesFor('Nonsense').names).toEqual([]);
+  });
+});
+
+describe('findVariableUses', () => {
+  const at = (template: string, names: string[]) =>
+    findVariableUses(template, names).map((use) => use.text);
+
+  test('finds a variable and says where it is and which it is', () => {
+    expect(findVariableUses('a {{topic}} b', ['topic'])).toEqual([
+      {start: 2, end: 11, text: '{{topic}}', name: 'topic'},
+    ]);
+  });
+
+  test('names the variable without the whitespace it was written with', () => {
+    // The message names what it found, so a loosely written variable must not
+    // come back as one the table has never heard of.
+    expect(findVariableUses('{{ topic }}', ['topic'])[0].name).toBe('topic');
+  });
+
+  test('slicing on the offsets puts the template back together', () => {
+    const template = '{{topic}} and {{body}}!';
+    const uses = findVariableUses(template, ['topic', 'body']);
+    let rebuilt = '';
+    let written = 0;
+    for (const use of uses) {
+      rebuilt += template.slice(written, use.start) + use.text;
+      written = use.end;
+    }
+    expect(rebuilt + template.slice(written)).toBe(template);
+  });
+
+  test('whitespace inside the braces is still the same variable', () => {
+    expect(at('{{ topic }}', ['topic'])).toEqual(['{{ topic }}']);
+    expect(at('{{\ttopic\t}}', ['topic'])).toEqual(['{{\ttopic\t}}']);
+  });
+
+  test('finds every use, not only the first', () => {
+    expect(at('{{topic}} {{topic}}', ['topic'])).toHaveLength(2);
+  });
+
+  test('a shorter name does not stand in for a longer one', () => {
+    expect(at('{{createdTime}}', ['created'])).toEqual([]);
+    expect(at('{{created}} {{createdTime}}', ['created', 'createdTime']))
+      .toEqual(['{{created}}', '{{createdTime}}']);
+  });
+
+  test('leaves alone what is not asked for', () => {
+    expect(at('{{body}}', ['topic'])).toEqual([]);
+    expect(at('{{topic}}', [])).toEqual([]);
+    expect(at('topic', ['topic'])).toEqual([]);
   });
 
   test('the text markup types are exactly the ones carrying QuadPoints', () => {

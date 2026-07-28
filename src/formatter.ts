@@ -149,6 +149,11 @@ export class PDFAnnotationPluginFormatter {
 			// As pdf.js names it, which a {{#if}} can be written against.
 			type: annotation.subtype,
 			topic: annotation.topic,
+			// The day and the time of day apart, so a template can write either
+			// without the other. The PDF's own timestamp, down to the second,
+			// stays on `annotation.creationDate` in the shape the file wrote it.
+			created: annotation.created,
+			createdTime: annotation.createdTime,
 		};
 
 		return { annotation: annotation, ...shortcuts };

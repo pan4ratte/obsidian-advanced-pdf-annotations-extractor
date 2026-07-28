@@ -115,4 +115,6 @@ export interface PDFAnnotation extends RawPDFAnnotation {
 	topic?: string;
 	/** The day `creationDate` names, as `YYYY-MM-DD`. */
 	created?: string;
+	/** The time `creationDate` names, as `HH:mm`; absent when it carries none. */
+	createdTime?: string;
 }

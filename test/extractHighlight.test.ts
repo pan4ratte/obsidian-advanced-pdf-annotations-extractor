@@ -1,5 +1,9 @@
 import {describe, expect, test, jest, beforeEach} from '@jest/globals';
-import {extractHighlight, pdfDateToDay} from '../src/extractHighlight';
+import {
+  extractHighlight,
+  pdfDateToDay,
+  pdfDateToTime,
+} from '../src/extractHighlight';
 
 jest.mock('src/settings', () => {
   return {
@@ -44,6 +48,40 @@ describe('pdfDateToDay', () => {
     expect(pdfDateToDay('D:20241315')).toBeUndefined();
     expect(pdfDateToDay('D:20240100')).toBeUndefined();
     expect(pdfDateToDay('D:20240132')).toBeUndefined();
+  });
+});
+
+describe('pdfDateToTime', () => {
+  test('reads the time out of a full PDF date string', () => {
+    expect(pdfDateToTime("D:20240115143000+01'00'")).toBe('14:30');
+    expect(pdfDateToTime('D:20240115143000Z')).toBe('14:30');
+    expect(pdfDateToTime('20240115143000')).toBe('14:30');
+  });
+
+  test('the zone is ignored, so the time is the one the writer saw', () => {
+    // Same instant in two zones, each reading as its own writer's clock.
+    expect(pdfDateToTime("D:20240115233000+05'00'")).toBe('23:30');
+    expect(pdfDateToTime("D:20240115013000-05'00'")).toBe('01:30');
+  });
+
+  test('minutes are optional, seconds are not read', () => {
+    expect(pdfDateToTime('D:2024011514')).toBe('14:00');
+    expect(pdfDateToTime('D:20240115143059')).toBe('14:30');
+  });
+
+  test('gives no time when the date carries none', () => {
+    expect(pdfDateToTime('D:2024')).toBeUndefined();
+    expect(pdfDateToTime('D:202403')).toBeUndefined();
+    expect(pdfDateToTime('D:20240307')).toBeUndefined();
+  });
+
+  test('gives no time for a missing or unreadable date', () => {
+    expect(pdfDateToTime(null)).toBeUndefined();
+    expect(pdfDateToTime(undefined)).toBeUndefined();
+    expect(pdfDateToTime('')).toBeUndefined();
+    expect(pdfDateToTime('this afternoon')).toBeUndefined();
+    expect(pdfDateToTime('D:2024011525')).toBeUndefined();
+    expect(pdfDateToTime('D:202401151460')).toBeUndefined();
   });
 });
 

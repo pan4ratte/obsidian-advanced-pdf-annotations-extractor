@@ -91,6 +91,7 @@ export default {
     VAR_TYPE: "Annotation type",
     VAR_TOPIC: "First line of the comment",
     VAR_CREATED: "Day the annotation was created, like 2024-01-15, when the PDF stores dates",
+    VAR_CREATED_TIME: "Time the annotation was created, like 14:30, when the PDF stores times",
     VAR_IS_EXTERNAL: "True for PDFs outside the vault, for {{#if isExternal}} in a template",
 
     // ─── Settings: annotations ───────────────────────────────────────────────────
@@ -112,6 +113,13 @@ export default {
     SETTING_TEMPLATE_DESC: "The default template applies to every annotation type whose own template is empty.",
     OPTION_TEMPLATE_DEFAULT: "Default (for all types)",
     PLACEHOLDER_TEMPLATE_DEFAULT: "Empty: this annotation type currently uses the default template.",
+    /**
+     * Names a variable the type being edited never fills. It hovers over the
+     * variable itself where there is a mouse, and stands under the editor
+     * where there is none. `{{variable}}` is replaced with its name and
+     * `{{type}}` with the type's — only the words around them are translated.
+     */
+    WARNING_VARIABLE_UNFILLED: "{{variable}} is left empty: “{{type}}” marks up no text in the PDF.",
 
     // ─── Settings: grouping ──────────────────────────────────────────────────────
     SECTION_GROUPING: "Annotations grouping",
