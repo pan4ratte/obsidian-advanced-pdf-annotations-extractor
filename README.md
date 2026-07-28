@@ -1,41 +1,63 @@
-# Classy PDF Extractor plugin
+<p align="center">
+  <img alt="header" src="https://shieldcn.dev/header/graph.svg?title=Classy+PDF+Extractor&amp;subtitle=Import+all+types+of+annotations+to+your+vault&amp;size=wide&amp;mode=dark" />
+</p>
 
-Extract every kind of annotation — highlights, underlines, squiggly and struck out text, sticky notes and free text — from PDFs inside and outside your vault, and write them into notes you have shaped yourself. Pick the annotation types, choose the pages and the days they were made on, format each type with its own Handlebars template, group them by topic, date and folder, and send them to the current note, a new one, or a note per annotation. The interface is available in English and Russian.
+<p align="center">
+  English | <a href="README_ru.md">Русский</a>
+</p>
 
-> This plugin started as a fork of [Extract PDF Annotations](https://github.com/munach/obsidian-extract-pdf-annotations). It keeps the idea and very little else: the extraction was rebuilt, a long list of bugs was fixed — sorting outside the Latin alphabet, tags in any script, note names the vault refused, heading levels, single-character highlights — and every part of the interface was reworked. Treat it as a different plugin rather than a newer version of that one.
+The plugin extracts all types of annotations from PDFs and writes them into the notes of your vault with automated formatting. The import offers a choice of annotation types, page ranges and the days the comments were created on, while templates let you format every type separately. Group the annotations by topic, date, folder and file, and send them to the current note, to a new one, or every annotation into a note of its own.
+
 
 ## Features
 
-### 1. Every annotation type, chosen with checkboxes
+### 1. Extract annotations from PDFs inside and outside the vault
 
-Highlights, underlines, squiggly and struck out text bring the PDF text underneath them along; sticky notes and free text bring what you typed. Pick the types from a grid of checkboxes instead of typing their names. Purely graphical annotations — drawings, shapes, stamps, attachments — are not offered, because there is nothing in them a markdown note could show.
+Extract highlighted, underlined and struck out text and squiggly underlines, as well as sticky note comments and free text on the page, from your PDFs. Import sources: the file you are reading, every PDF in the current folder, and a path in the clipboard — for those PDFs you would rather not copy into the vault.
 
-### 2. PDFs inside and outside the vault
+### 2. Advanced extraction menu for fine-tuned import
 
-Extract from the file you are reading, from every PDF in the current folder, or from a path in the clipboard for PDFs you would rather not copy into the vault. `{{filelink}}` links whichever it is: a `[[wiki link]]` inside the vault, the `file://` path outside it.
+Already extracted the annotations from a PDF, then made new ones and want to import only those? Open the advanced menu and narrow the extraction down to certain pages (`25-50`, `25, 26, 30`, `i-viii`) — and even to certain days on which the annotations were created.
 
-### 3. Extraction with advanced settings
+### 3. Formatting templates for every annotation type
 
-One command opens a window that asks what to extract rather than deciding beforehand. Search the vault's PDFs or paste a path — a path already in the clipboard is filled in for you. Narrow the extraction to certain pages (`25-50`, `25, 26, 30`, `i-viii`), read against physical pages or the labels the author gave them. Tick off the days the annotations were made on, listed from the file itself. Then choose where the result goes: the current note, a new note, or a note per annotation.
+Set up the default template that will format all annotation types, or create separate templates for specific types. Empty a template — and that annotation type goes back to using the default one. A table of the available variables sits right above the editor for your convenience. Finally, the tags contained in your annotations can be moved into the note's `tags` property automatically, to save you time.
 
-### 4. A template for every annotation type
+### 4. Grouping, headings and note naming rules
 
-One card with a picker: the default template writes every type, and any type you give a template of its own is written with that instead. Empty a type's template and it goes back to the default. A table of variables sits above the editor, each one clickable to copy, and the editor itself is monospaced with a numbered gutter.
+Group the annotations by topic (the first line of each comment), by the day they were created, by folder and file. Group headings can optionally be added to the notes automatically. Notes can be named from a template (or after the annotation's own topic) and placed into subfolders, which are also created from a template.
 
-### 5. Grouping, headings and note naming
 
-Group the annotations by topic — the first line of each comment — by the day they were made, and by folder, each independently of the others. Headings are a separate question from grouping, and their levels follow what encloses what, so a note reads as an outline and the outline pane follows it. Notes can be named from a template, or after the annotation's own topic.
+## Installation
 
-### 6. Tags into note properties
+### Option 1: Obsidian plugin store
 
-Tags written in your comments are moved into the note's `tags` property rather than left in its text, in any script you annotate in. Choose whether that happens never, always, only for extractions into one note, or only for extractions into separate notes.
+1. In Obsidian settings open the tab "Community plugins" and click "Browse" button.
 
-### 7. English and Russian interface
+2. In the search bar type `Classy PDF Extractor`, click on the result, then "Install" and "Enable" buttons.
 
-The plugin follows Obsidian's own language, falling back to English. Dates in the extraction window, the notes it writes and every setting are translated.
+Alternatively, you can install the plugin by following the link to the community website: [https://community.obsidian.md/plugins/classy-pdf-extractor](https://community.obsidian.md/plugins/classy-pdf-extractor)
+
+### Option 2: BRAT plugin
+
+If you want to test beta-versions of the plugin or use previous versions, you can do that with `BRAT` plugin:
+
+1. Install `BRAT` plugin from the official Obsidian plugin store.
+
+2. In the `BRAT` settings, find the “Beta plugin list” section and click on the “Add beta plugin” button.
+
+3. In the window that appears, paste the link to the `Classy PDF Extractor` plugin repository: [https://github.com/pan4ratte/obsidian-classy-pdf-extractor](https://github.com/pan4ratte/obsidian-classy-pdf-extractor)
+
+4. Under “Select a version” choose the desired version and click the “Add plugin” button. The plugin will be automatically installed and will be ready to use.
+
+
+## About the Author
+
+My name is Mark Ingrem, I am a Religious Studies scholar. Apart from my main area of study (Protestant Political Theology in Russia), I teach the subject "Information Technologies in Scientific Research", a unique course that I developed myself from scratch. This plugin helps me in my studies and I use it in my teaching, as well as other plugins that I develop and that you can find on [my GitHub profile](https://github.com/pan4ratte/).
+
+Hello to every student that came across this page!
+
 
 ## Credits
 
-A fork of [Extract PDF Annotations](https://github.com/munach/obsidian-extract-pdf-annotations) by Franz Achermann and Florian Stöckl, which in turn built on ideas from [Alexis Rondeau's plugin](https://github.com/akaalias/obsidian-extract-pdf-highlights). Like both of them, it reads PDFs with the pdf.js library Obsidian already ships.
-
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the build. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+The plugin started as a fork of [Extract PDF Annotations](https://github.com/munach/obsidian-extract-pdf-annotations) by Franz Achermann and Florian Stöckl, which in turn built on ideas from Alexis Rondeau's [plugin](https://github.com/akaalias/obsidian-extract-pdf-highlights). Nothing but the idea is left of it: almost everything has been rewritten, fixed, extended and redesigned. Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
