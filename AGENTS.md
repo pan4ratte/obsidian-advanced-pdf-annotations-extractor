@@ -19,6 +19,52 @@
 - Plugin entrypoint: `src/main.ts` → default export `PDFAnnotationPlugin`.
 - `obsidian` is pinned to exactly `1.8.7` — it matches `minAppVersion` and is a
   hard peer requirement of `eslint-plugin-obsidianmd`.
+- Both halves of the build target **ES2020** (`target` in `tsconfig.json` and in
+  `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.8.7 has all of
+  it, so nothing is downlevelled.
+- TypeScript is **6.0.3**, one major behind `latest`: `typescript-eslint` caps
+  at `<6.1.0` and `ts-jest` at `<7`, so 7.x takes the linter and the tests down
+  with it. Three tsconfig entries exist only because of the 6.0 defaults —
+  `strict: false` (6 flipped the default on; the code predates it),
+  `esModuleInterop: true` (mandatory now, and the reason `moment` needs the cast
+  in `advancedExtractionModal.ts`) and `rootDir` (6 will not infer an output
+  layout from ts-jest's one-file-at-a-time compiles).
+- ESLint is **10.x** but `@eslint/js` stays on **9.x** — it is in
+  `devDependencies` only to satisfy `eslint-plugin-obsidianmd`'s `^9.30.1` peer,
+  and `eslint.config.mjs` never imports it. Same for `@eslint/json`, pinned to
+  the exact `0.14.0` that plugin asks for.
+
+## npm audit
+
+`npm audit` reports **29 high-severity findings. They are one advisory, and it
+is already patched — do not act on the number.**
+
+- The one advisory is [GHSA-mh99-v99m-4gvg][be] (CVE-2026-14257), an
+  out-of-memory DoS in `brace-expansion` reachable by feeding it a hostile glob.
+  Every other line of the report is a package that depends on it through
+  `minimatch`. Nothing reaches the plugin: `npm audit --omit=dev` finds **0**,
+  and `main.js` bundles only `handlebars`, `pdfjs-dist` and this repo's source.
+- The `overrides` block in `package.json` is what fixes it. Every copy of
+  `brace-expansion` in the tree now carries the `EXPANSION_MAX_LENGTH` guard —
+  `2.1.3` under old `minimatch`, `5.0.8` under `minimatch@10`.
+- The selector is `minimatch@<10` **on purpose**. `brace-expansion@5` exports
+  `expand` as a *named* export; `minimatch` 3, 8 and 9 all want the default one.
+  A blanket `"brace-expansion": "^5.0.8"` installs cleanly and then breaks at
+  runtime. `2.1.3` is the maintenance backport that carries the fix and keeps
+  the CommonJS default export.
+- **The count stays at 29 anyway.** The advisory's range is `<=5.0.7`, written
+  when `5.0.8` was the only fix; the `2.1.3` and `3.0.5` backports were
+  published after it and the range has not been narrowed to exclude them. This
+  is stale advisory metadata, not exposure — verify with
+  `npm ls brace-expansion --all` and check the versions, not with the count.
+- **Zero is not reachable, and jest is not what is holding it.** Zero requires
+  every `minimatch` at `>=10.0.3`, and `eslint-plugin-import@2.32.0` (pulled in
+  by `eslint-plugin-obsidianmd`) calls `minimatch()` as a function — the export
+  `minimatch@10` no longer has. No released version of that plugin has moved
+  off it. Getting to zero means dropping the official Obsidian ruleset, which
+  is a worse trade than a dev-only DoS advisory.
+
+[be]: https://github.com/advisories/GHSA-mh99-v99m-4gvg
 
 ## Testing
 

@@ -43,7 +43,11 @@ const context = await esbuild.context({
 		'@codemirror/view',
 		...builtins],
 	format: 'cjs',
-	target: 'es2016',
+	// Obsidian 1.8.7 (the manifest's minAppVersion) ships an Electron whose
+	// Chromium has all of ES2020, so nothing here needs downlevelling to the
+	// es2016 the plugin template shipped with. The source already calls
+	// String.matchAll, Object.fromEntries and optional chaining directly.
+	target: 'es2020',
 	logLevel: "info",
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,

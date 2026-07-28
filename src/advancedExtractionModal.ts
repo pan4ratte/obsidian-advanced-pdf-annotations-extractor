@@ -72,12 +72,21 @@ interface FormattedDate {
 	format(format: string): string;
 }
 
+// Narrowed to the one call and two methods used rather than typed as
+// `moment.Moment`: `moment` reaches us through Obsidian's re-export of the
+// moment package, and an `any` here would spread into everything the day is
+// written into. The cast is also what keeps this compiling under TypeScript 6,
+// which makes esModuleInterop mandatory — Obsidian declares the re-export as
+// `typeof Moment` off a namespace import, and a namespace import of a package
+// that exports by assignment no longer carries its call signatures.
+const parseDay = moment as unknown as (
+	value: string,
+	format: string,
+	strict: boolean,
+) => FormattedDate;
+
 function readableDay(day: string): string {
-	// Narrowed to the two methods used rather than typed as `moment.Moment`:
-	// `moment` reaches us through Obsidian's re-export of the moment package,
-	// which is `any` wherever that package's own types are not installed —
-	// and an `any` here would spread into everything the day is written into.
-	const date = moment(day, "YYYY-MM-DD", true) as unknown as FormattedDate;
+	const date = parseDay(day, "YYYY-MM-DD", true);
 	return date.isValid() ? date.format(t.DATE_FORMAT) : day;
 }
 
