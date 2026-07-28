@@ -1,6 +1,6 @@
 {
-	"id": "advanced-annotations-importer",
-	"name": "Advanced Annotations Importer",
+	"id": "classy-pdf-extractor",
+	"name": "Classy PDF Extractor",
 	"version": "1.9.5",
 	"minAppVersion": "1.8.7",
 	"description": "Import all types of annotations from PDFs inside and outside your vault, with flexible settings and templates",
