@@ -108,6 +108,26 @@ export default defineConfig([
 		},
 	},
 
+	// The settings tab is built imperatively in display(), which 1.13's
+	// getSettingDefinitions() would replace rather than supplement: a
+	// non-empty array of definitions renders the tab instead of display(),
+	// and none of this tab's custom pieces — the variables table, the
+	// template editor and its gutter, the warning overlay, the accordion,
+	// the annotation grid — is a control the API describes, so each would
+	// have to move into a render callback. minAppVersion is 1.8.7, so
+	// display() stays regardless, and adopting the API means maintaining the
+	// tab twice. Revisit when minAppVersion passes 1.13 and display() can go.
+	//
+	// Turned off here rather than at the class: the recommended config
+	// restricts inline disables of this rule. The reasoning is repeated in a
+	// comment on the class itself.
+	{
+		files: ["src/settings.ts"],
+		rules: {
+			"obsidianmd/settings-tab/prefer-setting-definitions": "off",
+		},
+	},
+
 	// Build tooling runs in Node, outside the plugin sandbox.
 	{
 		files: ["*.mjs", "*.js"],
@@ -116,6 +136,39 @@ export default defineConfig([
 		},
 		rules: {
 			"obsidianmd/no-nodejs-modules": "off",
+
+			// The console guideline is about a plugin leaving noise in the
+			// user's developer console. A build script has no user and no
+			// console but the terminal that ran it, where saying which file
+			// was written is the whole point. So `log` is allowed here and
+			// nowhere else.
+			//
+			// `no-new-func` is restated because this option object replaces
+			// the recommended one rather than merging into it, and dropping
+			// the rule would take a real check off the build script with it.
+			// Each wrapped rule has to bring its message map, which is keyed by
+			// the text the base rule emits — hence `log` inside the key as
+			// well as inside the option it comes from.
+			"obsidianmd/rule-custom-message": [
+				"error",
+				{
+					"no-console": {
+						messages: {
+							"Unexpected console statement. Only these console methods are allowed: log, warn, error, debug.":
+								"Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+						},
+						options: [
+							{ allow: ["log", "warn", "error", "debug"] },
+						],
+					},
+					"no-new-func": {
+						messages: {
+							"The Function constructor is eval":
+								"Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+						},
+					},
+				},
+			],
 		},
 	},
 ]);

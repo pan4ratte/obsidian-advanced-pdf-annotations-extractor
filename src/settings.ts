@@ -460,6 +460,28 @@ class FolderSuggest extends AbstractInputSuggest<string> {
 	}
 }
 
+/**
+ * Built imperatively in `display()` rather than declared through 1.13's
+ * `getSettingDefinitions()`.
+ *
+ * The two are not additive: a non-empty array of definitions renders the tab
+ * *instead of* `display()`, which is then only reached on the versions that
+ * have no declarative API at all. Adopting it here means writing this tab
+ * twice — the second time with the variables table, the template editor and
+ * its gutter, the warning overlay, the accordion and the annotation grid each
+ * moved into a `render` callback, since none of them is a control the API
+ * describes. `minAppVersion` is 1.8.7, so `display()` has to stay either way.
+ *
+ * The cost of that is a second copy of the settings UI to keep in step; the
+ * cost of not doing it is that the plain toggles and dropdowns do not turn up
+ * in the settings search on 1.13 and later. Worth revisiting when
+ * `minAppVersion` rises past 1.13 and `display()` can be dropped, which makes
+ * it one implementation again rather than two.
+ *
+ * The rule that asks for the declarative API is turned off for this file in
+ * `eslint.config.mjs`, where the same reasoning is recorded — an inline
+ * disable is itself disallowed by the recommended config.
+ */
 export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	plugin: PDFAnnotationPlugin;
 

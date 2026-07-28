@@ -99,10 +99,33 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ needs.check.outputs.version }}"
-          NOTES=$(awk "/^## $VERSION/{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # The heading is matched whole, not as a prefix: `## 1.9.5` used as a
+          # regex also matches `## 1.9.51`, and the notes of both sections end
+          # up in the body — the later version's first. Comparing the heading
+          # as a string also stops the dots being read as wildcards.
+          NOTES=$(awk -v version="$VERSION" '
+            /^## / {
+              heading = $0
+              sub(/^## +/, "", heading)
+              sub(/[[:space:]]+$/, "", heading)
+              inside = (heading == version)
+              next
+            }
+            inside
+          ' CHANGELOG.md)
+          if [ -z "$(printf %s "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "::error::No release notes for $VERSION in CHANGELOG.md. Rename its '## Unreleased' section to '## $VERSION'."
+            exit 1
+          fi
+          # A delimiter nothing in the notes can be: a changelog line reading
+          # EOF would otherwise end the value early and spill the rest into
+          # the step's output as if it were more variables.
+          DELIMITER="notes-$(openssl rand -hex 16)"
+          {
+            echo "notes<<$DELIMITER"
+            echo "$NOTES"
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
 
       # Step 6: Create the GitHub Release (creates the tag at this commit) and
       # attach the attested files
