@@ -5,8 +5,8 @@
 Clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/pan4ratte/obsidian-advanced-pdf-annotations-extractor.git
-cd obsidian-advanced-pdf-annotations-extractor
+git clone https://github.com/pan4ratte/obsidian-classy-pdf-extractor.git
+cd obsidian-classy-pdf-extractor
 npm install
 ```
 
