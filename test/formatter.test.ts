@@ -1,4 +1,5 @@
 import {describe, expect, test} from '@jest/globals';
+import {t} from '../lang/helpers';
 import {PDFAnnotationPluginFormatter} from '../src/formatter';
 import {PDFAnnotationPluginSetting} from '../src/settings';
 import {PDFAnnotation} from '../src/types';
@@ -83,7 +84,8 @@ describe('template variables', () => {
   });
 
   test('reports when there is nothing to render', () => {
-    expect(formatterWith('{{body}}').format([], false)).toBe('*No annotations*');
+    expect(formatterWith('{{body}}').format([], false))
+      .toBe(t.NOTE_NO_ANNOTATIONS);
   });
 });
 
@@ -330,6 +332,10 @@ describe('filelink', () => {
   settings.fileHeading = 'none';
     const formatter = new PDFAnnotationPluginFormatter(settings);
     expect(formatter.format([annotation()], false)).toContain('[[refs/Paper.pdf]]');
-    expect(formatter.format([annotation()], true)).toContain(' on refs/Paper.pdf');
+    // The bare path, and no wiki link anywhere around it. Asserted without the
+    // words either side, which belong to the template and so to the locale.
+    const external = formatter.format([annotation()], true);
+    expect(external).toContain('refs/Paper.pdf');
+    expect(external).not.toContain('[[');
   });
 });

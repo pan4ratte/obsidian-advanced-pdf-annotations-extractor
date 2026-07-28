@@ -92,8 +92,8 @@ src/
   collapsible.ts              — the show/hide animation, shared by tab and modal
   types.ts                    — PDFFile, annotation and pdf.js boundary types
 lang/
-  en.ts               — every user-facing string, flat UPPER_SNAKE keys
-  ru.ts               — the same keys, in the same order, translated
+  ru.ts               — every user-facing string; the original
+  en.ts               — the same keys, in the same order, translated from ru.ts
   helpers.ts          — picks the locale, exports `t`
 test/
   extractHighlight.test.ts  — glyph-level text extraction
@@ -155,12 +155,17 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
   grouped under `// ─── Section ───` banners; values are plain strings, and
   anything variable is interpolated at the call site
   (`` new Notice(`${t.NOTICE_COPIED}: ${variable}`) ``). A new language is a
-  copy of `en.ts` listed in `helpers.ts`'s `localeMap`; `ru.ts` is the worked
-  example, and every locale file must carry all of `en.ts`'s keys, since `t` is
-  typed as `typeof en`. Three of them are not free prose: `HANDLEBARS_LINK` must
-  appear verbatim inside `SECTION_TEMPLATES_DESC` for the link to be woven in,
-  `DATE_FORMAT` is a moment format string, and the `DEFAULT_*_TEMPLATE` values
-  may only have the words around their `{{variables}}` translated.
+  copy of `en.ts` listed in `helpers.ts`'s `localeMap`. Every locale file must
+  carry all of `en.ts`'s keys, since `t` is typed as `typeof en`.
+- **`ru.ts` is the original; `en.ts` is translated from it.** New or reworded UI
+  text goes into `ru.ts` first and `en.ts` is synced to match in the same
+  change — never the reverse. Three kinds of value are not free prose in any
+  locale: `HANDLEBARS_LINK` must appear verbatim inside that file's
+  `SECTION_TEMPLATES_DESC` for the link to be woven in, `DATE_FORMAT` is a
+  moment format string (`ru` uses `D MMMM YYYY`, since moment's `LL` adds a
+  "г." that suits prose and not a list), and `DEFAULT_*_TEMPLATE`,
+  `DEFAULT_NOTE_NAME` and `NAME_NO_TOPIC` may only have the words around their
+  `{{variables}}` translated.
   Exempt, and to stay exempt: the annotation subtypes (spelled as the PDF format
   spells them), the `{{variable}}` names, the command IDs (persisted, so hotkeys
   survive), and the markdown and YAML syntax the formatter writes.
