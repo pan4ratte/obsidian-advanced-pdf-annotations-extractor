@@ -37,6 +37,29 @@ import { AdvancedExtractionModal } from "src/advancedExtractionModal";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
+/**
+ * The one thing this plugin asks of Node's `fs`: whether a path the reader
+ * pasted names a file.
+ *
+ * Described here rather than taken from `typeof import("fs")`, which is only a
+ * type where `@types/node` is installed. It is a devDependency, so a checkout
+ * that installs none — a reviewer's, a CI job that lints without building —
+ * resolves it to `any`, and that `any` then spreads through every call made on
+ * it. Naming the one method used costs four lines and depends on nothing.
+ */
+interface NodeFileSystem {
+	statSync(path: string): { isFile(): boolean };
+}
+
+/**
+ * The loader Obsidian's CommonJS bundle is handed. Declared for the same
+ * reason as the interface above: without `@types/node` the name resolves to
+ * nothing at all, and a call on an unresolved name is unsafe by definition.
+ * Declaring it emits nothing — at run time this is Electron's own `require`,
+ * reached only behind the desktop guard that precedes every use.
+ */
+declare const require: (id: string) => unknown;
+
 /** When a name template and the PDF's own name both render nothing usable. */
 const FALLBACK_NOTE_NAME = "Annotations";
 
@@ -282,14 +305,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			// Behind the desktop guard above, since mobile has no fs.
 			// require() because esbuild leaves a bare import() in the CJS
 			// bundle, which Obsidian's loader cannot always resolve.
-			// Through `unknown` on the way: `require` is typed `any` in some
-			// setups and as the module itself in others, so asserting the
-			// module type straight off it is either unsafe or redundant
-			// depending on whose type information is loaded. Narrowing from
-			// `unknown` is neither, and says what is actually known here —
-			// that this is a module the caller has to name the type of.
-			const required: unknown = require("fs");
-			const fs = required as typeof import("fs");
+			const fs = require("fs") as NodeFileSystem;
 			const filePathWithoutBeginningAndEndQuotes = filePathFromClipboard.replace(
 				/^["']|["']$/g,
 				""

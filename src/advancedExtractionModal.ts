@@ -66,8 +66,18 @@ function unquote(raw: string): string {
  * whatever the format puts first. Obsidian sets moment's locale to the app's,
  * so a Russian interface reads Russian months without a translation here.
  */
+/** The slice of a moment object a day is rendered through. */
+interface FormattedDate {
+	isValid(): boolean;
+	format(format: string): string;
+}
+
 function readableDay(day: string): string {
-	const date: moment.Moment = moment(day, "YYYY-MM-DD", true);
+	// Narrowed to the two methods used rather than typed as `moment.Moment`:
+	// `moment` reaches us through Obsidian's re-export of the moment package,
+	// which is `any` wherever that package's own types are not installed —
+	// and an `any` here would spread into everything the day is written into.
+	const date = moment(day, "YYYY-MM-DD", true) as unknown as FormattedDate;
 	return date.isValid() ? date.format(t.DATE_FORMAT) : day;
 }
 
