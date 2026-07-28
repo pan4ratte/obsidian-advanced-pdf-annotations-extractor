@@ -102,8 +102,11 @@ export const DEFAULT_TEMPLATE_KEY = "default";
  * up nothing, so none of them needs a template to start on.
  */
 export function defaultAnnotationTemplates(): Record<string, string> {
+	// The pairs are annotated as tuples: an array literal widens to `string[]`,
+	// which `Object.fromEntries` answers with its `any`-returning overload
+	// rather than the typed one.
 	return Object.fromEntries(
-		SUPPORTED_ANNOTS.map(({ subtype }) => [subtype, ""])
+		SUPPORTED_ANNOTS.map(({ subtype }): [string, string] => [subtype, ""])
 	);
 }
 
@@ -151,15 +154,21 @@ export function findVariableUses(
 	if (names.length === 0) return [];
 
 	const pattern = new RegExp(`\\{\\{\\s*(${names.join("|")})\\s*\\}\\}`, "g");
-	return Array.from(template.matchAll(pattern), (match) => {
-		const start = match.index ?? 0;
-		return {
-			start,
-			end: start + match[0].length,
-			text: match[0],
-			name: match[1],
-		};
-	});
+	return Array.from(
+		template.matchAll(pattern),
+		(match: RegExpMatchArray) => {
+			const start = match.index ?? 0;
+			const text = match[0];
+			return {
+				start,
+				end: start + text.length,
+				text,
+				// The pattern has one group and it matched, or there would be
+				// no match to be here for; the fallback is for the type only.
+				name: match[1] ?? "",
+			};
+		}
+	);
 }
 
 export const DEFAULT_DESIRED_ANNOTATIONS = SUPPORTED_ANNOTS.filter(
@@ -433,8 +442,9 @@ export class PDFAnnotationPluginSetting {
 			value && typeof value === "object" ? value : {}
 		) as Record<string, unknown>;
 
+		// Tuples for the reason `defaultAnnotationTemplates` gives.
 		return Object.fromEntries(
-			SUPPORTED_ANNOTS.map(({ subtype }) => [
+			SUPPORTED_ANNOTS.map(({ subtype }): [string, string] => [
 				subtype,
 				typeof held[subtype] === "string" ? held[subtype] : "",
 			])
@@ -920,9 +930,11 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 
 		const templateVariableBody = templateVariableTable.createEl("tbody");
-		Object.entries(TEMPLATE_VARIABLES).forEach((variableData) => {
-			const [key, description] = variableData,
-				templateVariableRow = templateVariableBody.createEl("tr"),
+		const variableRows: [string, string][] = Object.entries(
+			TEMPLATE_VARIABLES
+		);
+		variableRows.forEach(([key, description]) => {
+			const templateVariableRow = templateVariableBody.createEl("tr"),
 				nameCell = templateVariableRow.createEl("td", {
 					cls: "pdf-annotations-variable-name",
 				}),

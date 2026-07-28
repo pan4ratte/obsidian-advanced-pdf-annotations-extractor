@@ -67,7 +67,7 @@ function unquote(raw: string): string {
  * so a Russian interface reads Russian months without a translation here.
  */
 function readableDay(day: string): string {
-	const date = moment(day, "YYYY-MM-DD", true);
+	const date: moment.Moment = moment(day, "YYYY-MM-DD", true);
 	return date.isValid() ? date.format(t.DATE_FORMAT) : day;
 }
 

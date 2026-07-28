@@ -282,7 +282,14 @@ export default class PDFAnnotationPlugin extends Plugin {
 			// Behind the desktop guard above, since mobile has no fs.
 			// require() because esbuild leaves a bare import() in the CJS
 			// bundle, which Obsidian's loader cannot always resolve.
-			const fs = require("fs") as typeof import("fs");
+			// Through `unknown` on the way: `require` is typed `any` in some
+			// setups and as the module itself in others, so asserting the
+			// module type straight off it is either unsafe or redundant
+			// depending on whose type information is loaded. Narrowing from
+			// `unknown` is neither, and says what is actually known here —
+			// that this is a module the caller has to name the type of.
+			const required: unknown = require("fs");
+			const fs = required as typeof import("fs");
 			const filePathWithoutBeginningAndEndQuotes = filePathFromClipboard.replace(
 				/^["']|["']$/g,
 				""
