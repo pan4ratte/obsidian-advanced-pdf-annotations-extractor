@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  English | <a href="README_ru.md">Русский</a>
+  English | <a href="https://github.com/pan4ratte/obsidian-classy-pdf-extractor/blob/main/README_RU.md">Русский</a>
 </p>
 
 This plugin extracts all types of annotations from PDFs and writes them into the notes of your vault with automated formatting. The import offers a choice of annotation types, page ranges and the days the comments were created on, while templates let you format every type separately. Group the annotations by topic, date, folder and file, and send them to the current note, to a new one, or every annotation into a note of its own.
