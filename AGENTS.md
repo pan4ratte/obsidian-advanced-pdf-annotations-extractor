@@ -17,10 +17,13 @@
 - Output `main.js` is **gitignored**; the release workflow ships it with
   `manifest.json` and `styles.css` — those three files are the plugin.
 - Plugin entrypoint: `src/main.ts` → default export `PDFAnnotationPlugin`.
-- `obsidian` is pinned to exactly `1.8.7` — it matches `minAppVersion` and is a
-  hard peer requirement of `eslint-plugin-obsidianmd`.
+- `obsidian` is pinned to exactly `1.13.1` — it matches `minAppVersion` 1.13.0,
+  which the declarative settings tab needs. `eslint-plugin-obsidianmd` still
+  peer-requires exactly `1.8.7`, so `package.json` overrides that peer to
+  `$obsidian`; without the override `npm install` fails with `ERESOLVE`. Drop
+  the override once a release of that plugin widens the peer.
 - Both halves of the build target **ES2020** (`target` in `tsconfig.json` and in
-  `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.8.7 has all of
+  `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.13.0 has all of
   it, so nothing is downlevelled.
 - TypeScript is **6.0.3**, one major behind `latest`: `typescript-eslint` caps
   at `<6.1.0` and `ts-jest` at `<7`, so 7.x takes the linter and the tests down
@@ -129,6 +132,38 @@ carries **no migrations** — don't add any for versions of the ancestor plugin.
 exist for a hand-edited `data.json` and for types added in later versions, not
 for upgrades: anything unrecognised falls back to the default.
 
+## Settings tab
+
+Declared through Obsidian 1.13's `getSettingDefinitions()`. `display()` is gone:
+a non-empty array of definitions renders the tab **instead of** it, and
+`minAppVersion` is 1.13.0, so nothing reaches it.
+
+The array is one group holding one definition per section of the tab —
+header, annotation types, templates, grouping, headings, notes — and it never
+changes shape. Five rules keep it working; each one is a silent failure if
+broken:
+
+- **No `control`.** Nothing in this tab is a control the API describes, so every
+  definition uses `render` and draws itself. `render` does **not** auto-save:
+  every change handler calls `saveSettings()` itself.
+- **Build into `setting.settingEl`, never `group.listEl`.** After each pass
+  Obsidian prunes the group's list down to the rows it created itself, so
+  anything put there is drawn and deleted in the same tick — a blank tab, no
+  console error.
+- **Reuse the root.** `update()` runs the callback again on the row it already
+  drew; appending a fresh root each time puts the whole UI on screen twice. The
+  `section()` helper looks the root up before creating it.
+- **Redraw your own root, not the definition list.** Obsidian reconciles rows by
+  a key taken from the definition's name, so the list stays static and a section
+  that has to change redraws into the root it already owns.
+- **Fill in `name`, `desc` and `aliases`.** The settings search indexes the
+  definition, not the DOM, and a hit scrolls to the row the section is drawn in.
+  Each section names the settings inside it in `aliases`, taken from `t` so
+  nothing new needs translating. Adding a setting means adding its name there.
+
+The stylesheet carries the other half of this — see the reset at the top of
+`styles.css` and the file-order rule on it.
+
 ## Source layout (flat, not a monorepo)
 
 ```
@@ -154,6 +189,7 @@ test/
   mocks/obsidian.ts
 styles.css            — settings tab CSS (release asset)
 CHANGELOG.md          — release notes source for the workflow
+versions.json         — plugin version → the minAppVersion it shipped with
 ```
 
 ## Release
@@ -169,7 +205,13 @@ To cut a release, in one commit:
 2. Rename `## Unreleased` in `CHANGELOG.md` to that version — the workflow greps
    `## <version>` for the release notes, so a missing section means an empty
    release body
-3. Push
+3. Add the new version to `versions.json`, mapped to the `minAppVersion` this
+   release ships with — that file is what lets an older Obsidian keep offering
+   the last release it can actually run. It is read from the repository, not
+   from the release assets, so it only has to be committed. It covers this
+   plugin's own releases only: the history before `1.0.0` belongs to the plugin
+   this one was forked from, under a different id
+4. Push
 
 The workflow then runs `npm ci` and `npm run build`, attests build provenance for
 `main.js` / `manifest.json` / `styles.css`, creates the release with those three
@@ -185,9 +227,10 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
 - `eslint.config.mjs` (flat config) extends `eslint-plugin-obsidianmd`'s
   `recommended`, which bundles `eslint:recommended`, typescript-eslint
   `recommended-type-checked`, `import`, `depend` and `no-unsanitized`.
-- Lint is **clean**: 0 errors, and the single remaining warning is
-  `prefer-setting-definitions`, which needs Obsidian 1.13's declarative settings
-  API and so is out of reach at `minAppVersion` 1.8.7. Keep it that way.
+- Lint is **clean**: 0 errors and 0 warnings. Keep it that way.
+- Every component carries a `then()` for chaining, which
+  `@typescript-eslint/no-misused-promises` reads as a promise. Never test one
+  for truth — compare it with `null`, or the rule fails the build.
 - pdf.js data is typed at the boundary, not passed around as `any`:
   `RawPDFAnnotation` (what pdf.js reports), `PDFAnnotation` (once extraction has
   filled in the note's fields), `PositionedText` and `PDFJsLib` in `src/types.ts`.
@@ -197,7 +240,12 @@ Lint and tests are **not** gated by the workflow — run `npm run lint` and
   fixer rewrites `any` to `unknown` and breaks every call site).
 - No inline UI styles — put CSS in `styles.css` and add a class.
 - Settings UI: headings via `new Setting(el).setName(...).setHeading()`, sentence
-  case for all user-facing text, no plugin name in command names.
+  case for all user-facing text, no plugin name in command names. A new setting
+  goes into the section renderer it belongs to and its name goes into that
+  section's `aliases` — see **Settings tab**.
+- No CSS rule that re-asserts a settings row of this plugin's own may be added
+  above the reset at the top of `styles.css`: they tie with it at 0,3,0, so file
+  order is the only thing settling them.
 - **No string literals in the UI** — command names, notices, setting names and
   descriptions, the settings header, and the default templates and export names
   (they end up in exported notes) all come from `lang/en.ts`, reached as

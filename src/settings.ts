@@ -7,6 +7,8 @@ import {
 	PluginSettingTab,
 	setIcon,
 	Setting,
+	SettingDefinitionItem,
+	SettingDefinitionRender,
 	setTooltip,
 	TextAreaComponent,
 	ToggleComponent,
@@ -471,29 +473,37 @@ class FolderSuggest extends AbstractInputSuggest<string> {
 }
 
 /**
- * Built imperatively in `display()` rather than declared through 1.13's
- * `getSettingDefinitions()`.
+ * Declared through 1.13's `getSettingDefinitions()`, one definition per section
+ * of the tab. `display()` is gone: a non-empty array of definitions renders the
+ * tab instead of it, and `minAppVersion` is 1.13.0, so there is no version left
+ * that would reach it.
  *
- * The two are not additive: a non-empty array of definitions renders the tab
- * *instead of* `display()`, which is then only reached on the versions that
- * have no declarative API at all. Adopting it here means writing this tab
- * twice — the second time with the variables table, the template editor and
- * its gutter, the warning overlay, the accordion and the annotation grid each
- * moved into a `render` callback, since none of them is a control the API
- * describes. `minAppVersion` is 1.8.7, so `display()` has to stay either way.
+ * Every definition draws itself through `render`. None of this tab's pieces —
+ * the variables table, the template editor and its gutter, the warning overlay,
+ * the accordion, the annotation grid — is a control the API describes, so
+ * `control` is used nowhere here and nothing is saved automatically: each
+ * change handler still calls `saveSettings()` itself, exactly as it did when
+ * the tab was built imperatively.
  *
- * The cost of that is a second copy of the settings UI to keep in step; the
- * cost of not doing it is that the plain toggles and dropdowns do not turn up
- * in the settings search on 1.13 and later. Worth revisiting when
- * `minAppVersion` rises past 1.13 and `display()` can be dropped, which makes
- * it one implementation again rather than two.
+ * What a definition carries besides its drawing is what the settings search
+ * indexes — the DOM is not read — so each one names the settings inside it in
+ * `aliases`, and a hit scrolls to the row the section is drawn in.
  *
- * The rule that asks for the declarative API is turned off for this file in
- * `eslint.config.mjs`, where the same reasoning is recorded — an inline
- * disable is itself disallowed by the recommended config.
+ * The list never changes shape. Obsidian reconciles rows by a key taken from
+ * the definition's name, so a section that has to redraw redraws its own root
+ * rather than asking for the list again.
  */
 export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	plugin: PDFAnnotationPlugin;
+
+	/**
+	 * The two heading toggles are switched on and off by settings in the
+	 * section above theirs, so they outlive the call that draws them. Null
+	 * until that section has been drawn, and again once it is torn down.
+	 */
+	private topicHeadingToggle: ToggleComponent | null = null;
+	private dateHeadingToggle: ToggleComponent | null = null;
+	private syncingHeadings = false;
 
 	constructor(app: App, plugin: PDFAnnotationPlugin) {
 		super(app, plugin);
@@ -674,7 +684,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 	/**
 	 * Marks every variable the type being edited never fills, and says why.
-	 * Returns the call that switches the marks to another type.
+	 * Returns the call that switches the marks to another type, and the one
+	 * that gives up the media query it watches — the query outlives the
+	 * elements, so the section that drew them hands this back as its cleanup.
 	 *
 	 * The marks lie under the text area rather than in it, so nothing about
 	 * the typing changes; the pointer never reaches them, and is measured
@@ -689,7 +701,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		textarea: HTMLTextAreaElement,
 		overlay: HTMLElement,
 		host: HTMLElement
-	): (subtype: string) => void {
+	): { show: (subtype: string) => void; dispose: () => void } {
 		const tooltip = host.createDiv({
 			cls: "pdf-annotations-template-tooltip",
 		});
@@ -785,11 +797,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			tooltip.show();
 		});
 
-		return (subtype: string) => {
-			const unfilledHere = unfilledVariablesFor(subtype);
-			unfilled = unfilledHere.names;
-			description = unfilledHere.description;
-			paint();
+		return {
+			show: (subtype: string) => {
+				const unfilledHere = unfilledVariablesFor(subtype);
+				unfilled = unfilledHere.names;
+				description = unfilledHere.description;
+				paint();
+			},
+			dispose: () => hovers.removeEventListener("change", paint),
 		};
 	}
 
@@ -845,21 +860,136 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		});
 	}
 
-	display(): void {
-		const { containerEl } = this;
+	/**
+	 * One section of the tab, as a definition that draws itself.
+	 *
+	 * The row Obsidian gives the definition is a host and nothing else: its own
+	 * name and description are there for the search to index and are hidden by
+	 * the stylesheet, and the section is built into a root inside it. It has to
+	 * be `settingEl` and not the group's list element, which Obsidian prunes
+	 * down to the rows it created itself after every pass — anything else put
+	 * there is drawn and then deleted in the same tick.
+	 *
+	 * The root is looked up before it is created, since `update()` runs the
+	 * callback again on the row it already drew and a second root would leave
+	 * the section on screen twice.
+	 */
+	private section(
+		definition: Omit<SettingDefinitionRender, "render">,
+		draw: (root: HTMLElement) => (() => void) | void
+	): SettingDefinitionRender {
+		return {
+			...definition,
+			render: (setting) => {
+				setting.settingEl.addClass("pdf-annotations-settings-anchor");
+				const root =
+					setting.settingEl.querySelector<HTMLElement>(
+						":scope > .pdf-annotations-settings-root"
+					) ??
+					setting.settingEl.createDiv("pdf-annotations-settings-root");
+				root.empty();
+				return draw(root);
+			},
+		};
+	}
 
-		containerEl.empty();
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		// One group, named so the stylesheet can blank the card 1.13 draws
+		// around it: the sections inside bring cards of their own.
+		return [
+			{
+				type: "group",
+				cls: "pdf-annotations-settings-group",
+				items: [
+					this.section(
+						{
+							name: t.PLUGIN_NAME,
+							desc: t.PLUGIN_DESCRIPTION,
+						},
+						(root) => this.renderHeader(root)
+					),
+					this.section(
+						{
+							name: t.SETTING_ANNOTATIONS_NAME,
+							aliases: SUPPORTED_ANNOTS.map(
+								({ description }) => description
+							),
+						},
+						(root) => this.renderAnnotationTypes(root)
+					),
+					this.section(
+						{
+							name: t.SECTION_TEMPLATES,
+							desc: t.SECTION_TEMPLATES_DESC,
+							// The variable names are what a reader looking for
+							// the template editor is most likely to type.
+							aliases: [
+								t.SETTING_TEMPLATE_NAME,
+								t.HANDLEBARS_LINK,
+								t.SHOW_VARIABLES_TABLE,
+								...Object.keys(TEMPLATE_VARIABLES).map(
+									(name) => `{{${name}}}`
+								),
+							],
+						},
+						(root) => this.renderTemplates(root)
+					),
+					this.section(
+						{
+							name: t.SECTION_GROUPING,
+							aliases: [
+								t.SETTING_SORT_BY_TOPIC_NAME,
+								t.SETTING_GROUP_BY_DATE_NAME,
+								t.SETTING_GROUP_BY_FOLDER_NAME,
+							],
+						},
+						(root) => this.renderGrouping(root)
+					),
+					this.section(
+						{
+							name: t.SECTION_HEADINGS,
+							aliases: [
+								t.SETTING_DATE_HEADING_NAME,
+								t.SETTING_TOPIC_HEADING_NAME,
+								t.SETTING_FILE_HEADING_NAME,
+							],
+						},
+						(root) => this.renderHeadings(root)
+					),
+					this.section(
+						{
+							name: t.SECTION_NOTES,
+							aliases: [
+								t.SETTING_NOTE_LOCATION_NAME,
+								t.SETTING_NOTE_FOLDER_NAME,
+								t.SETTING_NOTE_SUBFOLDER_NAME,
+								t.SETTING_TOPIC_TO_NAME_NAME,
+								t.SETTING_ONE_NOTE_NAME_NAME,
+								t.SETTING_EXTRACT_TAGS_NAME,
+								t.SETTING_NOTE_NAME_NAME,
+								t.SETTING_OVERWRITE_NAME,
+							],
+						},
+						(root) => this.renderNotes(root)
+					),
+				],
+			},
+		];
+	}
 
-		const header = new Setting(containerEl)
+	private renderHeader(root: HTMLElement): void {
+		const header = new Setting(root)
 			.setName(t.PLUGIN_NAME)
 			.setDesc(t.PLUGIN_DESCRIPTION)
 			.setHeading();
 		header.settingEl.addClass("pdf-annotations-settings-header");
+	}
 
+	private renderAnnotationTypes(root: HTMLElement): void {
 		// Name, description and checkboxes form one card, stacked: the grid
 		// goes into the setting's control element, which styles.css widens to
 		// the full row underneath the text.
-		const annotationSetting = new Setting(containerEl)
+		const annotationSetting = new Setting(root)
 			.setName(t.SETTING_ANNOTATIONS_NAME)
 			.setHeading();
 		annotationSetting.settingEl.addClass(
@@ -888,11 +1018,17 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.catch((error) => console.error(error));
 			});
 		});
+	}
 
+	/**
+	 * Returns the cleanup for the media query the warnings watch: Obsidian
+	 * calls it when the tab is hidden and before the section is drawn again.
+	 */
+	private renderTemplates(root: HTMLElement): () => void {
 		// The heading's description rather than a paragraph after it, so the
 		// section reads as one block. Through descEl, since setDesc takes text
 		// and this has a link in the middle.
-		const templatesHeading = new Setting(containerEl)
+		const templatesHeading = new Setting(root)
 			.setName(t.SECTION_TEMPLATES)
 			.setHeading();
 		templatesHeading.descEl.addClass("pdf-annotations-template-instructions");
@@ -908,7 +1044,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// `sizeVariableTable` is assigned below, once there is a table to size.
 		let sizeVariableTable: () => void = () => undefined;
 		const variablesContent = this.createAccordion(
-			containerEl,
+			root,
 			t.SHOW_VARIABLES_TABLE,
 			t.HIDE_VARIABLES_TABLE,
 			() => sizeVariableTable()
@@ -981,7 +1117,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 
 		// One card whose picker says which template is being written. Editing
 		// them one at a time keeps the card one template tall.
-		const templateColumns = containerEl.createDiv({
+		const templateColumns = root.createDiv({
 			cls: "pdf-annotations-template-columns",
 		});
 		// The card is a box of ours holding a setting row and the editor
@@ -1065,55 +1201,70 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		// Under the setting row rather than inside it: text and picker share
 		// the row, the editor takes the width of the card beneath it.
 		if (editorEl) templateCard.appendChild(editorEl);
+		let disposeWarnings: () => void = () => undefined;
 		if (overlayEl) {
-			showUnfilledVariables = this.addVariableWarnings(
+			const warnings = this.addVariableWarnings(
 				editor.inputEl,
 				overlayEl,
 				templateCard
 			);
+			showUnfilledVariables = warnings.show;
+			disposeWarnings = warnings.dispose;
 			// The template on screen was shown before there was anything to
 			// mark it with.
 			showUnfilledVariables(editing);
 		}
 
-		// Two groups, in the order they take effect: where an annotation lands,
-		// then what is written above it.
-		// The topic heading has nothing to head until a topic is split off, so
-		// it follows the setting that splits it — greyed out but still in view,
-		// and remembering the choice it was switched off from.
-		// Assigned as the settings below are built, before anything can call it.
-		let topicHeadingToggle!: ToggleComponent;
-		let dateHeadingToggle!: ToggleComponent;
-		let syncingHeadings = false;
-		const syncHeading = (
-			toggle: ToggleComponent,
-			enabled: boolean,
-			remembered: boolean
-		) => {
-			// setValue calls onChange, which would take this for an edit and
-			// write the remembered choice away.
-			syncingHeadings = true;
-			toggle.setValue(enabled && remembered);
-			toggle.setDisabled(!enabled);
-			syncingHeadings = false;
-		};
-		const syncTopicHeading = () =>
-			syncHeading(
-				topicHeadingToggle,
-				this.plugin.settings.sortByTopic,
-				this.plugin.settings.topicHeading
-			);
-		const syncDateHeading = () =>
-			syncHeading(
-				dateHeadingToggle,
-				this.plugin.settings.groupByDate,
-				this.plugin.settings.dateHeading
-			);
+		return () => disposeWarnings();
+	}
 
-		new Setting(containerEl)
+	/**
+	 * The topic heading has nothing to head until a topic is split off, so it
+	 * follows the setting that splits it — greyed out but still in view, and
+	 * remembering the choice it was switched off from. The two live in
+	 * different sections, so the toggle is a field of the tab rather than a
+	 * local of the call that drew it, and nothing happens until it exists.
+	 */
+	private syncHeadingToggle(
+		toggle: ToggleComponent | null,
+		enabled: boolean,
+		remembered: boolean
+	): void {
+		// Compared with null rather than tested for truth: every component
+		// carries a `then` for chaining, which reads as a promise to the rule
+		// that guards against awaiting one by accident.
+		if (toggle === null) return;
+		// setValue calls onChange, which would take this for an edit and write
+		// the remembered choice away.
+		this.syncingHeadings = true;
+		toggle.setValue(enabled && remembered);
+		toggle.setDisabled(!enabled);
+		this.syncingHeadings = false;
+	}
+
+	private syncTopicHeading(): void {
+		this.syncHeadingToggle(
+			this.topicHeadingToggle,
+			this.plugin.settings.sortByTopic,
+			this.plugin.settings.topicHeading
+		);
+	}
+
+	private syncDateHeading(): void {
+		this.syncHeadingToggle(
+			this.dateHeadingToggle,
+			this.plugin.settings.groupByDate,
+			this.plugin.settings.dateHeading
+		);
+	}
+
+	// Two sections, in the order they take effect: where an annotation lands,
+	// then what is written above it.
+	private renderGrouping(root: HTMLElement): void {
+		new Setting(root)
 			.setName(t.SECTION_GROUPING)
 			.setHeading();
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
 			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
 			.addToggle((toggle) =>
@@ -1121,12 +1272,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.sortByTopic)
 					.onChange(async (value) => {
 						this.plugin.settings.sortByTopic = value;
-						syncTopicHeading();
+						this.syncTopicHeading();
 						await this.plugin.saveSettings();
 					})
 			);
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_GROUP_BY_DATE_NAME)
 			.setDesc(t.SETTING_GROUP_BY_DATE_DESC)
 			.addToggle((toggle) =>
@@ -1134,12 +1285,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.groupByDate)
 					.onChange(async (value) => {
 						this.plugin.settings.groupByDate = value;
-						syncDateHeading();
+						this.syncDateHeading();
 						await this.plugin.saveSettings();
 					})
 			);
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_GROUP_BY_FOLDER_NAME)
 			.setDesc(t.SETTING_GROUP_BY_FOLDER_DESC)
 			.addToggle((toggle) =>
@@ -1150,41 +1301,47 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+	}
 
-		new Setting(containerEl)
+	/**
+	 * Returns the cleanup that forgets the two toggles the section above
+	 * reaches for, so nothing is left pointing at a row that is gone.
+	 */
+	private renderHeadings(root: HTMLElement): () => void {
+		new Setting(root)
 			.setName(t.SECTION_HEADINGS)
 			.setHeading();
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_DATE_HEADING_NAME)
 			.setDesc(t.SETTING_DATE_HEADING_DESC)
 			.addToggle((toggle) => {
-				dateHeadingToggle = toggle;
+				this.dateHeadingToggle = toggle;
 				toggle
 					.setValue(this.plugin.settings.dateHeading)
 					.onChange(async (value) => {
-						if (syncingHeadings) return;
+						if (this.syncingHeadings) return;
 						this.plugin.settings.dateHeading = value;
 						await this.plugin.saveSettings();
 					});
 			});
-		syncDateHeading();
+		this.syncDateHeading();
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_TOPIC_HEADING_NAME)
 			.setDesc(t.SETTING_TOPIC_HEADING_DESC)
 			.addToggle((toggle) => {
-				topicHeadingToggle = toggle;
+				this.topicHeadingToggle = toggle;
 				toggle
 					.setValue(this.plugin.settings.topicHeading)
 					.onChange(async (value) => {
-						if (syncingHeadings) return;
+						if (this.syncingHeadings) return;
 						this.plugin.settings.topicHeading = value;
 						await this.plugin.saveSettings();
 					});
 			});
-		syncTopicHeading();
+		this.syncTopicHeading();
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_FILE_HEADING_NAME)
 			.setDesc(t.SETTING_FILE_HEADING_DESC)
 			.addDropdown((dropdown) =>
@@ -1201,7 +1358,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
+		return () => {
+			this.dateHeadingToggle = null;
+			this.topicHeadingToggle = null;
+		};
+	}
+
+	private renderNotes(root: HTMLElement): void {
+		new Setting(root)
 			.setName(t.SECTION_NOTES)
 			.setHeading();
 		// A note beside its PDF has no vault folder to go in and no subfolder
@@ -1214,7 +1378,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 		};
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_NOTE_LOCATION_NAME)
 			.setDesc(t.SETTING_NOTE_LOCATION_DESC)
 			.addDropdown((dropdown) =>
@@ -1232,7 +1396,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 
-		const noteTargetPanel = containerEl.createDiv({
+		const noteTargetPanel = root.createDiv({
 			cls: "pdf-annotations-collapsible",
 		});
 		showNoteTarget = createCollapsible(noteTargetPanel);
@@ -1273,7 +1437,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			showOneNoteName(!this.plugin.settings.topicToNoteName, animate);
 		};
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_TOPIC_TO_NAME_NAME)
 			.setDesc(t.SETTING_TOPIC_TO_NAME_DESC)
 			.addToggle((toggle) =>
@@ -1286,7 +1450,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					})
 			);
 
-		const oneNoteNamePanel = containerEl.createDiv({
+		const oneNoteNamePanel = root.createDiv({
 			cls: "pdf-annotations-collapsible",
 		});
 		showOneNoteName = createCollapsible(oneNoteNamePanel);
@@ -1301,7 +1465,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		);
 		syncOneNoteName(false);
 
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_EXTRACT_TAGS_NAME)
 			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
 			.addDropdown((dropdown) =>
@@ -1314,12 +1478,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
-		const noteNameSetting = new Setting(containerEl)
+		const noteNameSetting = new Setting(root)
 			.setName(t.SETTING_NOTE_NAME_NAME)
 			.setDesc(t.SETTING_NOTE_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "noteName"));
 		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
-		new Setting(containerEl)
+		new Setting(root)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)
 			.addToggle((toggle) =>

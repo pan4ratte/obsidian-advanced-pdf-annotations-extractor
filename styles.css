@@ -1,6 +1,74 @@
-/* Ordered as the interface is: the settings tab from its header down, then the
-   advanced extraction modal from its first card down. The last section of the
-   settings tab holds the helpers both of them share. */
+/* Ordered as the interface is: the settings tab from its group and its reset
+   down, then the advanced extraction modal from its first card down. The last
+   section of the settings tab holds the helpers both of them share. */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Settings tab — the declarative group, its host rows, and the reset
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* The tab is declared through getSettingDefinitions(), which draws one card
+   around the whole group and restyles every setting row inside it: no frame of
+   its own, wider padding, and a divider drawn between one row and the next.
+
+   This tab brings its own cards and its own section headings, so the group's
+   card is blanked and the rows are handed back what a row looks like when it
+   stands on its own — which is what every rule below was written against.
+
+   Obsidian's group rules score 0,3,0 (a :not() lends its argument's weight), so
+   everything here that answers one is named through three classes to match. */
+
+.pdf-annotations-settings-group > .setting-items {
+	background-color: transparent;
+	border: none;
+	border-radius: 0;
+}
+
+/* The row a section is drawn inside is a host and not a setting: no frame, no
+   padding, no space under it, and no divider above it. */
+.pdf-annotations-settings-group .setting-item.pdf-annotations-settings-anchor {
+	display: block;
+	padding: 0;
+	margin-bottom: 0;
+	border: none;
+	background-color: transparent;
+	border-radius: 0;
+}
+
+.pdf-annotations-settings-group
+	.setting-item.pdf-annotations-settings-anchor::before {
+	content: none;
+}
+
+/* The host row's own name and description are there for the settings search to
+   read; the section draws its own heading. */
+.pdf-annotations-settings-anchor > .setting-item-info,
+.pdf-annotations-settings-anchor > .setting-item-control {
+	display: none;
+}
+
+/* THE RESET. Every rule further down this file that re-asserts a row of this
+   plugin's own ties with it at 0,3,0, so file order is what settles them: keep
+   them BELOW this, or they stop reaching their rows.
+
+   The first five declarations put back what the group took off a row, so a row
+   inside a section looks exactly as it did before there was a group. The sixth
+   answers a rule of Obsidian's own rather than the group's: the base row aligns
+   its control to the top, which leaves a dropdown level with the first line of
+   a description instead of beside the middle of it. */
+.pdf-annotations-settings-root .setting-item:not(.setting-item-heading) {
+	padding: var(--size-4-4);
+	margin-bottom: var(--size-4-2);
+	border: var(--setting-items-border-width) solid
+		var(--setting-items-border-color);
+	background-color: var(--setting-items-background);
+	border-radius: var(--setting-items-radius);
+	align-items: center;
+}
+
+.pdf-annotations-settings-root
+	.setting-item:not(.setting-item-heading)::before {
+	content: none;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Settings tab — header
@@ -19,8 +87,12 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 /* Heading, description and checkbox grid as one stacked card: text above, the
-   checkboxes across the full width below. */
-.pdf-annotations-annotation-setting {
+   checkboxes across the full width below.
+
+   Named through the render root and its own row class to reach 0,3,0: the group
+   restyles a heading row too, and would otherwise take this card's padding, its
+   background and the space under it. */
+.pdf-annotations-settings-root .setting-item.pdf-annotations-annotation-setting {
 	flex-direction: column;
 	align-items: stretch;
 	gap: 12px;
@@ -287,8 +359,11 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 /* A row that wraps: text and picker side by side. Too narrow, and the picker
    takes a line of its own. The frame belongs to the card around it, so the
    row brings none of its own. min-width stops a text area's intrinsic width
-   from widening the card. */
-.pdf-annotations-template-setting {
+   from widening the card.
+
+   Named through the render root to reach 0,3,0, which is what the reset above
+   scores: the frame and the padding it takes off are put back by it otherwise. */
+.pdf-annotations-settings-root .setting-item.pdf-annotations-template-setting {
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px 16px;
@@ -488,8 +563,13 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 
 /* Settings whose field wants the whole row — a vault path, a template, a naming
    pattern — rather than the sliver Obsidian leaves at the end of one. Name and
-   description above, the field across the width below. */
-.pdf-annotations-stacked-setting {
+   description above, the field across the width below.
+
+   The class is named twice beside `.setting-item` for the weight alone: the
+   settings tab's reset centres a row's children and would otherwise centre
+   these instead of stretching them. Weight and not scope, because the modal
+   uses this class too and has no render root to be named through. */
+.setting-item.pdf-annotations-stacked-setting.pdf-annotations-stacked-setting {
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;

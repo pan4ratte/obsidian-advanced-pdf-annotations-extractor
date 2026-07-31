@@ -108,26 +108,6 @@ export default defineConfig([
 		},
 	},
 
-	// The settings tab is built imperatively in display(), which 1.13's
-	// getSettingDefinitions() would replace rather than supplement: a
-	// non-empty array of definitions renders the tab instead of display(),
-	// and none of this tab's custom pieces — the variables table, the
-	// template editor and its gutter, the warning overlay, the accordion,
-	// the annotation grid — is a control the API describes, so each would
-	// have to move into a render callback. minAppVersion is 1.8.7, so
-	// display() stays regardless, and adopting the API means maintaining the
-	// tab twice. Revisit when minAppVersion passes 1.13 and display() can go.
-	//
-	// Turned off here rather than at the class: the recommended config
-	// restricts inline disables of this rule. The reasoning is repeated in a
-	// comment on the class itself.
-	{
-		files: ["src/settings.ts"],
-		rules: {
-			"obsidianmd/settings-tab/prefer-setting-definitions": "off",
-		},
-	},
-
 	// Build tooling runs in Node, outside the plugin sandbox.
 	{
 		files: ["*.mjs", "*.js"],
