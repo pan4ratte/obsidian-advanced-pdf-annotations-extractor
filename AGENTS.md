@@ -22,6 +22,21 @@
   peer-requires exactly `1.8.7`, so `package.json` overrides that peer to
   `$obsidian`; without the override `npm install` fails with `ERESOLVE`. Drop
   the override once a release of that plugin widens the peer.
+- **After changing the `obsidian` version, run `npm ls obsidian` and restart the
+  editor's TypeScript server.** Two things go wrong quietly here:
+  - `npm install` will not re-resolve a nested copy the lockfile already holds,
+    so the plugin's own `node_modules/obsidian` can be left behind at the old
+    version. `npm ls` then exits `ELSPROBLEMS` with `invalid:`. Delete the
+    nested directory *and* its `package-lock.json` entry, then install again.
+  - `noImplicitAny` is **false**, so an `obsidian` that does not resolve is not
+    an error — every import from it silently becomes `any`. It surfaces as
+    ~90 `no-unsafe-assignment` warnings spread over every file that imports
+    from `obsidian`, starting at `lang/helpers.ts:12` and including
+    `collapsible.ts` (which needs the global `HTMLElement` augmentation). It
+    reads like a code problem and is not one: `tsc` and `npm run lint` from a
+    fresh `npm ci` are the check that settles it. An editor that had the
+    package swapped underneath it will keep reporting them until its TS server
+    is restarted.
 - Both halves of the build target **ES2020** (`target` in `tsconfig.json` and in
   `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.13.0 has all of
   it, so nothing is downlevelled.
