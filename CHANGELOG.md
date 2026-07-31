@@ -6,6 +6,14 @@ heading here spelled exactly as in manifest.json. Rename `## Unreleased` to the
 new version number in the same commit that bumps manifest.json and
 package.json. -->
 
+## 1.1.0
+
+### Settings could be searched now
+
+* **Requires Obsidian 1.13.0.** The settings tab is now declared through the API that version introduced. Earlier releases stay available to earlier versions of Obsidian.
+* **The settings are searchable.** Every section of the tab is indexed — its name, its description, the settings inside it and the template variables — so searching Obsidian's settings for a folder, a tag rule or `{{topic}}` lands on the section that holds it.
+
+
 ## 1.0.0
 
 ### Initial release
