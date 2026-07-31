@@ -1,0 +1,76 @@
+name: CI
+
+# Lint, tests and type-check on every push and pull request. The release
+# workflow (main.yml) only fires when manifest.json's version changes, so
+# without this nothing checks a normal commit.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      # Same lockfile caveat as the release workflow: package-lock.json is
+      # written on Windows, which never resolves the Linux-only optional
+      # packages the ESLint resolver reaches through, so `npm ci` can reject a
+      # lockfile that is complete on the machine that wrote it. Announce the
+      # fallback rather than failing the run over it.
+      - name: Install dependencies
+        run: |
+          if ! npm ci; then
+            echo "::warning title=Lockfile not usable on this platform::npm ci failed, falling back to npm install. Regenerate package-lock.json on Linux and commit it to restore reproducible installs."
+            npm install
+          fi
+
+      # This guard exists because of how badly the failure downstream of it
+      # reads. `noImplicitAny` is false, so a dependency that does not resolve
+      # is not a type error — every import from it silently becomes `any` and
+      # the type-checked ESLint rules turn that into ~815 no-unsafe-* warnings
+      # spread across eight files, against source that is completely clean.
+      # It looks exactly like a code problem and is not one. Fail here instead,
+      # with one line that names the actual cause.
+      - name: Verify dependencies resolved
+        run: |
+          node -e '
+            const fs = require("fs");
+            const needed = ["obsidian", "pdfjs-dist", "handlebars"];
+            const missing = needed.filter((m) => !fs.existsSync("node_modules/" + m));
+            if (missing.length > 0) {
+              console.error("::error title=Dependencies not installed::" + missing.join(", ") + " did not resolve. Type-aware ESLint rules will report hundreds of phantom no-unsafe-* warnings against clean source. Fix the install, do not edit src/.");
+              process.exit(1);
+            }
+            console.log("Resolved: " + needed.join(", "));
+          '
+
+      # Runs before lint: an unresolved import is TS2307 here, one clear line,
+      # where the linter would only show its consequences.
+      - name: Type-check
+        run: npx tsc -noEmit -skipLibCheck
+
+      # --max-warnings 0 because this repo keeps lint at 0 errors and 0
+      # warnings; without it ESLint exits 0 on warnings and the job passes
+      # while the warning count climbs.
+      - name: Lint
+        run: npm run lint -- --max-warnings 0
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

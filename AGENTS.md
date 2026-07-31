@@ -37,6 +37,17 @@
     fresh `npm ci` are the check that settles it. An editor that had the
     package swapped underneath it will keep reporting them until its TS server
     is restarted.
+  - The same thing on a **whole uninstalled tree** — a CI job or review bot
+    that lints without `npm ci` — is the full-blown version: `obsidian`,
+    `pdfjs-dist` and `handlebars` all resolve to nothing and ESLint reports
+    **~815 warnings across eight files** (`settings.ts` 472,
+    `advancedExtractionModal.ts` 171, `main.ts` 124, `extractHighlight.ts` 30,
+    `types.ts` 6, `collapsible.ts` 5, `helpers.ts` 4, `formatter.ts` 3), in
+    six `no-unsafe-*` rules plus `no-redundant-type-constituents` and a single
+    `no-unnecessary-type-assertion` at `settings.ts:533`. That fingerprint —
+    especially the lone assertion warning — identifies the cause exactly. Not
+    one of them is a source defect. `.github/workflows/ci.yml` guards against
+    it with a dependency check that fails before the linter ever runs.
 - Both halves of the build target **ES2020** (`target` in `tsconfig.json` and in
   `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.13.0 has all of
   it, so nothing is downlevelled.
@@ -233,8 +244,10 @@ The workflow then runs `npm ci` and `npm run build`, attests build provenance fo
 assets, and verifies the attestations. It skips if that version is already
 released, so unrelated `manifest.json` edits are harmless.
 
-Lint and tests are **not** gated by the workflow — run `npm run lint` and
-`npm test` before pushing.
+The release workflow itself does not run lint or tests — `.github/workflows/ci.yml`
+does, on every push and pull request, with `--max-warnings 0`. Still run
+`npm run lint` and `npm test` before pushing; CI is the backstop, not the
+first look.
 
 ## Style
 
