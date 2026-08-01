@@ -79,26 +79,17 @@ jobs:
 
       # Step 2: Install plugin's dependencies
       #
-      # `npm ci` requires the lockfile to describe this platform's tree
-      # exactly. package-lock.json is written on Windows, where npm never
-      # resolves the Linux-only optional packages that the lint toolchain
-      # reaches through — a wasm fallback under the ESLint resolver, which
-      # wants `@emnapi/core` and `@emnapi/runtime` hoisted here and nowhere
-      # else. The lockfile is therefore complete on the machine that wrote it
-      # and short on this one, and no amount of regenerating it there will
-      # add what that platform never resolves.
-      #
-      # So the release is not failed over it, but the fallback is announced:
-      # a run that installs this way did not install from the lockfile, and
-      # the artifacts it attests were built from a tree resolved fresh. The
-      # durable fix is a lockfile regenerated on Linux and committed, after
-      # which this step goes back to a bare `npm ci`.
+      # A bare `npm ci`, so a release is always built from the lockfile and
+      # never from a tree resolved fresh. package-lock.json is now generated
+      # on Linux and carries the top-level `@emnapi/core` and `@emnapi/runtime`
+      # that the native `@unrs/resolver` binding needs here; a lockfile written
+      # by `npm install` on Windows omits them and this step fails with
+      # "package.json and package-lock.json are not in sync". If that happens,
+      # regenerate the lockfile under WSL/Linux and commit it — re-running
+      # `npm install` on Windows recreates the broken one. ci.yml checks for
+      # exactly this on every push, so it should never reach a release.
       - name: Install dependencies
-        run: |
-          if ! npm ci; then
-            echo "::warning title=Lockfile not usable on this platform::npm ci failed, falling back to npm install. Regenerate package-lock.json on Linux and commit it to restore reproducible installs."
-            npm install
-          fi
+        run: npm ci
 
       # Step 3: Run npm build command
       - name: Build plugin

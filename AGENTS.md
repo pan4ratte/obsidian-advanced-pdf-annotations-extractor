@@ -65,35 +65,75 @@
 
 ## npm audit
 
-`npm audit` reports **29 high-severity findings. They are one advisory, and it
-is already patched — do not act on the number.**
+`npm audit` reports **0 vulnerabilities**, on Windows and on Linux. It reported
+29 for a while; that was stale advisory metadata, now corrected upstream, not a
+change in this tree. **The `overrides` block is what keeps it at zero — do not
+"simplify" it.**
 
-- The one advisory is [GHSA-mh99-v99m-4gvg][be] (CVE-2026-14257), an
+- The advisory was [GHSA-mh99-v99m-4gvg][be] (CVE-2026-14257), an
   out-of-memory DoS in `brace-expansion` reachable by feeding it a hostile glob.
-  Every other line of the report is a package that depends on it through
-  `minimatch`. Nothing reaches the plugin: `npm audit --omit=dev` finds **0**,
-  and `main.js` bundles only `handlebars`, `pdfjs-dist` and this repo's source.
-- The `overrides` block in `package.json` is what fixes it. Every copy of
-  `brace-expansion` in the tree now carries the `EXPANSION_MAX_LENGTH` guard —
-  `2.1.3` under old `minimatch`, `5.0.8` under `minimatch@10`.
-- The selector is `minimatch@<10` **on purpose**. `brace-expansion@5` exports
-  `expand` as a *named* export; `minimatch` 3, 8 and 9 all want the default one.
-  A blanket `"brace-expansion": "^5.0.8"` installs cleanly and then breaks at
-  runtime. `2.1.3` is the maintenance backport that carries the fix and keeps
-  the CommonJS default export.
-- **The count stays at 29 anyway.** The advisory's range is `<=5.0.7`, written
-  when `5.0.8` was the only fix; the `2.1.3` and `3.0.5` backports were
-  published after it and the range has not been narrowed to exclude them. This
-  is stale advisory metadata, not exposure — verify with
-  `npm ls brace-expansion --all` and check the versions, not with the count.
-- **Zero is not reachable, and jest is not what is holding it.** Zero requires
-  every `minimatch` at `>=10.0.3`, and `eslint-plugin-import@2.32.0` (pulled in
-  by `eslint-plugin-obsidianmd`) calls `minimatch()` as a function — the export
-  `minimatch@10` no longer has. No released version of that plugin has moved
-  off it. Getting to zero means dropping the official Obsidian ruleset, which
-  is a worse trade than a dev-only DoS advisory.
+  Everything else in the old report was a package depending on it through
+  `minimatch`. Nothing reached the plugin anyway: `main.js` bundles only
+  `handlebars`, `pdfjs-dist` and this repo's source.
+- Every copy of `brace-expansion` in the tree carries the
+  `EXPANSION_MAX_LENGTH` guard — `2.1.4` under old `minimatch`, `5.0.9` under
+  `minimatch@10`. Verify with `npm ls brace-expansion --all` and read the
+  versions; the audit count is the weaker signal.
+- The selector is `minimatch@<10` **on purpose, and this is load-bearing**.
+  `brace-expansion@5` exports `expand` as a *named* export; `minimatch` 3, 8
+  and 9 all want the default one. A blanket `"brace-expansion": "^5.0.9"`
+  installs cleanly, passes lint, tests and build, reports zero vulnerabilities —
+  and then throws `(0 , brace_expansion_1.default) is not a function` the first
+  time anything expands a brace glob. It was committed once and reverted.
+  `2.1.x` is the maintenance backport that carries the fix and keeps the
+  CommonJS default export.
+- Zero is **not** reachable by moving every `minimatch` to `>=10`:
+  `eslint-plugin-import@2.32.0` (via `eslint-plugin-obsidianmd`) calls
+  `minimatch()` as a function, which `minimatch@10` no longer exports.
 
 [be]: https://github.com/advisories/GHSA-mh99-v99m-4gvg
+
+## package-lock.json is generated on Linux
+
+**Never commit a `package-lock.json` that `npm install` wrote on Windows.** The
+Windows resolution is 674 entries; the Linux one is 676. The two extra are
+top-level `node_modules/@emnapi/core` and `node_modules/@emnapi/runtime`,
+optional transitive dependencies of the native `@unrs/resolver` binding that
+`eslint-plugin-import` loads. Windows never resolves them at the top level, so a
+lockfile written there is complete locally and short everywhere else:
+
+```
+npm error `npm ci` can only install packages when your package.json and
+npm error package-lock.json ... are in sync.
+npm error Missing: @emnapi/core@1.11.3 from lock file
+npm error Missing: @emnapi/runtime@1.11.3 from lock file
+```
+
+Three things make this worse than it sounds, and all three have been hit:
+
+- **The declared dependencies are in sync.** `dependencies` and
+  `devDependencies` match the lockfile exactly; only the resolved tree is
+  short. Diffing the two files tells you nothing.
+- **npm's own advice is a trap here.** The error says to run `npm install` —
+  which, run on Windows, regenerates the *broken* lockfile and reverts the fix
+  silently, leaving no diff. It only helps on Linux or macOS.
+- **It is invisible on Windows.** `npm ci`, lint, tests and build all pass
+  there with the short lockfile.
+
+To regenerate, in WSL (Ubuntu 24.04 with a native Node 24 — not the Windows
+`node` that `/mnt/c` interop puts on `PATH`):
+
+```bash
+cp package.json package-lock.json ~/lockgen/ && cd ~/lockgen
+npm install          # rewrites package-lock.json with the hoisted entries
+rm -rf node_modules && npm ci    # must succeed
+```
+
+then copy `package-lock.json` back. The result still carries the win32, linux
+and darwin binaries (8 / 27 / 6 entries), so it works on every platform —
+`npm ci` on Windows is the check for that. `ci.yml` verifies the two hoisted
+entries are present before installing, so a Windows-written lockfile fails
+there with the fix named rather than as npm's "not in sync".
 
 ## Testing
 
