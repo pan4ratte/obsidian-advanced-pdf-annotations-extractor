@@ -134,15 +134,14 @@ export default {
 
     // ─── Settings: headings ──────────────────────────────────────────────────────
     SECTION_HEADINGS: "Headings",
+    SETTING_FOLDER_HEADING_NAME: "Add folder headings",
+    SETTING_FOLDER_HEADING_DESC: "Adds a heading to the text with the folder name when annotations are grouped by folder.",
+    SETTING_FILE_HEADING_NAME: "Add file headings",
+    SETTING_FILE_HEADING_DESC: "Adds a heading to the text with the file name when annotations are grouped by file.",
     SETTING_DATE_HEADING_NAME: "Add date headings",
     SETTING_DATE_HEADING_DESC: "Adds a heading to the text for each date when annotations are grouped by creation date.",
     SETTING_TOPIC_HEADING_NAME: "Collect notes with the same topic under a shared heading",
     SETTING_TOPIC_HEADING_DESC: "Adds a heading for each topic and collects the matching notes under it.",
-    SETTING_FILE_HEADING_NAME: "Add file headings",
-    SETTING_FILE_HEADING_DESC: "Adds a heading with the folder or file name, which marks each group when the matching grouping is on and heads the whole note when the name is the same throughout.",
-    OPTION_FILE_HEADING_FOLDER: "Add folder name",
-    OPTION_FILE_HEADING_FILE: "Add file name",
-    OPTION_FILE_HEADING_NONE: "Add nothing",
 
     // ─── Settings: notes ─────────────────────────────────────────────────────────
     SECTION_NOTES: "Notes creation",

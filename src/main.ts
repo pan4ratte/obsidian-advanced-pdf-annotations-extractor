@@ -508,9 +508,18 @@ export default class PDFAnnotationPlugin extends Plugin {
 		// Every field the settings object declares, so a new setting cannot be
 		// forgotten here and silently never load.
 		Object.keys(this.settings).forEach((setting) => {
-			if (setting in loadedSettings) {
-				asIndexable(this.settings)[setting] = loadedSettings[setting];
+			if (!(setting in loadedSettings)) return;
+			// A field this version declares as a toggle and data.json holds as
+			// something else keeps the default: 1.1 wrote `fileHeading` as the
+			// dropdown the folder and file toggles replaced, and every string
+			// it could have written — `"none"` included — is truthy.
+			if (
+				typeof asIndexable(this.settings)[setting] === "boolean" &&
+				typeof loadedSettings[setting] !== "boolean"
+			) {
+				return;
 			}
+			asIndexable(this.settings)[setting] = loadedSettings[setting];
 		});
 
 		// data.json is a file a reader may edit, so nothing loaded from it is
@@ -524,9 +533,6 @@ export default class PDFAnnotationPlugin extends Plugin {
 			settings.normalizeAnnotationTemplates(
 				this.settings.annotationTemplates
 			);
-		this.settings.fileHeading = settings.normalizeFileHeading(
-			this.settings.fileHeading
-		);
 		this.settings.noteLocation = settings.normalizeNoteLocation(
 			this.settings.noteLocation
 		);

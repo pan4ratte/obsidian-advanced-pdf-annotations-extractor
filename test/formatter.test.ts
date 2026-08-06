@@ -28,7 +28,6 @@ function annotation(over: Partial<PDFAnnotation> = {}): PDFAnnotation {
 function formatterWith(template: string) {
   const settings = new PDFAnnotationPluginSetting();
   settings.topicHeading = false;
-  settings.fileHeading = 'none';
   settings.defaultTemplate = template;
   settings.annotationTemplates = {
     ...settings.annotationTemplates,
@@ -150,24 +149,42 @@ describe('headings', () => {
     ]);
   }
 
+  /**
+   * Each heading takes the grouping it heads. Grouping by file is on out of
+   * the box and grouping by folder is not, so the folder heading needs both.
+   */
+  const FOLDERS = {folderHeading: true, groupByFolder: true};
+
   test('the folder name collapses every PDF in it under one heading', () => {
-    expect(headingsFor({fileHeading: 'folder'})).toBe('# refs\n\n## Method\n\n-\n-\n');
+    expect(headingsFor(FOLDERS)).toBe('# refs\n\n## Method\n\n-\n-\n');
   });
 
   test('a PDF in the vault root is headed as such, not with an empty heading', () => {
-    expect(format({fileHeading: 'folder'}, [annotation({folder: '', topic: 'A'})]))
+    expect(format(FOLDERS, [annotation({folder: '', topic: 'A'})]))
       .toBe('# Vault root\n\n## A\n\n-\n');
   });
 
   test('the file name gives each PDF its own heading, extension included', () => {
-    expect(headingsFor({fileHeading: 'file'})).toBe(
+    expect(headingsFor({fileHeading: true})).toBe(
       '# Paper.pdf\n\n## Method\n\n-\n# Other.pdf\n\n-\n'
+    );
+  });
+
+  test('the folder and the file are headed apart, one inside the other', () => {
+    expect(
+      format({...FOLDERS, fileHeading: true}, [
+        annotation({topic: 'A'}),
+        annotation({topic: 'B', folder: 'papers', file: OTHER}),
+      ])
+    ).toBe(
+      '# refs\n\n## Paper.pdf\n\n### A\n\n-\n' +
+        '# papers\n\n## Other.pdf\n\n### B\n\n-\n'
     );
   });
 
   test('the one file they all came from heads the note, not each group', () => {
     expect(
-      format({fileHeading: 'file'}, [
+      format({fileHeading: true}, [
         annotation({topic: 'A'}),
         annotation({topic: 'B'}),
       ])
@@ -177,13 +194,13 @@ describe('headings', () => {
   test('no file heading marks the groups when nothing groups by the file', () => {
     // Ungrouped, the two files interleave, and a heading naming one of them
     // would land above annotations belonging to the other.
-    expect(headingsFor({fileHeading: 'file', groupByFile: false}))
+    expect(headingsFor({fileHeading: true, groupByFile: false}))
       .toBe('# Method\n\n-\n-\n');
   });
 
   test('no folder heading marks the groups when nothing groups by the folder', () => {
     expect(
-      format({fileHeading: 'folder', groupByFolder: false}, [
+      format({folderHeading: true, groupByFolder: false}, [
         annotation({topic: 'A'}),
         annotation({topic: 'B', folder: 'papers'}),
       ])
@@ -191,24 +208,24 @@ describe('headings', () => {
   });
 
   test('no heading leaves the topic heading standing on its own', () => {
-    expect(headingsFor({fileHeading: 'none'})).toBe('# Method\n\n-\n-\n');
+    expect(headingsFor()).toBe('# Method\n\n-\n-\n');
   });
 
   test('a file heading with no topic heading around it takes the first level', () => {
-    expect(headingsFor({topicHeading: false, fileHeading: 'file'})).toBe(
+    expect(headingsFor({topicHeading: false, fileHeading: true})).toBe(
       '# Paper.pdf\n\n-\n# Other.pdf\n\n-\n'
     );
   });
 
   test('turning both off leaves nothing but the templates', () => {
-    expect(headingsFor({topicHeading: false, fileHeading: 'none'})).toBe('-\n-\n');
+    expect(headingsFor({topicHeading: false})).toBe('-\n-\n');
   });
 
-  test('a file heading that never changes is written once, not under every topic', () => {
+  test('a folder heading that never changes is written once, not under every topic', () => {
     // Every annotation is its own topic as soon as the comments differ, which
     // used to put a heading saying 'refs' above every one of them.
     expect(
-      format({fileHeading: 'folder'}, [
+      format(FOLDERS, [
         annotation({topic: 'A'}),
         annotation({topic: 'B'}),
         annotation({topic: 'C', file: OTHER}),
@@ -220,7 +237,7 @@ describe('headings', () => {
     // The file encloses what was read out of it, so a topic spanning both is
     // named under each rather than the file being named under each topic.
     expect(
-      format({fileHeading: 'file'}, [
+      format({fileHeading: true}, [
         annotation({topic: 'A'}),
         annotation({topic: 'B'}),
         annotation({topic: 'A', file: OTHER}),
@@ -230,7 +247,7 @@ describe('headings', () => {
 
   test('without topic headings a file heading only marks where the file changes', () => {
     expect(
-      format({topicHeading: false, fileHeading: 'file'}, [
+      format({topicHeading: false, fileHeading: true}, [
         annotation({topic: 'A'}),
         annotation({topic: 'B'}),
         annotation({topic: 'C', file: OTHER}),
@@ -240,7 +257,7 @@ describe('headings', () => {
 
   test('the date heads the note above the topics it groups', () => {
     expect(
-      format({groupByDate: true, fileHeading: 'none'}, [
+      format({groupByDate: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-01-15'}),
         annotation({topic: 'C', created: '2024-03-02'}),
@@ -250,7 +267,7 @@ describe('headings', () => {
 
   test('an annotation the PDF gave no date is headed as such', () => {
     expect(
-      format({groupByDate: true, sortByTopic: false, fileHeading: 'none'}, [
+      format({groupByDate: true, sortByTopic: false}, [
         annotation({created: '2024-01-15'}),
         annotation({created: undefined}),
       ])
@@ -259,7 +276,7 @@ describe('headings', () => {
 
   test('all three headings nest, outermost first', () => {
     expect(
-      format({groupByDate: true, fileHeading: 'file'}, [
+      format({groupByDate: true, fileHeading: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-03-02'}),
         annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
@@ -274,7 +291,7 @@ describe('headings', () => {
     // The second file was read on a day the first one already headed, and
     // that heading belongs to the first file's annotations only.
     expect(
-      format({groupByDate: true, fileHeading: 'file'}, [
+      format({groupByDate: true, fileHeading: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
         annotation({topic: 'B', created: '2024-03-02', file: OTHER}),
@@ -285,9 +302,9 @@ describe('headings', () => {
     );
   });
 
-  test('a constant file heading still heads the note, above the dates', () => {
+  test('a constant folder heading still heads the note, above the dates', () => {
     expect(
-      format({groupByDate: true, fileHeading: 'folder'}, [
+      format({groupByDate: true, folderHeading: true, groupByFolder: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-03-02'}),
       ])
@@ -298,7 +315,7 @@ describe('headings', () => {
     // A topic spanning two days is named under each of them, so neither day's
     // annotations sit under a heading belonging to the other.
     expect(
-      format({groupByDate: true, fileHeading: 'none'}, [
+      format({groupByDate: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-01-15'}),
         annotation({topic: 'A', created: '2024-03-02'}),
@@ -310,7 +327,7 @@ describe('headings', () => {
     // Same rule as the file heading: one that says the same thing throughout
     // is written where it first applies and not again.
     expect(
-      format({groupByDate: true, fileHeading: 'none'}, [
+      format({groupByDate: true}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'A', created: '2024-03-02'}),
       ])
@@ -319,7 +336,7 @@ describe('headings', () => {
 
   test('grouping by date without its heading only affects the order', () => {
     expect(
-      format({groupByDate: true, dateHeading: false, fileHeading: 'none'}, [
+      format({groupByDate: true, dateHeading: false}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-03-02'}),
       ])
@@ -328,7 +345,7 @@ describe('headings', () => {
 
   test('no date heading is written when the annotations are not grouped by date', () => {
     expect(
-      format({groupByDate: false, fileHeading: 'none'}, [
+      format({groupByDate: false}, [
         annotation({topic: 'A', created: '2024-01-15'}),
         annotation({topic: 'B', created: '2024-03-02'}),
       ])
@@ -336,8 +353,8 @@ describe('headings', () => {
   });
 
   test('no topic heading is written when there is no topic to write', () => {
-    expect(headingsFor({sortByTopic: false, fileHeading: 'none'})).toBe('-\n-\n');
-    expect(headingsFor({sortByTopic: false, fileHeading: 'folder'})).toBe('# refs\n\n-\n-\n');
+    expect(headingsFor({sortByTopic: false})).toBe('-\n-\n');
+    expect(headingsFor({sortByTopic: false, ...FOLDERS})).toBe('# refs\n\n-\n-\n');
   });
 });
 
@@ -360,35 +377,43 @@ describe('a note holding one annotation and nothing else', () => {
   const dated = annotation({topic: 'Method', created: '2024-01-15'});
 
   test('is headed by neither the day nor the folder it was grouped by', () => {
-    expect(alone({groupByDate: true, fileHeading: 'folder'}, dated))
+    expect(alone({groupByDate: true, folderHeading: true, groupByFolder: true}, dated))
       .toBe('# Method\n\n-\n');
   });
 
   test('is headed by neither the day nor the file it came from', () => {
-    expect(alone({groupByDate: true, fileHeading: 'file'}, dated))
+    expect(alone({groupByDate: true, fileHeading: true}, dated))
       .toBe('# Method\n\n-\n');
   });
 
   test('keeps the topic heading, which says what it is about', () => {
-    expect(alone({fileHeading: 'none'}, dated)).toBe('# Method\n\n-\n');
+    expect(alone({}, dated)).toBe('# Method\n\n-\n');
   });
 
   test('takes the first heading level once the groupings are gone', () => {
     // The topic was a third-level heading under the day and the folder.
-    expect(alone({groupByDate: true, fileHeading: 'folder'}, dated))
+    expect(alone({groupByDate: true, folderHeading: true, groupByFolder: true}, dated))
       .not.toContain('###');
   });
 
   test('is nothing but the template when the topic heads it no more', () => {
     expect(
-      alone({groupByDate: true, fileHeading: 'folder', topicHeading: false}, dated)
+      alone(
+        {
+          groupByDate: true,
+          folderHeading: true,
+          groupByFolder: true,
+          topicHeading: false,
+        },
+        dated
+      )
     ).toBe('-\n');
   });
 
   test('is written with every heading when it is not that kind of note', () => {
     const settings = new PDFAnnotationPluginSetting();
     settings.defaultTemplate = '-\n';
-    Object.assign(settings, {groupByDate: true, fileHeading: 'folder'});
+    Object.assign(settings, {groupByDate: true, folderHeading: true, groupByFolder: true});
     expect(
       new PDFAnnotationPluginFormatter(settings).format([dated], false)
     ).toBe('# refs\n\n## 2024-01-15\n\n### Method\n\n-\n');
@@ -415,7 +440,6 @@ describe('filelink', () => {
     // enough to change how every type is written.
     const settings = new PDFAnnotationPluginSetting();
     settings.topicHeading = false;
-    settings.fileHeading = 'none';
     settings.defaultTemplate = '{{type}} {{filelink}}\n';
     const formatter = new PDFAnnotationPluginFormatter(settings);
 

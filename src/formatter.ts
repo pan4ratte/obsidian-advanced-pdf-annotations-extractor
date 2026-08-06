@@ -3,7 +3,6 @@ import {
 	TemplateDelegate as Template,
 } from "handlebars";
 import { t } from "../lang/helpers";
-import { groupsByFile, groupsByFolder } from "./ordering";
 import {
 	PDFAnnotationPluginSetting,
 	templateForAnnotation,
@@ -43,66 +42,70 @@ export class PDFAnnotationPluginFormatter {
 		onePerNote = false
 	): string {
 		let text = "";
-		let topic = "";
-		let currentLabel = "";
-
+		let folder = "";
+		let file = "";
 		let date = "";
+		let topic = "";
+
+		// A PDF in the vault root has no folder to name.
+		const folderFor = (anno: PDFAnnotation) =>
+			anno.folder || t.NOTE_VAULT_ROOT;
+		const dateFor = (anno: PDFAnnotation) => anno.created || t.NOTE_NO_DATE;
 
 		// A new group restarts the headings under it, so a day read from
 		// several files says which each annotation came from. A heading with
 		// only one thing to say is not restarted, or it would repeat down the
 		// whole note.
-		const labelFor = (anno: PDFAnnotation) => {
-			if (this.settings.fileHeading === "file") return anno.file.name;
-			// A PDF in the vault root has no folder to name.
-			return anno.folder || t.NOTE_VAULT_ROOT;
-		};
-		const dateFor = (anno: PDFAnnotation) => anno.created || t.NOTE_NO_DATE;
-		const labelVaries = new Set(grandtotal.map(labelFor)).size > 1;
+		const fileVaries = new Set(grandtotal.map((a) => a.file.name)).size > 1;
 		const dateVaries = new Set(grandtotal.map(dateFor)).size > 1;
 		const topicVaries = new Set(grandtotal.map((a) => a.topic)).size > 1;
 
-		// Nothing to head a topic or day with unless they were grouped by one.
-		const headingTopics =
-			this.settings.topicHeading && this.settings.sortByTopic;
+		// Nothing to head a group with unless the annotations were gathered
+		// into one: ungrouped they interleave, and a heading naming one group
+		// would stand above annotations belonging to another. A note holding a
+		// single annotation has nothing gathered at all — except the topic,
+		// which says what it is about rather than where it came from.
+		const headingFolders =
+			this.settings.folderHeading &&
+			this.settings.groupByFolder &&
+			!onePerNote;
+		const headingFiles =
+			this.settings.fileHeading &&
+			this.settings.groupByFile &&
+			!onePerNote;
 		const headingDates =
 			this.settings.dateHeading &&
 			this.settings.groupByDate &&
 			!onePerNote;
-		const headingFiles =
-			this.settings.fileHeading !== "none" && !onePerNote;
-
-		// One unchanging label heads the note instead of marking a place in it.
-		const headsTheNote = !labelVaries && headingFiles;
-		// Marking places takes the grouping that gathered them: unsorted, the
-		// files interleave and a heading naming one repeats down the note.
-		const labelGroups =
-			headingFiles &&
-			(this.settings.fileHeading === "folder"
-				? groupsByFolder(this.settings, grandtotal)
-				: groupsByFile(this.settings, grandtotal));
+		const headingTopics =
+			this.settings.topicHeading && this.settings.sortByTopic;
 
 		// Whichever heading encloses the others takes the first level, and the
 		// rest follow the order the annotations were grouped in.
-		const [noteLevel, fileLevel, dateLevel, topicLevel] = headingLevels([
-			headsTheNote,
-			labelGroups,
+		const [folderLevel, fileLevel, dateLevel, topicLevel] = headingLevels([
+			headingFolders,
+			headingFiles,
 			headingDates,
 			headingTopics,
 		]);
 
-		if (headsTheNote && grandtotal.length > 0) {
-			text += `${noteLevel} ${labelFor(grandtotal[0])}\n\n`;
-		}
-
 		grandtotal.forEach((anno) => {
-			if (labelGroups) {
-				const label = labelFor(anno);
-				if (currentLabel != label) {
-					currentLabel = label;
+			if (headingFolders) {
+				if (folder != folderFor(anno)) {
+					folder = folderFor(anno);
+					if (fileVaries) file = "";
 					if (dateVaries) date = "";
 					if (topicVaries) topic = "";
-					text += `${fileLevel} ${label}\n\n`;
+					text += `${folderLevel} ${folder}\n\n`;
+				}
+			}
+
+			if (headingFiles) {
+				if (file != anno.file.name) {
+					file = anno.file.name;
+					if (dateVaries) date = "";
+					if (topicVaries) topic = "";
+					text += `${fileLevel} ${file}\n\n`;
 				}
 			}
 

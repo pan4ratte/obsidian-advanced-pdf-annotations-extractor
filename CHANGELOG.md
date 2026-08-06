@@ -12,7 +12,8 @@ package.json. -->
 
 * **Grouping by file.** A new setting gathers every annotation of the same PDF together, on by default. Switched off, annotations from several PDFs are read page by page across all of them.
 * **The groupings nest widest first:** folder, file, creation date, topic — the order they are now listed in and applied in. Headings follow the same order, so the outline pane reads the note as the grouping built it.
-* **Grouping by folder and by file applies only to an extraction that spans several of them.** One folder or one file is what the ordinary extraction reads, and it has nothing to separate — the folder or file name still heads the whole note as before.
+* **Grouping by folder and by file applies only to an extraction that spans several of them.** One folder or one file is what the ordinary extraction reads, and it has nothing to separate.
+* **A heading toggle per grouping.** The "add file headings" dropdown is now two toggles, "add folder headings" and "add file headings", so a note can carry both — the folder around the file it holds. Each heading toggle follows the grouping it heads and greys out while that grouping is off, as the date and topic headings already did, and the four are listed in the order they nest: folder, file, date, topic.
 
 
 ## 1.1.0

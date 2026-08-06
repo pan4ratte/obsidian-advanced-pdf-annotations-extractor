@@ -193,15 +193,6 @@ export const TAG_EXTRACTION_MODES = {
 export type TagExtraction = keyof typeof TAG_EXTRACTION_MODES;
 
 /**
- * What the heading above each group of annotations shows. It marks the groups
- * the matching setting made — `groupByFolder` for the folder name,
- * `groupByFile` for the file name — and heads the whole note when the name it
- * shows is the same from end to end.
- */
-export const FILE_HEADINGS = ["folder", "file", "none"] as const;
-export type FileHeading = (typeof FILE_HEADINGS)[number];
-
-/**
  * Where the notes go. `current` follows the file being looked at rather than
  * the PDF — the same folder when the PDF is open, and the only one there is
  * when the PDF lives outside the vault.
@@ -287,9 +278,6 @@ const HANDLEBARS_DOCS = "https://handlebarsjs.com/guide/expressions.html";
 const VISIBLE_VARIABLE_ROWS = 6;
 
 export class PDFAnnotationPluginSetting {
-	public topicHeading: boolean;
-	public dateHeading: boolean;
-	public fileHeading: FileHeading;
 	/**
 	 * The groupings, widest first: a folder holds the files, a file holds the
 	 * days it was read on, a day holds the topics. `ordering.ts` applies them
@@ -299,6 +287,16 @@ export class PDFAnnotationPluginSetting {
 	public groupByFile: boolean;
 	public groupByDate: boolean;
 	public sortByTopic: boolean;
+	/**
+	 * One heading per grouping, in the same order and each paired with the
+	 * grouping it heads: a heading is written only where that grouping gathered
+	 * the annotations under it, since ungrouped they interleave and the heading
+	 * would repeat down the whole note instead of opening a group.
+	 */
+	public folderHeading: boolean;
+	public fileHeading: boolean;
+	public dateHeading: boolean;
+	public topicHeading: boolean;
 	public noteLocation: NoteLocation;
 	/** Vault-relative folder the notes go in, empty for the vault root. */
 	public noteFolder: string;
@@ -326,12 +324,6 @@ export class PDFAnnotationPluginSetting {
 	public extractTags: TagExtraction;
 
 	constructor() {
-		this.topicHeading = true;
-		this.dateHeading = true;
-		// One PDF at a time is the usual extraction, and a heading naming the
-		// one folder or the one file it came from says nothing the reader did
-		// not already know.
-		this.fileHeading = "none";
 		this.groupByFolder = false;
 		// On: annotations from several PDFs read as one note per PDF, not as
 		// every page four of them and then every page five. It costs nothing
@@ -340,6 +332,13 @@ export class PDFAnnotationPluginSetting {
 		// Off, so an upgrade does not reorder notes nobody asked to reorder.
 		this.groupByDate = false;
 		this.sortByTopic = true;
+		// Both off: one PDF at a time is the usual extraction, and a heading
+		// naming the one folder or the one file it came from says nothing the
+		// reader did not already know.
+		this.folderHeading = false;
+		this.fileHeading = false;
+		this.dateHeading = true;
+		this.topicHeading = true;
 		// A folder of the vault's own, which is somewhere whether or not
 		// anything is open: an extraction from a path in the clipboard, run
 		// from the command palette with no file in front of the reader, has
@@ -408,16 +407,6 @@ export class PDFAnnotationPluginSetting {
 			),
 			...[...selected].filter((type) => !known.has(type)),
 		];
-	}
-
-	/**
-	 * A heading this version knows. Anything else would silence the heading
-	 * through the `none` branch by accident.
-	 */
-	public static normalizeFileHeading(value: unknown): FileHeading {
-		return FILE_HEADINGS.includes(value as FileHeading)
-			? (value as FileHeading)
-			: "folder";
 	}
 
 	/** A location this version knows, for a data.json edited by hand. */
@@ -509,12 +498,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	plugin: PDFAnnotationPlugin;
 
 	/**
-	 * The two heading toggles are switched on and off by settings in the
-	 * section above theirs, so they outlive the call that draws them. Null
-	 * until that section has been drawn, and again once it is torn down.
+	 * Each heading toggle is switched on and off by the grouping it heads,
+	 * which is a setting in the section above theirs, so they outlive the call
+	 * that draws them. Null until that section has been drawn, and again once
+	 * it is torn down.
 	 */
-	private topicHeadingToggle: ToggleComponent | null = null;
+	private folderHeadingToggle: ToggleComponent | null = null;
+	private fileHeadingToggle: ToggleComponent | null = null;
 	private dateHeadingToggle: ToggleComponent | null = null;
+	private topicHeadingToggle: ToggleComponent | null = null;
 	private syncingHeadings = false;
 
 	constructor(app: App, plugin: PDFAnnotationPlugin) {
@@ -962,9 +954,10 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						{
 							name: t.SECTION_HEADINGS,
 							aliases: [
+								t.SETTING_FOLDER_HEADING_NAME,
+								t.SETTING_FILE_HEADING_NAME,
 								t.SETTING_DATE_HEADING_NAME,
 								t.SETTING_TOPIC_HEADING_NAME,
-								t.SETTING_FILE_HEADING_NAME,
 							],
 						},
 						(root) => this.renderHeadings(root)
@@ -1232,11 +1225,12 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * The topic heading has nothing to head until a topic is split off, so it
-	 * follows the setting that splits it — greyed out but still in view, and
-	 * remembering the choice it was switched off from. The two live in
-	 * different sections, so the toggle is a field of the tab rather than a
-	 * local of the call that drew it, and nothing happens until it exists.
+	 * A heading has nothing to head until the grouping it belongs to gathers
+	 * something, so it follows the setting that groups — greyed out but still
+	 * in view, and remembering the choice it was switched off from. The two
+	 * live in different sections, so the toggle is a field of the tab rather
+	 * than a local of the call that drew it, and nothing happens until it
+	 * exists.
 	 */
 	private syncHeadingToggle(
 		toggle: ToggleComponent | null,
@@ -1255,11 +1249,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		this.syncingHeadings = false;
 	}
 
-	private syncTopicHeading(): void {
+	private syncFolderHeading(): void {
 		this.syncHeadingToggle(
-			this.topicHeadingToggle,
-			this.plugin.settings.sortByTopic,
-			this.plugin.settings.topicHeading
+			this.folderHeadingToggle,
+			this.plugin.settings.groupByFolder,
+			this.plugin.settings.folderHeading
+		);
+	}
+
+	private syncFileHeading(): void {
+		this.syncHeadingToggle(
+			this.fileHeadingToggle,
+			this.plugin.settings.groupByFile,
+			this.plugin.settings.fileHeading
 		);
 	}
 
@@ -1268,6 +1270,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			this.dateHeadingToggle,
 			this.plugin.settings.groupByDate,
 			this.plugin.settings.dateHeading
+		);
+	}
+
+	private syncTopicHeading(): void {
+		this.syncHeadingToggle(
+			this.topicHeadingToggle,
+			this.plugin.settings.sortByTopic,
+			this.plugin.settings.topicHeading
 		);
 	}
 
@@ -1286,6 +1296,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.groupByFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.groupByFolder = value;
+						this.syncFolderHeading();
 						await this.plugin.saveSettings();
 					})
 			);
@@ -1298,6 +1309,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.groupByFile)
 					.onChange(async (value) => {
 						this.plugin.settings.groupByFile = value;
+						this.syncFileHeading();
 						await this.plugin.saveSettings();
 					})
 			);
@@ -1330,13 +1342,44 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Returns the cleanup that forgets the two toggles the section above
-	 * reaches for, so nothing is left pointing at a row that is gone.
+	 * Returns the cleanup that forgets the toggles the section above reaches
+	 * for, so nothing is left pointing at a row that is gone. The rows are in
+	 * the order of the groupings they head, which is the order they nest in.
 	 */
 	private renderHeadings(root: HTMLElement): () => void {
 		new Setting(root)
 			.setName(t.SECTION_HEADINGS)
 			.setHeading();
+		new Setting(root)
+			.setName(t.SETTING_FOLDER_HEADING_NAME)
+			.setDesc(t.SETTING_FOLDER_HEADING_DESC)
+			.addToggle((toggle) => {
+				this.folderHeadingToggle = toggle;
+				toggle
+					.setValue(this.plugin.settings.folderHeading)
+					.onChange(async (value) => {
+						if (this.syncingHeadings) return;
+						this.plugin.settings.folderHeading = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		this.syncFolderHeading();
+
+		new Setting(root)
+			.setName(t.SETTING_FILE_HEADING_NAME)
+			.setDesc(t.SETTING_FILE_HEADING_DESC)
+			.addToggle((toggle) => {
+				this.fileHeadingToggle = toggle;
+				toggle
+					.setValue(this.plugin.settings.fileHeading)
+					.onChange(async (value) => {
+						if (this.syncingHeadings) return;
+						this.plugin.settings.fileHeading = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		this.syncFileHeading();
+
 		new Setting(root)
 			.setName(t.SETTING_DATE_HEADING_NAME)
 			.setDesc(t.SETTING_DATE_HEADING_DESC)
@@ -1367,24 +1410,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			});
 		this.syncTopicHeading();
 
-		new Setting(root)
-			.setName(t.SETTING_FILE_HEADING_NAME)
-			.setDesc(t.SETTING_FILE_HEADING_DESC)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions({
-						folder: t.OPTION_FILE_HEADING_FOLDER,
-						file: t.OPTION_FILE_HEADING_FILE,
-						none: t.OPTION_FILE_HEADING_NONE,
-					})
-					.setValue(this.plugin.settings.fileHeading)
-					.onChange(async (value) => {
-						this.plugin.settings.fileHeading = value as FileHeading;
-						await this.plugin.saveSettings();
-					})
-			);
-
 		return () => {
+			this.folderHeadingToggle = null;
+			this.fileHeadingToggle = null;
 			this.dateHeadingToggle = null;
 			this.topicHeadingToggle = null;
 		};
