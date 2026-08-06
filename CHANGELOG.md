@@ -1,41 +1,19 @@
 # Changelog
 
-<!-- The release workflow turns the section of the version in manifest.json into
-the GitHub release notes, so every released version needs a `## <version>`
-heading here spelled exactly as in manifest.json. Rename `## Unreleased` to the
-new version number in the same commit that bumps manifest.json and
-package.json. -->
 
-## Unreleased
+## 1.2.0
 
-### A folder per section of the PDF
+### New features
 
-* **"Create a subfolder for each section of the PDF"**, on an extraction into separate notes, reads the document's own bookmarks and files each note under the heading its annotation stands in. The bookmarks nest, and so do the folders: a note from "Second trial" inside "Results" lands in `Results/Second trial`.
-* **It goes under the subfolder template**, so `{{filename}}` can still give every PDF a folder of its own with the sections inside it.
-* **An annotation standing before the first heading** — on a title page, in an abstract — is in no section and files beside the section folders rather than in one of them.
-* Off by default, and the outline is read only while it is on: a PDF without bookmarks gains nothing for the reading.
-
-### A clipboard path may name a folder
-
-* **A folder in the clipboard extracts every PDF in it.** All three clipboard commands take a folder path as well as a file path: into the current note they arrive as one insertion, and into new notes as a note per PDF — the note name is a template over the file it was read from. The folder itself is read, not the folders under it, and a PDF that will not open is named and skipped rather than taking the rest of the folder with it.
-* **Nothing is opened when a folder wrote more than one note**, which would otherwise bury whatever you were looking at.
-
-### The settings are split by the kind of extraction they apply to
-
-The tab now has three sections in place of four, and every setting sits in the one that says when it takes effect. Nothing about how an extraction behaves has changed — only where it is asked for.
-
-* **"General extraction rules"** — what every extraction obeys: reading the topic of each comment and heading the annotations that share it, where the notes go, whether tags move to the properties, and whether an existing note is overwritten.
-* **"Extraction to separate notes"** — a note of its own for each annotation: naming it after its comment's topic, the pattern that stands in when there is no topic, and the subfolder.
-* **"Extraction to shared notes"** — one note for all the annotations of a PDF. Grouping by folder, by file and by creation date live here with the headings they write, since a note holding a single annotation has nothing to gather and never carried those headings.
-* **Each grouping now sits directly above the heading it controls**, so a greyed-out heading toggle has its reason on the row above it. The separate "Annotation grouping" and "Headings" sections are gone.
-* **The subfolder now applies to an extraction into separate notes only** — that is the extraction whose notes it keeps together — and it applies under either destination, the folder of the open file as well as a folder of the vault. An extraction into one note ignores it.
-
-### Grouping reads from the outside in
-
+* **Create subfolders for each section of the PDF.** Applies on an extraction into separate notes, reads the document's own bookmarks and files each note under the heading its annotation stands in. The bookmarks nest, and so do the folders: a note from "Second trial" inside "Results" lands in `Results/Second trial`.
+* **Extract from PDFs in a folder in the clipboard.** Now all clipboard commands take a folder path as well as a file path: into the current note they arrive as one insertion, and into new notes as a note per PDF — the note name is a template over the file it was read from.
 * **Grouping by file.** A new setting gathers every annotation of the same PDF together, on by default. Switched off, annotations from several PDFs are read page by page across all of them.
-* **The groupings nest widest first:** folder, file, creation date, topic — the order they are now listed in and applied in. Headings follow the same order, so the outline pane reads the note as the grouping built it.
-* **Grouping by folder and by file applies only to an extraction that spans several of them.** One folder or one file is what the ordinary extraction reads, and it has nothing to separate.
-* **A heading toggle per grouping.** The "add file headings" dropdown is now two toggles, "add folder headings" and "add file headings", so a note can carry both — the folder around the file it holds. Each heading toggle follows the grouping it heads and greys out while that grouping is off, as the date and topic headings already did, and the four are listed in the order they nest: folder, file, date, topic.
+
+### UI/UX enhancements and bug fixes 
+
+* Options in the settings were split and regrouped for better logic and clarity for the user.
+* The groupings nesting was reordered: now its folder - file - creation date - topic.
+* Grouping by folder and by file applies only to an extraction that spans several of them.
 
 
 ## 1.1.0
