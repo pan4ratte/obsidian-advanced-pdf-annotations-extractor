@@ -70,6 +70,38 @@
 	content: none;
 }
 
+/* Every section opens with a heading row, and each one stands the same distance
+   from the section above it. That distance is a margin and nothing else, so
+   what a section looks like inside is its own business.
+
+   The tab's own header has no section above it to stand apart from, so it is
+   left out rather than overridden: an override could return the margin but not
+   the padding the rule below takes, which belongs to Obsidian and cannot be
+   asked for back by name. Excluding it keeps that row exactly as it was.
+
+   Below the reset, like every rule that re-asserts a row of this plugin's own.
+   The :not() takes these two to 0,4,0 — above the group's heading rules rather
+   than tied with them, which changes nothing beyond making file order moot. */
+.pdf-annotations-settings-root
+	> .setting-item.setting-item-heading:not(.pdf-annotations-settings-header) {
+	margin-top: var(--size-4-6);
+}
+
+/* Obsidian's own top padding on a heading is empty space above the words, and
+   it is what made the gap above one section differ from the gap above the next;
+   with the margin above stating that distance, the padding has nothing left to
+   do. The annotation types keep theirs: that row is drawn as a card further
+   down the file, where the padding is inside its own frame and is what holds
+   the heading off its border — the margin above already puts the frame the same
+   distance below the section before it. */
+.pdf-annotations-settings-root
+	> .setting-item.setting-item-heading:not(
+		.pdf-annotations-settings-header,
+		.pdf-annotations-annotation-setting
+	) {
+	padding-top: 0;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Settings tab — header
    ────────────────────────────────────────────────────────────────────────── */

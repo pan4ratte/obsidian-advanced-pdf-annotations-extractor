@@ -176,7 +176,7 @@ export default {
     // already says that an empty field creates no subfolder.
     PLACEHOLDER_SUBFOLDER_EXAMPLE: "For example, {{filename}} or another variable with any prefix or suffix",
     SETTING_SECTION_SUBFOLDER_NAME: "Create a subfolder for each section of the PDF",
-    SETTING_SECTION_SUBFOLDER_DESC: "Reads the bookmarks of the PDF itself and files each note in the folder of the section its annotation stands in. The nesting of the bookmarks becomes the nesting of the folders, which are created inside the subfolder above.",
+    SETTING_SECTION_SUBFOLDER_DESC: "Reads the bookmarks of the PDF itself and files each note in the folder of the section its annotation stands in.",
 
     // ─── Settings: shared notes ──────────────────────────────────────────────────
     SECTION_SHARED_NOTES: "Extraction to shared notes",
