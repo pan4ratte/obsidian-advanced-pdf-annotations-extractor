@@ -315,6 +315,12 @@ export class PDFAnnotationPluginSetting {
 	 * notes only — see `resolveNotePath`.
 	 */
 	public noteSubfolder: string;
+	/**
+	 * File a note per annotation under the section of the PDF its annotation
+	 * falls in, read from the document's own outline and nested as the outline
+	 * nests. Goes under `noteSubfolder` when both are asked for.
+	 */
+	public subfolderPerSection: boolean;
 	public noteName: string;
 	public desiredAnnotations: string[];
 	/** Written for every annotation type that has no template of its own. */
@@ -357,6 +363,9 @@ export class PDFAnnotationPluginSetting {
 		this.noteLocation = "vault";
 		this.noteFolder = "";
 		this.noteSubfolder = "";
+		// Off: it reads the PDF's outline on every extraction, and a document
+		// without one would gain nothing for the reading.
+		this.subfolderPerSection = false;
 		this.noteName = t.DEFAULT_NOTE_NAME;
 		this.desiredAnnotations = [...DEFAULT_DESIRED_ANNOTATIONS];
 		this.defaultTemplate = t.DEFAULT_NOTE_TEMPLATE;
@@ -972,6 +981,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 								t.SETTING_TOPIC_TO_NAME_NAME,
 								t.SETTING_ONE_NOTE_NAME_NAME,
 								t.SETTING_NOTE_SUBFOLDER_NAME,
+								t.SETTING_SECTION_SUBFOLDER_NAME,
 							],
 						},
 						(root) => this.renderSeparateNotes(root)
@@ -1461,6 +1471,19 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		noteSubfolderSetting.settingEl.addClass(
 			"pdf-annotations-stacked-setting"
 		);
+
+		// Under the field it nests inside, which is where its folders are made.
+		new Setting(root)
+			.setName(t.SETTING_SECTION_SUBFOLDER_NAME)
+			.setDesc(t.SETTING_SECTION_SUBFOLDER_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.subfolderPerSection)
+					.onChange(async (value) => {
+						this.plugin.settings.subfolderPerSection = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 
 	/**

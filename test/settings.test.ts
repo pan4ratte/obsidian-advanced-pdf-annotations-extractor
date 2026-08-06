@@ -208,6 +208,17 @@ describe('naming a note per annotation after its topic', () => {
   });
 });
 
+describe('a subfolder per section of the PDF', () => {
+  test('is off, since it reads the outline of every PDF extracted', () => {
+    expect(new PDFAnnotationPluginSetting().subfolderPerSection).toBe(false);
+  });
+
+  test('is a field of its own, which is what makes it load', () => {
+    expect(Object.keys(new PDFAnnotationPluginSetting()))
+      .toContain('subfolderPerSection');
+  });
+});
+
 describe('cleanNoteName', () => {
   test('a name a vault already takes is left alone', () => {
     expect(cleanNoteName('Annotations for Paper-1')).toBe(

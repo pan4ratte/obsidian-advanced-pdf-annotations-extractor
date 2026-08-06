@@ -144,6 +144,9 @@ there with the fix named rather than as npm's "not in sync".
 - Run `npm test` (no watch by default).
 - `loadPDFFile.test.ts` drives the pipeline through a hand-rolled pdf.js stub
   cast to `PDFJsLib`; that interface is small on purpose so this stays possible.
+  The stub also answers `getOutline`, `getDestination` and `getPageIndex`, which
+  is what the section tests drive — a destination there is
+  `[pageRef, {name}, ...arguments]`, exactly as pdf.js reports one.
 - The glyph fixtures are real pdf.js text items and real PDF highlight rectangles for
   the words `diese`, `(S. 1)`, `Word,` and `Lesen`. The single-character cases
   (`W`, `o`, `r`, `d`, `,` of `Word,`) are what pin down the glyph-width
@@ -313,8 +316,11 @@ first look.
   for truth — compare it with `null`, or the rule fails the build.
 - pdf.js data is typed at the boundary, not passed around as `any`:
   `RawPDFAnnotation` (what pdf.js reports), `PDFAnnotation` (once extraction has
-  filled in the note's fields), `PositionedText` and `PDFJsLib` in `src/types.ts`.
-  `loadPdfJs()` and `getAnnotations()` return `any` — cast once, there.
+  filled in the note's fields), `RawPDFOutlineItem`, `PDFSection`,
+  `PositionedText` and `PDFJsLib` in `src/types.ts`. `loadPdfJs()`,
+  `getAnnotations()` and `getOutline()` return `any` — cast once, there.
+  `getOutline()` is typed as an array and answers **null** for a document with
+  no outline, which is most of them; the cast says so.
 - Local overrides in `eslint.config.mjs`: `no-unused-vars` on (args: none),
   `ban-ts-comment` off, `no-explicit-any` autofix disabled (its `fixToUnknown`
   fixer rewrites `any` to `unknown` and breaks every call site).

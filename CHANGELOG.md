@@ -8,6 +8,13 @@ package.json. -->
 
 ## Unreleased
 
+### A folder per section of the PDF
+
+* **"Create a subfolder for each section of the PDF"**, on an extraction into separate notes, reads the document's own bookmarks and files each note under the heading its annotation stands in. The bookmarks nest, and so do the folders: a note from "Second trial" inside "Results" lands in `Results/Second trial`.
+* **It goes under the subfolder template**, so `{{filename}}` can still give every PDF a folder of its own with the sections inside it.
+* **An annotation standing before the first heading** — on a title page, in an abstract — is in no section and files beside the section folders rather than in one of them.
+* Off by default, and the outline is read only while it is on: a PDF without bookmarks gains nothing for the reading.
+
 ### A clipboard path may name a folder
 
 * **A folder in the clipboard extracts every PDF in it.** All three clipboard commands take a folder path as well as a file path: into the current note they arrive as one insertion, and into new notes as a note per PDF — the note name is a template over the file it was read from. The folder itself is read, not the folders under it, and a PDF that will not open is named and skipped rather than taking the rest of the folder with it.

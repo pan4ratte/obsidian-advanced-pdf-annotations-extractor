@@ -10,17 +10,48 @@ const textItems = [
 // Quad covering the whole word.
 const wholeWord = [71.5, 663.974, 103.287, 663.974, 71.5, 653.558, 103.287, 653.558];
 
-function pdfjsReturning(annotations: unknown[]): PDFJsLib {
-  const page = {
-    getAnnotations: () => Promise.resolve(annotations),
-    getTextContent: () => Promise.resolve({items: textItems}),
-  };
+/**
+ * The outline as pdf.js hands it over: `dest` is either an explicit
+ * destination — a page reference, the kind of view, then its arguments — or the
+ * name of one the document defines.
+ */
+interface StubOutlineItem {
+  title: string;
+  dest: unknown;
+  items?: StubOutlineItem[];
+}
+
+interface StubDocument {
+  /** Pages, in order, each with the annotations standing on it. */
+  pages?: unknown[][];
+  outline?: StubOutlineItem[] | null;
+  /** Named destinations, for an outline that points at one. */
+  destinations?: Record<string, unknown[]>;
+}
+
+/** Page 3 of the document, as a reference and as the index pdf.js resolves it to. */
+const pageRef = (page: number) => ({num: 100 + page, gen: 0});
+
+function pdfjsFor(document: StubDocument): PDFJsLib {
+  const pages = document.pages ?? [[]];
   const pdf = {
-    numPages: 1,
+    numPages: pages.length,
     getPageLabels: () => Promise.resolve(null),
-    getPage: () => Promise.resolve(page),
+    getPage: (pagenum: number) =>
+      Promise.resolve({
+        getAnnotations: () => Promise.resolve(pages[pagenum - 1] ?? []),
+        getTextContent: () => Promise.resolve({items: textItems}),
+      }),
+    getOutline: () => Promise.resolve(document.outline ?? null),
+    getDestination: (id: string) =>
+      Promise.resolve(document.destinations?.[id] ?? null),
+    getPageIndex: (ref: {num: number}) => Promise.resolve(ref.num - 101),
   };
   return {getDocument: () => ({promise: Promise.resolve(pdf)})} as unknown as PDFJsLib;
+}
+
+function pdfjsReturning(annotations: unknown[]): PDFJsLib {
+  return pdfjsFor({pages: [annotations]});
 }
 
 function annotation(over: Record<string, unknown>) {
@@ -95,5 +126,123 @@ describe('loadPDFFile', () => {
     ]);
     expect(anno.body).toBe('why?');
     expect(anno.highlightedText).toBe('');
+  });
+
+  test('reads no outline unless the sections are asked for', async () => {
+    const [anno] = await extract([annotation({})]);
+    expect(anno.section).toBeUndefined();
+  });
+});
+
+describe('the section of the PDF an annotation falls in', () => {
+  /** An annotation whose top edge is `top`, on page `page`. */
+  const at = (page: number, top: number) => ({
+    page,
+    anno: annotation({rect: [0, top - 10, 100, top]}),
+  });
+
+  /** Jumps to the top of `page`; XYZ leaves the height unset, as writers do. */
+  const topOfPage = (page: number) => [pageRef(page), {name: 'Fit'}];
+  const partWayDown = (page: number, top: number) => [
+    pageRef(page),
+    {name: 'XYZ'},
+    0,
+    top,
+    null,
+  ];
+
+  async function sectionsOf(document: StubDocument): Promise<(string[] | undefined)[]> {
+    const total: PDFAnnotation[] = [];
+    await loadPDFFile(file, pdfjsFor(document), 'refs', total, ['Text'], true);
+    return total.map((anno) => anno.section);
+  }
+
+  test('is the last heading beginning at or above it', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno], [at(2, 700).anno], [at(3, 700).anno]],
+      outline: [
+        {title: 'Introduction', dest: topOfPage(1)},
+        {title: 'Method', dest: topOfPage(3)},
+      ],
+    });
+    expect(found).toEqual([['Introduction'], ['Introduction'], ['Method']]);
+  });
+
+  test('is nothing for an annotation standing before the first heading', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno], [at(2, 700).anno]],
+      outline: [{title: 'Introduction', dest: topOfPage(2)}],
+    });
+    expect(found).toEqual([undefined, ['Introduction']]);
+  });
+
+  test('carries the headings a heading sits under', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno], [at(2, 700).anno]],
+      outline: [
+        {
+          title: 'Results',
+          dest: topOfPage(1),
+          items: [{title: 'Second trial', dest: topOfPage(2)}],
+        },
+      ],
+    });
+    expect(found).toEqual([['Results'], ['Results', 'Second trial']]);
+  });
+
+  test('splits a page between two headings by where each one starts', async () => {
+    // PDF y grows upwards, so 700 is above 400.
+    const found = await sectionsOf({
+      pages: [[at(1, 720).anno, at(1, 500).anno, at(1, 300).anno]],
+      outline: [
+        {title: 'Method', dest: partWayDown(1, 700)},
+        {title: 'Results', dest: partWayDown(1, 400)},
+      ],
+    });
+    expect(found).toEqual([undefined, ['Method'], ['Results']]);
+  });
+
+  test('follows a named destination the document defines', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno]],
+      outline: [{title: 'Introduction', dest: 'intro'}],
+      destinations: {intro: topOfPage(1)},
+    });
+    expect(found).toEqual([['Introduction']]);
+  });
+
+  test('a heading with nothing to jump to still names the ones beneath it', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno]],
+      outline: [
+        {title: 'Part one', dest: null, items: [{title: 'Chapter 1', dest: topOfPage(1)}]},
+      ],
+    });
+    expect(found).toEqual([['Part one', 'Chapter 1']]);
+  });
+
+  test('a slash in a heading opens no folder of its own', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno]],
+      outline: [{title: 'Input/output', dest: topOfPage(1)}],
+    });
+    expect(found).toEqual([['Input output']]);
+  });
+
+  test('an unresolvable destination leaves the rest of the outline standing', async () => {
+    const found = await sectionsOf({
+      pages: [[at(1, 700).anno], [at(2, 700).anno]],
+      outline: [
+        {title: 'Introduction', dest: topOfPage(1)},
+        {title: 'Nowhere', dest: 'missing'},
+        {title: 'Method', dest: topOfPage(2)},
+      ],
+    });
+    expect(found).toEqual([['Introduction'], ['Method']]);
+  });
+
+  test('a document with no outline files nothing by section', async () => {
+    const found = await sectionsOf({pages: [[at(1, 700).anno]], outline: null});
+    expect(found).toEqual([undefined]);
   });
 });

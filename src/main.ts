@@ -116,7 +116,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			pdfjsLib,
 			containingFolder,
 			grandtotal,
-			desiredAnnotations
+			desiredAnnotations,
+			this.settings.subfolderPerSection
 		);
 		return {
 			fileMeta: pdfFile,
@@ -267,7 +268,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 								topic,
 								this.getResolvedNoTopicName(fileMeta, counter)
 							)) + ".md";
-				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder, true);
+				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder, true, anno);
 				// A note per annotation is a great many notes; opening each of
 				// them buries whatever the reader was looking at.
 				const written = await this.saveHighlightsToFile(filePathOfNote, note, this.settings.overwriteExistingNote, false);
@@ -370,7 +371,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			pdfjsLib,
 			containingFolder,
 			annotations,
-			desiredAnnotations
+			desiredAnnotations,
+			this.settings.subfolderPerSection
 		);
 		return { fileMeta: pdfFile, annotations, isExternalFile: true };
 	}
@@ -790,43 +792,76 @@ export default class PDFAnnotationPlugin extends Plugin {
 	}
 
 	/**
+	 * The folders one note goes in under its destination: what the subfolder
+	 * template renders, and under that the PDF's own section the annotation
+	 * falls in, as deep as the outline nests it.
+	 *
+	 * A part that renders nothing is skipped rather than left as an empty step
+	 * in the path — an annotation before the first heading of the document is
+	 * in no section, and files beside the ones that are.
+	 */
+	private getResolvedSubfolders(
+		pdfFile: FileMeta,
+		folder: string,
+		annotation?: PDFAnnotation
+	): string {
+		const parts = [this.getResolvedNoteSubfolder(pdfFile, folder)];
+		if (this.settings.subfolderPerSection && annotation?.section) {
+			parts.push(...annotation.section);
+		}
+		return parts.filter((part) => part.trim().length > 0).join("/");
+	}
+
+	/**
 	 * `separateNotes` is the extraction that writes a note per annotation, and
-	 * the only one the subfolder applies to: a subfolder is what keeps that
-	 * many notes together, and an extraction writing the one note has nothing
-	 * to keep together.
+	 * the only one the subfolders apply to: a subfolder is what keeps that many
+	 * notes together, and an extraction writing the one note has nothing to
+	 * keep together. `annotation` is that note's own, and what says which
+	 * section of the PDF it came out of.
 	 */
 	getResolvedNotePath(
 		pdfFile: FileMeta,
 		currentFolder: string,
 		fileNameOfNote: string,
 		folder = "",
-		separateNotes = false
+		separateNotes = false,
+		annotation?: PDFAnnotation
 	): string {
 		return resolveNotePath(
 			this.settings,
 			currentFolder,
 			fileNameOfNote,
-			separateNotes ? this.getResolvedNoteSubfolder(pdfFile, folder) : ""
+			separateNotes
+				? this.getResolvedSubfolders(pdfFile, folder, annotation)
+				: ""
 		);
 	}
 
 	/**
 	 * The subfolder a template names need not exist yet, and `vault.create`
 	 * will not make it. Anything already there is left alone.
+	 *
+	 * One level at a time, outermost first: the path may nest as deep as the
+	 * PDF's outline does, and a folder is not made under a parent that is not
+	 * there yet.
 	 */
 	private async createMissingFolders(filePath: string): Promise<void> {
 		const lastSlash = filePath.lastIndexOf("/");
 		if (lastSlash < 0) return;
 
-		const folder = filePath.slice(0, lastSlash);
-		if (!folder || this.app.vault.getFolderByPath(folder)) return;
+		let folder = "";
+		for (const part of filePath.slice(0, lastSlash).split("/")) {
+			folder = folder ? `${folder}/${part}` : part;
+			if (this.app.vault.getFolderByPath(folder)) continue;
 
-		try {
-			await this.app.vault.createFolder(folder);
-		} catch (error) {
-			// Made in the meantime by another note of the same run, or named
-			// something the vault refuses — which `vault.create` reports.
-			console.error(error);
+			try {
+				await this.app.vault.createFolder(folder);
+			} catch (error) {
+				// Made in the meantime by another note of the same run, or
+				// named something the vault refuses — which `vault.create`
+				// reports.
+				console.error(error);
+			}
 		}
 	}
 

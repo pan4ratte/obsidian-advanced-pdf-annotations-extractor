@@ -1,8 +1,16 @@
-import { PDFAnnotation, PDFFile, PDFJsLib, RawPDFAnnotation } from "src/types";
+import {
+	PDFAnnotation,
+	PDFFile,
+	PDFJsLib,
+	PDFSection,
+	RawPDFAnnotation,
+	RawPDFOutlineItem,
+} from "src/types";
 import { ANNOTS_TREATED_AS_HIGHLIGHTS } from "src/settings";
 import {
 	PDFDocumentProxy,
 	PDFPageProxy,
+	RefProxy,
 	TextContent,
 	TextItem,
 } from "pdfjs-dist/types/src/display/api";
@@ -202,6 +210,164 @@ export function extractHighlight(
 	return highlight;
 }
 
+/**
+ * Where in a destination array the top of the view sits, by the kind of
+ * destination it is: `[pageRef, {name}, ...arguments]`. The kinds left out —
+ * `Fit`, `FitB`, `FitV`, `FitBV` — name a page or a width and no height on it,
+ * so a section jumping to one of them starts at the top of its page.
+ */
+const TOP_IN_DESTINATION: Record<string, number> = {
+	// left, top, zoom
+	XYZ: 3,
+	// top
+	FitH: 2,
+	FitBH: 2,
+	// left, bottom, right, top
+	FitR: 5,
+};
+
+/** A pdf.js object reference, which is what an explicit destination points at. */
+function isPageReference(value: unknown): value is RefProxy {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as RefProxy).num === "number" &&
+		typeof (value as RefProxy).gen === "number"
+	);
+}
+
+/** The `{name}` an explicit destination carries second, or nothing usable. */
+function destinationKind(destination: unknown[]): string {
+	const kind = destination[1];
+	if (typeof kind !== "object" || kind === null) return "";
+	const name = (kind as { name?: unknown }).name;
+	return typeof name === "string" ? name : "";
+}
+
+/**
+ * The page a destination lands on and how far down it, or nothing when it
+ * cannot be resolved — a named destination the document does not define, or a
+ * reference to a page that is not there. One unusable bookmark is not the
+ * whole outline.
+ */
+async function startOfDestination(
+	pdf: PDFDocumentProxy,
+	dest: string | unknown[] | null
+): Promise<{ pageNumber: number; top: number } | null> {
+	if (!dest) return null;
+
+	try {
+		const destination =
+			typeof dest === "string"
+				? ((await pdf.getDestination(dest)) as unknown[] | null)
+				: dest;
+		if (!destination || destination.length === 0) return null;
+
+		// Usually a reference to the page; some writers put its index there.
+		const target = destination[0];
+		const pageIndex = isPageReference(target)
+			? await pdf.getPageIndex(target)
+			: typeof target === "number"
+				? target
+				: null;
+		if (pageIndex === null) return null;
+
+		const at = TOP_IN_DESTINATION[destinationKind(destination)];
+		const top = at === undefined ? undefined : destination[at];
+
+		return {
+			pageNumber: pageIndex + 1,
+			// A destination may leave any of its arguments null, which means
+			// "whatever the view already shows" — no height of its own either.
+			top: typeof top === "number" ? top : Infinity,
+		};
+	} catch (error) {
+		console.error(error);
+		return null;
+	}
+}
+
+/**
+ * A heading as a folder may be named after it. A slash would open a folder of
+ * its own, and the nesting of the outline is what says which folder holds
+ * which — so the title keeps none of its own.
+ */
+function sectionName(title: string): string {
+	return typeof title === "string"
+		? title.replace(/[\\/]+/g, " ").replace(/\s+/g, " ").trim()
+		: "";
+}
+
+/**
+ * The PDF's own outline, flattened into the sections it names and sorted into
+ * document order: down the pages, and down each page.
+ *
+ * A bookmark keeps its ancestors, so a section is the whole path to it. One
+ * that names nothing to jump to still passes its title down to the bookmarks
+ * beneath it — that is a heading over a part of the document, not a place in
+ * it.
+ */
+export async function readSections(
+	pdf: PDFDocumentProxy
+): Promise<PDFSection[]> {
+	// Typed as an array by pdf.js and null in a document that has no outline,
+	// which is most of them.
+	const outline = (await pdf.getOutline()) as RawPDFOutlineItem[] | null;
+	if (!outline || outline.length === 0) return [];
+
+	const sections: PDFSection[] = [];
+
+	const visit = async (
+		items: RawPDFOutlineItem[],
+		ancestors: string[]
+	): Promise<void> => {
+		for (const item of items) {
+			const name = sectionName(item.title);
+			const path = name ? [...ancestors, name] : ancestors;
+
+			const start = await startOfDestination(pdf, item.dest);
+			if (start && path.length > 0) {
+				sections.push({ ...start, path });
+			}
+
+			if (item.items?.length) await visit(item.items, path);
+		}
+	};
+	await visit(outline, []);
+
+	sections.sort((one, other) => {
+		if (one.pageNumber !== other.pageNumber) {
+			return one.pageNumber - other.pageNumber;
+		}
+		// Down the page, so the higher of the two comes first. Compared rather
+		// than subtracted: two sections at the top of one page are both at
+		// Infinity, and the difference of those is not a number.
+		if (one.top === other.top) return 0;
+		return one.top > other.top ? -1 : 1;
+	});
+	return sections;
+}
+
+/**
+ * The section an annotation falls in: the last one beginning at or above it.
+ * Nothing for an annotation standing before the first heading — a title page
+ * belongs to no section of the document.
+ */
+export function sectionAt(
+	sections: PDFSection[],
+	pageNumber: number,
+	top: number
+): string[] | undefined {
+	let found: PDFSection | undefined;
+	// In document order, so the first section past the annotation ends it.
+	for (const section of sections) {
+		if (section.pageNumber > pageNumber) break;
+		if (section.pageNumber === pageNumber && section.top < top) break;
+		found = section;
+	}
+	return found?.path;
+}
+
 /** Reads one page's wanted annotations into `total`. */
 async function loadPage(
 	page: PDFPageProxy,
@@ -210,7 +376,8 @@ async function loadPage(
 	file: PDFFile,
 	containingFolder: string,
 	total: PDFAnnotation[],
-	desiredAnnotations: string[]
+	desiredAnnotations: string[],
+	sections: PDFSection[]
 ) {
 	const rawAnnotations = (await page.getAnnotations()) as RawPDFAnnotation[];
 
@@ -252,6 +419,17 @@ async function loadPage(
 			anno.highlightedText = extractHighlight(anno, textItems);
 		}
 
+		if (sections.length > 0) {
+			// The top of the annotation, whichever corner the rectangle names
+			// first: a section starting between its top and its bottom is one
+			// the annotation has already begun before.
+			anno.section = sectionAt(
+				sections,
+				pagenum,
+				Math.max(raw.rect[1], raw.rect[3])
+			);
+		}
+
 		// Nothing a note could show, so nothing worth a blank entry.
 		if (!anno.body.trim() && !anno.highlightedText?.trim()) continue;
 
@@ -259,15 +437,24 @@ async function loadPage(
 	}
 }
 
+/**
+ * `withSections` reads the PDF's own outline and tells each annotation which
+ * section of the document it falls in. Asked for rather than always done: it
+ * resolves the destination of every bookmark, which a document with a long
+ * outline makes a great many of, and nothing needs the answer unless the notes
+ * are to be filed by section.
+ */
 export async function loadPDFFile(
 	file: PDFFile,
 	pdfjsLib: PDFJsLib,
 	containingFolder: string,
 	total: PDFAnnotation[],
-	desiredAnnotations: string[]
+	desiredAnnotations: string[],
+	withSections = false
 ) {
 	const pdf: PDFDocumentProxy = await pdfjsLib.getDocument(file.content)
 		.promise;
+	const sections = withSections ? await readSections(pdf) : [];
 	const pageLabels = await pdf.getPageLabels();
 	for (let i = 1; i <= pdf.numPages; i++) {
 		const page = await pdf.getPage(i);
@@ -284,7 +471,8 @@ export async function loadPDFFile(
 			file,
 			containingFolder,
 			total,
-			desiredAnnotations
+			desiredAnnotations,
+			sections
 		);
 	}
 }

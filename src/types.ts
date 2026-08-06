@@ -77,6 +77,34 @@ export interface PDFString {
 }
 
 /**
+ * One entry of the PDF's own outline — a bookmark, as a reader's app calls it,
+ * and a heading or section of the document as the author wrote it.
+ *
+ * Restated rather than taken from pdf.js, which types `dest` and `items` as
+ * `any`: cast to this once at the read, as with the annotations. `dest` is a
+ * named destination to look up, an explicit one to read, or nothing at all —
+ * a bookmark that only holds the ones beneath it.
+ */
+export interface RawPDFOutlineItem {
+	title: string;
+	dest: string | unknown[] | null;
+	items: RawPDFOutlineItem[];
+}
+
+/** Where a section of the PDF begins, and what it and its parents are called. */
+export interface PDFSection {
+	/** The heading and the headings it sits under, outermost first. */
+	path: string[];
+	pageNumber: number;
+	/**
+	 * Distance up the page the section starts at, PDF-style: larger is higher.
+	 * `Infinity` when the destination names a page and no place on it, which
+	 * makes the section start at the top of that page.
+	 */
+	top: number;
+}
+
+/**
  * What this plugin reads off a pdf.js annotation. pdf.js hands them over as
  * plain data with no type of its own, so only the fields used are modelled.
  */
@@ -113,6 +141,12 @@ export interface PDFAnnotation extends RawPDFAnnotation {
 	body: string;
 	/** First line of the body, read once the annotations are gathered. */
 	topic?: string;
+	/**
+	 * The section of the PDF the annotation falls in, outermost heading first.
+	 * Absent when the document has no outline, when nothing asked for one, or
+	 * when the annotation sits above the first heading.
+	 */
+	section?: string[];
 	/** The day `creationDate` names, as `YYYY-MM-DD`. */
 	created?: string;
 	/** The time `creationDate` names, as `HH:mm`; absent when it carries none. */
