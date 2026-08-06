@@ -13,9 +13,15 @@ package.json. -->
 * **A folder in the clipboard extracts every PDF in it.** All three clipboard commands take a folder path as well as a file path: into the current note they arrive as one insertion, and into new notes as a note per PDF — the note name is a template over the file it was read from. The folder itself is read, not the folders under it, and a PDF that will not open is named and skipped rather than taking the rest of the folder with it.
 * **Nothing is opened when a folder wrote more than one note**, which would otherwise bury whatever you were looking at.
 
-### Extraction to separate notes is its own section
+### The settings are split by the kind of extraction they apply to
 
-* **A new settings section** gathers the settings that apply to an extraction into separate notes and to no other: naming a note after its comment's topic, the naming pattern that stands in when it does not, and the subfolder.
+The tab now has three sections in place of four, and every setting sits in the one that says when it takes effect. Nothing about how an extraction behaves has changed — only where it is asked for.
+
+* **"General extraction rules"** — what every extraction obeys: reading the topic of each comment and heading the annotations that share it, where the notes go, whether tags move to the properties, and whether an existing note is overwritten.
+* **"Extraction to shared notes"** — one note for all the annotations of a PDF. Grouping by folder, by file and by creation date live here with the headings they write, since a note holding a single annotation has nothing to gather and never carried those headings.
+* **"Extraction to separate notes"** — a note of its own for each annotation: naming it after its comment's topic, the pattern that stands in when there is no topic, and the subfolder.
+* **Each grouping now sits directly above the heading it controls**, so a greyed-out heading toggle has its reason on the row above it. The separate "Annotation grouping" and "Headings" sections are gone.
+* Both new sections open with a line saying what the extraction produces, so the two can be told apart at a glance.
 * **The subfolder now applies to an extraction into separate notes only** — that is the extraction whose notes it keeps together — and it applies under either destination, the folder of the open file as well as a folder of the vault. An extraction into one note ignores it.
 
 ### Grouping reads from the outside in

@@ -205,8 +205,19 @@ a non-empty array of definitions renders the tab **instead of** it, and
 `minAppVersion` is 1.13.0, so nothing reaches it.
 
 The array is one group holding one definition per section of the tab —
-header, annotation types, templates, grouping, headings, notes, separate
-notes — and it never changes shape. Five rules keep it working; each one is a silent failure if
+header, annotation types, templates, general rules, shared notes, separate
+notes — and it never changes shape. The last three are the extraction's own
+settings, split by what they apply to: every extraction, the one writing a note
+per PDF, and the one writing a note per annotation.
+
+Each grouping is drawn next to the heading it heads, by `renderGroupingPair`,
+which greys the heading out while the grouping is off and remembers the choice
+it was switched off from. The pair decides which section both of them live in,
+and `formatter.ts` is what settles that: the folder, file and date headings are
+skipped for a note holding a single annotation (`onePerNote`), so those three
+pairs are shared-notes settings, while the topic pair is written for either kind
+and is a general rule. Nothing here spans sections any more — the toggle is a
+local of the call that draws the pair, and the tab keeps no fields. Five rules keep it working; each one is a silent failure if
 broken:
 
 - **No `control`.** Nothing in this tab is a control the API describes, so every

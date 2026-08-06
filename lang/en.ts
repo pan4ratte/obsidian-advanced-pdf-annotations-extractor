@@ -124,8 +124,9 @@ export default {
      */
     WARNING_VARIABLE_UNFILLED: "{{variable}} is left empty: “{{type}}” marks up no text in the PDF.",
 
-    // ─── Settings: grouping ──────────────────────────────────────────────────────
-    SECTION_GROUPING: "Annotation grouping",
+    // ─── Settings: grouping and headings ─────────────────────────────────────────
+    // Each grouping is paired with the heading it heads: a heading is written
+    // only where that grouping gathered the annotations under it.
     SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
     SETTING_GROUP_BY_FOLDER_DESC: "Collects every PDF from the same folder together, and applies only when the annotations come from several folders.",
     SETTING_GROUP_BY_FILE_NAME: "Group by file",
@@ -133,21 +134,20 @@ export default {
     SETTING_GROUP_BY_DATE_NAME: "Group by creation date",
     SETTING_GROUP_BY_DATE_DESC: "Groups annotations by the day of creation — annotations without a date come last.",
     SETTING_SORT_BY_TOPIC_NAME: "Group by topic",
-    SETTING_SORT_BY_TOPIC_DESC: "Reads the first line of each comment as its topic and groups by it inside every other grouping.",
-
-    // ─── Settings: headings ──────────────────────────────────────────────────────
-    SECTION_HEADINGS: "Headings",
+    SETTING_SORT_BY_TOPIC_DESC: "Reads the first line of each comment as its topic: in a shared note the annotations are collected by it, and in an extraction to separate notes it can become the name of a note.",
     SETTING_FOLDER_HEADING_NAME: "Add folder headings",
     SETTING_FOLDER_HEADING_DESC: "Adds a heading to the text with the folder name when annotations are grouped by folder.",
     SETTING_FILE_HEADING_NAME: "Add file headings",
     SETTING_FILE_HEADING_DESC: "Adds a heading to the text with the file name when annotations are grouped by file.",
     SETTING_DATE_HEADING_NAME: "Add date headings",
     SETTING_DATE_HEADING_DESC: "Adds a heading to the text for each date when annotations are grouped by creation date.",
-    SETTING_TOPIC_HEADING_NAME: "Collect notes with the same topic under a shared heading",
-    SETTING_TOPIC_HEADING_DESC: "Adds a heading for each topic and collects the matching notes under it.",
+    SETTING_TOPIC_HEADING_NAME: "Collect annotations with the same topic under one heading",
+    SETTING_TOPIC_HEADING_DESC: "Adds a heading for each topic and collects the annotations that share it underneath.",
 
-    // ─── Settings: notes ─────────────────────────────────────────────────────────
-    SECTION_NOTES: "Note creation",
+    // ─── Settings: general rules ─────────────────────────────────────────────────
+    // Applies to every extraction: where the notes land, what becomes of the
+    // tags, and what happens to a note that is already there.
+    SECTION_GENERAL_RULES: "General extraction rules",
     SETTING_NOTE_LOCATION_NAME: "Destination for created notes",
     SETTING_NOTE_LOCATION_DESC: "Choose where the created notes will be placed.",
     OPTION_NOTE_LOCATION_CURRENT: "Same folder as the current file",
@@ -161,14 +161,20 @@ export default {
     OPTION_EXTRACT_TAGS_ALWAYS: "Always",
     OPTION_EXTRACT_TAGS_SINGLE: "When extracting into a shared note",
     OPTION_EXTRACT_TAGS_SEPARATE: "When extracting into separate notes",
-    SETTING_NOTE_NAME_NAME: "Naming pattern for annotations imported into a shared note",
-    SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}}, or every PDF will write its annotations into the same note.",
     SETTING_OVERWRITE_NAME: "Allow overwriting",
     SETTING_OVERWRITE_DESC: "If a note with the same name already exists, it is replaced rather than appended to.",
 
+    // ─── Settings: shared notes ──────────────────────────────────────────────────
+    // The descriptions of the two sections below are read as a pair: they say
+    // how many notes come out and where the name of each comes from.
+    SECTION_SHARED_NOTES: "Extraction to shared notes",
+    SECTION_SHARED_NOTES_DESC: "One note for all the annotations of a PDF, named by the pattern below.",
+    SETTING_NOTE_NAME_NAME: "Naming pattern for annotations imported into a shared note",
+    SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}}, or every PDF will write its annotations into the same note.",
+
     // ─── Settings: separate notes ────────────────────────────────────────────────
-    // Applies only to an extraction into separate notes — one per annotation.
     SECTION_SEPARATE_NOTES: "Extraction to separate notes",
+    SECTION_SEPARATE_NOTES_DESC: "A note of its own for each annotation, named after the topic of its comment or by the pattern below.",
     SETTING_TOPIC_TO_NAME_NAME: "Use the topic of the comment as the note name",
     SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating separate notes, if your template has it.",
     SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported into separate notes",

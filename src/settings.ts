@@ -466,6 +466,19 @@ export class PDFAnnotationPluginSetting {
 }
 
 /**
+ * One toggle's worth of a settings row: what it says, and how the setting
+ * behind it is read and written. Passed rather than the setting's name, since
+ * a name would have to be looked up through `asIndexable` and would lose the
+ * type on the way.
+ */
+interface BooleanSetting {
+	name: string;
+	desc: string;
+	get: () => boolean;
+	set: (value: boolean) => void;
+}
+
+/**
  * Type-ahead over the vault's folders. Every folder is offered on an empty
  * query, so the field can be browsed as well as typed into.
  */
@@ -506,18 +519,6 @@ class FolderSuggest extends AbstractInputSuggest<string> {
  */
 export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	plugin: PDFAnnotationPlugin;
-
-	/**
-	 * Each heading toggle is switched on and off by the grouping it heads,
-	 * which is a setting in the section above theirs, so they outlive the call
-	 * that draws them. Null until that section has been drawn, and again once
-	 * it is torn down.
-	 */
-	private folderHeadingToggle: ToggleComponent | null = null;
-	private fileHeadingToggle: ToggleComponent | null = null;
-	private dateHeadingToggle: ToggleComponent | null = null;
-	private topicHeadingToggle: ToggleComponent | null = null;
-	private syncingHeadings = false;
 
 	constructor(app: App, plugin: PDFAnnotationPlugin) {
 		super(app, plugin);
@@ -950,44 +951,40 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 					),
 					this.section(
 						{
-							name: t.SECTION_GROUPING,
+							name: t.SECTION_GENERAL_RULES,
 							aliases: [
-								t.SETTING_GROUP_BY_FOLDER_NAME,
-								t.SETTING_GROUP_BY_FILE_NAME,
-								t.SETTING_GROUP_BY_DATE_NAME,
 								t.SETTING_SORT_BY_TOPIC_NAME,
-							],
-						},
-						(root) => this.renderGrouping(root)
-					),
-					this.section(
-						{
-							name: t.SECTION_HEADINGS,
-							aliases: [
-								t.SETTING_FOLDER_HEADING_NAME,
-								t.SETTING_FILE_HEADING_NAME,
-								t.SETTING_DATE_HEADING_NAME,
 								t.SETTING_TOPIC_HEADING_NAME,
-							],
-						},
-						(root) => this.renderHeadings(root)
-					),
-					this.section(
-						{
-							name: t.SECTION_NOTES,
-							aliases: [
 								t.SETTING_NOTE_LOCATION_NAME,
 								t.SETTING_NOTE_FOLDER_NAME,
 								t.SETTING_EXTRACT_TAGS_NAME,
-								t.SETTING_NOTE_NAME_NAME,
 								t.SETTING_OVERWRITE_NAME,
 							],
 						},
-						(root) => this.renderNotes(root)
+						(root) => this.renderGeneralRules(root)
+					),
+					// The two kinds of extraction, in the order the commands
+					// offer them: the one note first, then the many.
+					this.section(
+						{
+							name: t.SECTION_SHARED_NOTES,
+							desc: t.SECTION_SHARED_NOTES_DESC,
+							aliases: [
+								t.SETTING_GROUP_BY_FOLDER_NAME,
+								t.SETTING_FOLDER_HEADING_NAME,
+								t.SETTING_GROUP_BY_FILE_NAME,
+								t.SETTING_FILE_HEADING_NAME,
+								t.SETTING_GROUP_BY_DATE_NAME,
+								t.SETTING_DATE_HEADING_NAME,
+								t.SETTING_NOTE_NAME_NAME,
+							],
+						},
+						(root) => this.renderSharedNotes(root)
 					),
 					this.section(
 						{
 							name: t.SECTION_SEPARATE_NOTES,
+							desc: t.SECTION_SEPARATE_NOTES_DESC,
 							aliases: [
 								t.SETTING_TOPIC_TO_NAME_NAME,
 								t.SETTING_ONE_NOTE_NAME_NAME,
@@ -1243,203 +1240,95 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * A heading has nothing to head until the grouping it belongs to gathers
-	 * something, so it follows the setting that groups — greyed out but still
-	 * in view, and remembering the choice it was switched off from. The two
-	 * live in different sections, so the toggle is a field of the tab rather
-	 * than a local of the call that drew it, and nothing happens until it
-	 * exists.
+	 * A grouping and the heading that heads it, as the one pair they are: a
+	 * heading has nothing to head until the grouping gathers something under it,
+	 * so it follows the grouping — greyed out but still in view, and remembering
+	 * the choice it was switched off from.
+	 *
+	 * The two are drawn together, so the toggle they share is a local of this
+	 * call. It was a field of the tab while they lived in sections of their own,
+	 * and needed a cleanup to forget it by; neither is needed now.
 	 */
-	private syncHeadingToggle(
-		toggle: ToggleComponent | null,
-		enabled: boolean,
-		remembered: boolean
+	private renderGroupingPair(
+		root: HTMLElement,
+		grouping: BooleanSetting,
+		heading: BooleanSetting
 	): void {
-		// Compared with null rather than tested for truth: every component
-		// carries a `then` for chaining, which reads as a promise to the rule
-		// that guards against awaiting one by accident.
-		if (toggle === null) return;
-		// setValue calls onChange, which would take this for an edit and write
-		// the remembered choice away.
-		this.syncingHeadings = true;
-		toggle.setValue(enabled && remembered);
-		toggle.setDisabled(!enabled);
-		this.syncingHeadings = false;
-	}
+		let headingToggle: ToggleComponent | null = null;
+		let syncing = false;
 
-	private syncFolderHeading(): void {
-		this.syncHeadingToggle(
-			this.folderHeadingToggle,
-			this.plugin.settings.groupByFolder,
-			this.plugin.settings.folderHeading
-		);
-	}
+		const syncHeading = () => {
+			// Compared with null rather than tested for truth: every component
+			// carries a `then` for chaining, which reads as a promise to the
+			// rule that guards against awaiting one by accident.
+			if (headingToggle === null) return;
+			// setValue calls onChange, which would take this for an edit and
+			// write the remembered choice away.
+			syncing = true;
+			headingToggle.setValue(grouping.get() && heading.get());
+			headingToggle.setDisabled(!grouping.get());
+			syncing = false;
+		};
 
-	private syncFileHeading(): void {
-		this.syncHeadingToggle(
-			this.fileHeadingToggle,
-			this.plugin.settings.groupByFile,
-			this.plugin.settings.fileHeading
-		);
-	}
-
-	private syncDateHeading(): void {
-		this.syncHeadingToggle(
-			this.dateHeadingToggle,
-			this.plugin.settings.groupByDate,
-			this.plugin.settings.dateHeading
-		);
-	}
-
-	private syncTopicHeading(): void {
-		this.syncHeadingToggle(
-			this.topicHeadingToggle,
-			this.plugin.settings.sortByTopic,
-			this.plugin.settings.topicHeading
-		);
-	}
-
-	// Two sections, in the order they take effect: where an annotation lands,
-	// then what is written above it. The rows inside this one are in the order
-	// the groupings nest, widest first, which is the order they are applied in.
-	private renderGrouping(root: HTMLElement): void {
 		new Setting(root)
-			.setName(t.SECTION_GROUPING)
-			.setHeading();
-		new Setting(root)
-			.setName(t.SETTING_GROUP_BY_FOLDER_NAME)
-			.setDesc(t.SETTING_GROUP_BY_FOLDER_DESC)
+			.setName(grouping.name)
+			.setDesc(grouping.desc)
 			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.groupByFolder)
-					.onChange(async (value) => {
-						this.plugin.settings.groupByFolder = value;
-						this.syncFolderHeading();
-						await this.plugin.saveSettings();
-					})
+				toggle.setValue(grouping.get()).onChange(async (value) => {
+					grouping.set(value);
+					syncHeading();
+					await this.plugin.saveSettings();
+				})
 			);
 
 		new Setting(root)
-			.setName(t.SETTING_GROUP_BY_FILE_NAME)
-			.setDesc(t.SETTING_GROUP_BY_FILE_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.groupByFile)
-					.onChange(async (value) => {
-						this.plugin.settings.groupByFile = value;
-						this.syncFileHeading();
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(root)
-			.setName(t.SETTING_GROUP_BY_DATE_NAME)
-			.setDesc(t.SETTING_GROUP_BY_DATE_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.groupByDate)
-					.onChange(async (value) => {
-						this.plugin.settings.groupByDate = value;
-						this.syncDateHeading();
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(root)
-			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
-			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.sortByTopic)
-					.onChange(async (value) => {
-						this.plugin.settings.sortByTopic = value;
-						this.syncTopicHeading();
-						await this.plugin.saveSettings();
-					})
-			);
+			.setName(heading.name)
+			.setDesc(heading.desc)
+			.addToggle((toggle) => {
+				headingToggle = toggle;
+				toggle.setValue(heading.get()).onChange(async (value) => {
+					if (syncing) return;
+					heading.set(value);
+					await this.plugin.saveSettings();
+				});
+			});
+		syncHeading();
 	}
 
 	/**
-	 * Returns the cleanup that forgets the toggles the section above reaches
-	 * for, so nothing is left pointing at a row that is gone. The rows are in
-	 * the order of the groupings they head, which is the order they nest in.
+	 * What holds for an extraction of either kind: how the topic of a comment is
+	 * read, where the notes go, what becomes of the tags in them, and what
+	 * happens to a note already there. The two sections after it say what each
+	 * kind writes.
+	 *
+	 * The topic is here and the other three groupings are not, because it is the
+	 * only one that reaches both kinds: it takes the topic line out of every
+	 * comment, heads the annotations sharing it, and is what a separate note can
+	 * be named after.
 	 */
-	private renderHeadings(root: HTMLElement): () => void {
+	private renderGeneralRules(root: HTMLElement): void {
 		new Setting(root)
-			.setName(t.SECTION_HEADINGS)
+			.setName(t.SECTION_GENERAL_RULES)
 			.setHeading();
-		new Setting(root)
-			.setName(t.SETTING_FOLDER_HEADING_NAME)
-			.setDesc(t.SETTING_FOLDER_HEADING_DESC)
-			.addToggle((toggle) => {
-				this.folderHeadingToggle = toggle;
-				toggle
-					.setValue(this.plugin.settings.folderHeading)
-					.onChange(async (value) => {
-						if (this.syncingHeadings) return;
-						this.plugin.settings.folderHeading = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		this.syncFolderHeading();
 
-		new Setting(root)
-			.setName(t.SETTING_FILE_HEADING_NAME)
-			.setDesc(t.SETTING_FILE_HEADING_DESC)
-			.addToggle((toggle) => {
-				this.fileHeadingToggle = toggle;
-				toggle
-					.setValue(this.plugin.settings.fileHeading)
-					.onChange(async (value) => {
-						if (this.syncingHeadings) return;
-						this.plugin.settings.fileHeading = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		this.syncFileHeading();
+		// What is read out of the annotations first, then where what was read
+		// is filed — the order the tab has followed since the templates.
+		this.renderGroupingPair(
+			root,
+			{
+				name: t.SETTING_SORT_BY_TOPIC_NAME,
+				desc: t.SETTING_SORT_BY_TOPIC_DESC,
+				get: () => this.plugin.settings.sortByTopic,
+				set: (value) => (this.plugin.settings.sortByTopic = value),
+			},
+			{
+				name: t.SETTING_TOPIC_HEADING_NAME,
+				desc: t.SETTING_TOPIC_HEADING_DESC,
+				get: () => this.plugin.settings.topicHeading,
+				set: (value) => (this.plugin.settings.topicHeading = value),
+			}
+		);
 
-		new Setting(root)
-			.setName(t.SETTING_DATE_HEADING_NAME)
-			.setDesc(t.SETTING_DATE_HEADING_DESC)
-			.addToggle((toggle) => {
-				this.dateHeadingToggle = toggle;
-				toggle
-					.setValue(this.plugin.settings.dateHeading)
-					.onChange(async (value) => {
-						if (this.syncingHeadings) return;
-						this.plugin.settings.dateHeading = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		this.syncDateHeading();
-
-		new Setting(root)
-			.setName(t.SETTING_TOPIC_HEADING_NAME)
-			.setDesc(t.SETTING_TOPIC_HEADING_DESC)
-			.addToggle((toggle) => {
-				this.topicHeadingToggle = toggle;
-				toggle
-					.setValue(this.plugin.settings.topicHeading)
-					.onChange(async (value) => {
-						if (this.syncingHeadings) return;
-						this.plugin.settings.topicHeading = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		this.syncTopicHeading();
-
-		return () => {
-			this.folderHeadingToggle = null;
-			this.fileHeadingToggle = null;
-			this.dateHeadingToggle = null;
-			this.topicHeadingToggle = null;
-		};
-	}
-
-	private renderNotes(root: HTMLElement): void {
-		new Setting(root)
-			.setName(t.SECTION_NOTES)
-			.setHeading();
 		// A note following the file being looked at has no vault folder to go
 		// in, so the field opens and closes with the choice above it.
 		let showNoteTarget!: (shown: boolean, animate: boolean) => void;
@@ -1505,11 +1394,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
-		const noteNameSetting = new Setting(root)
-			.setName(t.SETTING_NOTE_NAME_NAME)
-			.setDesc(t.SETTING_NOTE_NAME_DESC)
-			.addText((input) => this.buildValueInput(input, "noteName"));
-		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
 		new Setting(root)
 			.setName(t.SETTING_OVERWRITE_NAME)
 			.setDesc(t.SETTING_OVERWRITE_DESC)
@@ -1524,15 +1408,91 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * The extraction that gathers a whole PDF into one note, and the only one
+	 * these settings reach: a note holding a single annotation has nothing to
+	 * gather and nothing to head, which is why the formatter skips all three of
+	 * these headings for it.
+	 *
+	 * The pairs are in the order the groupings nest, widest first — folder, then
+	 * file, then day — which is the order they are applied in and the order the
+	 * headings take their levels in.
+	 */
+	private renderSharedNotes(root: HTMLElement): void {
+		const heading = new Setting(root)
+			.setName(t.SECTION_SHARED_NOTES)
+			.setDesc(t.SECTION_SHARED_NOTES_DESC)
+			.setHeading();
+		// A heading row is not meant to carry a description, so the stylesheet
+		// is told this one does.
+		heading.settingEl.addClass("pdf-annotations-section-heading");
+
+		this.renderGroupingPair(
+			root,
+			{
+				name: t.SETTING_GROUP_BY_FOLDER_NAME,
+				desc: t.SETTING_GROUP_BY_FOLDER_DESC,
+				get: () => this.plugin.settings.groupByFolder,
+				set: (value) => (this.plugin.settings.groupByFolder = value),
+			},
+			{
+				name: t.SETTING_FOLDER_HEADING_NAME,
+				desc: t.SETTING_FOLDER_HEADING_DESC,
+				get: () => this.plugin.settings.folderHeading,
+				set: (value) => (this.plugin.settings.folderHeading = value),
+			}
+		);
+
+		this.renderGroupingPair(
+			root,
+			{
+				name: t.SETTING_GROUP_BY_FILE_NAME,
+				desc: t.SETTING_GROUP_BY_FILE_DESC,
+				get: () => this.plugin.settings.groupByFile,
+				set: (value) => (this.plugin.settings.groupByFile = value),
+			},
+			{
+				name: t.SETTING_FILE_HEADING_NAME,
+				desc: t.SETTING_FILE_HEADING_DESC,
+				get: () => this.plugin.settings.fileHeading,
+				set: (value) => (this.plugin.settings.fileHeading = value),
+			}
+		);
+
+		this.renderGroupingPair(
+			root,
+			{
+				name: t.SETTING_GROUP_BY_DATE_NAME,
+				desc: t.SETTING_GROUP_BY_DATE_DESC,
+				get: () => this.plugin.settings.groupByDate,
+				set: (value) => (this.plugin.settings.groupByDate = value),
+			},
+			{
+				name: t.SETTING_DATE_HEADING_NAME,
+				desc: t.SETTING_DATE_HEADING_DESC,
+				get: () => this.plugin.settings.dateHeading,
+				set: (value) => (this.plugin.settings.dateHeading = value),
+			}
+		);
+
+		const noteNameSetting = new Setting(root)
+			.setName(t.SETTING_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_NOTE_NAME_DESC)
+			.addText((input) => this.buildValueInput(input, "noteName"));
+		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
+	}
+
+	/**
 	 * The settings that apply to the extraction writing a note per annotation
 	 * and to no other, gathered where that is the one thing they have in
 	 * common: what the notes are named, and the folder that keeps that many of
-	 * them together under wherever the section above sends them.
+	 * them together under wherever the general rules send them.
 	 */
 	private renderSeparateNotes(root: HTMLElement): void {
-		new Setting(root)
+		const heading = new Setting(root)
 			.setName(t.SECTION_SEPARATE_NOTES)
+			.setDesc(t.SECTION_SEPARATE_NOTES_DESC)
 			.setHeading();
+		heading.settingEl.addClass("pdf-annotations-section-heading");
 
 		// The switch above the field it governs: once the topic names the
 		// notes, the name template has nothing left to name.

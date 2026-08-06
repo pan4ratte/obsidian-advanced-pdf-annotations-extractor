@@ -78,7 +78,8 @@
    tight under the name. Scoped to this plugin's rows, since styles.css is
    loaded app-wide. */
 .pdf-annotations-settings-header .setting-item-description,
-.pdf-annotations-annotation-setting .setting-item-description {
+.pdf-annotations-annotation-setting .setting-item-description,
+.pdf-annotations-section-heading .setting-item-description {
 	padding-top: 8px;
 }
 

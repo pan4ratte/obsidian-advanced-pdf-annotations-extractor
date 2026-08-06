@@ -25,7 +25,7 @@ Set up the default template that will format all annotation types, or create sep
 
 ### 4. Grouping, headings and note naming rules
 
-Group the annotations by folder, by file, by the day they were created and by topic (the first line of each comment) — the groupings nest in that order. Grouping by folder and by file applies only when the annotations come from several folders or files. Group headings can optionally be added to the notes automatically. Notes can be named from a template — and, on an extraction into separate notes, after the annotation's own topic; the subfolder for those notes is set in the same place and is also created from a template.
+Group the annotations by folder, by file, by the day they were created and by topic (the first line of each comment) — the groupings nest in that order. Grouping by folder and by file applies only when the annotations come from several folders or files. Group headings can optionally be added to the notes automatically. Notes can be named from a template — and, on an extraction into separate notes, after the annotation's own topic; the subfolder for those notes is set in the same place and is also created from a template. The settings are split by the kind of extraction they apply to: general rules, extraction to shared notes, and extraction to separate notes.
 
 
 ## Installation
