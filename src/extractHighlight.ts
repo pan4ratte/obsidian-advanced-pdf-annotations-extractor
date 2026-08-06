@@ -3,6 +3,7 @@ import {
 	PDFFile,
 	PDFJsLib,
 	PDFSection,
+	ProgressReport,
 	RawPDFAnnotation,
 	RawPDFOutlineItem,
 } from "src/types";
@@ -488,6 +489,10 @@ async function loadPage(
  * resolves the destination of every bookmark, which a document with a long
  * outline makes a great many of, and nothing needs the answer unless the notes
  * are to be filed by section.
+ *
+ * `onPage` is told as each page is read. The pages are the only part of an
+ * extraction whose length is known in advance, so they are what a bar watching
+ * this can fill.
  */
 export async function loadPDFFile(
 	file: PDFFile,
@@ -495,7 +500,8 @@ export async function loadPDFFile(
 	containingFolder: string,
 	total: PDFAnnotation[],
 	desiredAnnotations: string[],
-	withSections = false
+	withSections = false,
+	onPage?: ProgressReport
 ) {
 	const pdf: PDFDocumentProxy = await pdfjsLib.getDocument(file.content)
 		.promise;
@@ -519,6 +525,9 @@ export async function loadPDFFile(
 			desiredAnnotations,
 			sections
 		);
+		// After the page rather than before it, so what is reported is what has
+		// been read and not what is about to be.
+		onPage?.(i, pdf.numPages);
 	}
 }
 

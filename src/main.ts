@@ -32,8 +32,10 @@ import {
 	PDFAnnotation,
 	PDFFile,
 	PDFJsLib,
+	ProgressReport,
 } from "src/types";
 import { AdvancedExtractionModal } from "src/advancedExtractionModal";
+import { ExtractionProgress } from "src/progress";
 
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
@@ -79,6 +81,16 @@ function joinPath(folder: string, name: string): string {
 	return `${trimmed}${trimmed.includes("\\") ? "\\" : "/"}${name}`;
 }
 
+/** The last step of a path, however the path spells its separators. */
+function fileNameOf(path: string): string {
+	return path.split(/[\\/]/).last() ?? path;
+}
+
+/** What a read of several PDFs came to, all of them together. */
+function countAnnotations(loaded: LoadedAnnotations[]): number {
+	return loaded.reduce((total, one) => total + one.annotations.length, 0);
+}
+
 export default class PDFAnnotationPlugin extends Plugin {
 	public settings: PDFAnnotationPluginSetting;
 	public formatter: PDFAnnotationPluginFormatter;
@@ -105,7 +117,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	 */
 	async loadAnnotationsFromVaultFile(
 		pdfFile: TFile,
-		desiredAnnotations: string[] = this.settings.desiredAnnotations
+		desiredAnnotations: string[] = this.settings.desiredAnnotations,
+		progress?: ExtractionProgress
 	): Promise<LoadedAnnotations> {
 		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 		const containingFolder = pdfFile.parent.name;
@@ -117,7 +130,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			containingFolder,
 			grandtotal,
 			desiredAnnotations,
-			this.settings.subfolderPerSection
+			this.settings.subfolderPerSection,
+			(page, pages) => progress?.reading(pdfFile.name, page, pages)
 		);
 		return {
 			fileMeta: pdfFile,
@@ -147,25 +161,56 @@ export default class PDFAnnotationPlugin extends Plugin {
 	 * Sorts and files what an extraction gathered, however it was gathered.
 	 * `openIt` is what an extraction spanning several PDFs turns off: the note
 	 * of every one of them opening at once buries the vault.
+	 *
+	 * False when there was nowhere to put the notes, which is the one way this
+	 * comes back having written none — and not a thing to report as a finished
+	 * extraction.
 	 */
 	async writeLoadedAnnotations(
 		loaded: LoadedAnnotations,
 		onePerAnnotation = false,
-		openIt = true
-	): Promise<void> {
+		openIt = true,
+		onNote?: ProgressReport
+	): Promise<boolean> {
 		this.sort(loaded.annotations);
-		await this.writeNotes(
+		return await this.writeNotes(
 			loaded.fileMeta,
 			loaded.annotations,
 			loaded.isExternalFile,
 			onePerAnnotation,
-			openIt
+			openIt,
+			onNote
 		);
 	}
 
 	async loadSinglePDFFile(pdfFile: TFile, onePerAnnotation = false) {
-		const loaded = await this.loadAnnotationsFromVaultFile(pdfFile);
-		await this.writeLoadedAnnotations(loaded, onePerAnnotation);
+		const progress = new ExtractionProgress();
+		try {
+			const loaded = await this.loadAnnotationsFromVaultFile(
+				pdfFile,
+				undefined,
+				progress
+			);
+			progress.writing();
+			const written = await this.writeLoadedAnnotations(
+				loaded,
+				onePerAnnotation,
+				true,
+				(note, notes) => progress.writing(note, notes)
+			);
+			// Nowhere to put them, which the write said so itself. Nothing was
+			// extracted anywhere, so nothing is reported as having been.
+			if (!written) {
+				progress.stop();
+				return;
+			}
+			progress.succeed(loaded.annotations.length);
+		} catch (error) {
+			// The command that asked says what went wrong; the bar only has to
+			// stop claiming the extraction is still running.
+			progress.stop();
+			throw error;
+		}
 	}
 	/**
 	 * Into the note's own properties rather than a front matter block in its
@@ -224,9 +269,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean,
 		onePerAnnotation = false,
-		openIt = true
-	): Promise<void> {
-		if (!this.hasSomewhereToWriteNotes()) return;
+		openIt = true,
+		onNote?: ProgressReport
+	): Promise<boolean> {
+		if (!this.hasSomewhereToWriteNotes()) return false;
 
 		const currentFolder = this.currentFolder();
 		const extractTags = this.settings.extractsTags(onePerAnnotation);
@@ -275,6 +321,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				if (written) {
 					await this.addTagsToNoteProperties(written, tags);
 				}
+				onNote?.(counter, grandtotal.length);
 			}
 		} else {
 			const tags = takeTags(grandtotal);
@@ -287,6 +334,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 				await this.addTagsToNoteProperties(written, tags);
 			}
 		}
+		return true;
 	}
 
 	/**
@@ -346,7 +394,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	 */
 	private async readExternalPDF(
 		filePath: string,
-		desiredAnnotations: string[]
+		desiredAnnotations: string[],
+		onPage?: ProgressReport
 	): Promise<LoadedAnnotations> {
 		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 		const binaryContent = await FileSystemAdapter.readLocalFile(filePath);
@@ -372,7 +421,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 			containingFolder,
 			annotations,
 			desiredAnnotations,
-			this.settings.subfolderPerSection
+			this.settings.subfolderPerSection,
+			onPage
 		);
 		return { fileMeta: pdfFile, annotations, isExternalFile: true };
 	}
@@ -384,7 +434,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	 */
 	async loadAnnotationsFromExternalFile(
 		filePathFromClipboard: string,
-		desiredAnnotations: string[] = this.settings.desiredAnnotations
+		desiredAnnotations: string[] = this.settings.desiredAnnotations,
+		progress?: ExtractionProgress
 	): Promise<LoadedAnnotations | null> {
 		const fs = this.localFileSystem();
 		if (fs === null) return null;
@@ -395,7 +446,12 @@ export default class PDFAnnotationPlugin extends Plugin {
 				new Notice(t.NOTICE_PATH_NOT_A_FILE);
 				return null;
 			}
-			return await this.readExternalPDF(filePath, desiredAnnotations);
+			return await this.readExternalPDF(
+				filePath,
+				desiredAnnotations,
+				(page, pages) =>
+					progress?.reading(fileNameOf(filePath), page, pages)
+			);
 		} catch (error) {
 			new Notice(t.NOTICE_PATH_UNREADABLE);
 			console.error(error);
@@ -414,7 +470,8 @@ export default class PDFAnnotationPlugin extends Plugin {
 	 */
 	async loadAnnotationsFromClipboardPath(
 		pathFromClipboard: string,
-		desiredAnnotations: string[] = this.settings.desiredAnnotations
+		desiredAnnotations: string[] = this.settings.desiredAnnotations,
+		progress?: ExtractionProgress
 	): Promise<LoadedAnnotations[]> {
 		const fs = this.localFileSystem();
 		if (fs === null) return [];
@@ -425,7 +482,15 @@ export default class PDFAnnotationPlugin extends Plugin {
 			const path = unquotedPath(pathFromClipboard);
 			const stats = fs.statSync(path);
 			if (stats.isFile()) {
-				return [await this.readExternalPDF(path, desiredAnnotations)];
+				// One PDF, so its pages are what there is to count.
+				return [
+					await this.readExternalPDF(
+						path,
+						desiredAnnotations,
+						(page, pages) =>
+							progress?.reading(fileNameOf(path), page, pages)
+					),
+				];
 			}
 			if (!stats.isDirectory()) {
 				new Notice(t.NOTICE_PATH_NOT_A_FILE_OR_FOLDER);
@@ -450,7 +515,11 @@ export default class PDFAnnotationPlugin extends Plugin {
 		// One after another rather than all at once: a folder holds as many PDFs
 		// as it holds, and every one of them is read into memory whole.
 		const loaded: LoadedAnnotations[] = [];
-		for (const name of names) {
+		for (const [index, name] of names.entries()) {
+			// The files are what is counted here, not the pages inside them: a
+			// bar that ran to the end and started again with every PDF would
+			// say nothing about how much of the folder was left.
+			progress?.reading(name, index, names.length);
 			try {
 				loaded.push(
 					await this.readExternalPDF(
@@ -481,13 +550,36 @@ export default class PDFAnnotationPlugin extends Plugin {
 		if (!this.hasSomewhereToWriteNotes()) return;
 
 		const clipText = await navigator.clipboard.readText();
-		const loaded = await this.loadAnnotationsFromClipboardPath(clipText);
-		for (const one of loaded) {
-			await this.writeLoadedAnnotations(
-				one,
-				onePerAnnotation,
-				loaded.length === 1
+		const progress = new ExtractionProgress();
+		try {
+			const loaded = await this.loadAnnotationsFromClipboardPath(
+				clipText,
+				undefined,
+				progress
 			);
+			// Nothing to write, and the reason already said by the loader.
+			if (loaded.length === 0) {
+				progress.stop();
+				return;
+			}
+
+			for (const [index, one] of loaded.entries()) {
+				progress.writing(index, loaded.length);
+				const written = await this.writeLoadedAnnotations(
+					one,
+					onePerAnnotation,
+					loaded.length === 1
+				);
+				if (!written) {
+					progress.stop();
+					return;
+				}
+			}
+			progress.succeed(countAnnotations(loaded));
+		} catch (error) {
+			progress.stop();
+			console.error(error);
+			new Notice(t.NOTICE_EXTRACTION_FAILED);
 		}
 	}
 
@@ -553,15 +645,31 @@ export default class PDFAnnotationPlugin extends Plugin {
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const clipText = await navigator.clipboard.readText();
-				const loaded =
-					await this.loadAnnotationsFromClipboardPath(clipText);
-				if (loaded.length === 0) return;
+				const progress = new ExtractionProgress();
+				try {
+					const loaded =
+						await this.loadAnnotationsFromClipboardPath(
+							clipText,
+							undefined,
+							progress
+						);
+					if (loaded.length === 0) {
+						progress.stop();
+						return;
+					}
 
-				// One insertion however many PDFs were read: the note being
-				// edited is the one place all of it goes.
-				const grandtotal = loaded.flatMap((one) => one.annotations);
-				this.sort(grandtotal);
-				await this.insertIntoNote(editor, view, grandtotal, true);
+					// One insertion however many PDFs were read: the note being
+					// edited is the one place all of it goes.
+					progress.writing();
+					const grandtotal = loaded.flatMap((one) => one.annotations);
+					this.sort(grandtotal);
+					await this.insertIntoNote(editor, view, grandtotal, true);
+					progress.succeed(grandtotal.length);
+				} catch (error) {
+					progress.stop();
+					console.error(error);
+					new Notice(t.NOTICE_EXTRACTION_FAILED);
+				}
 			},
 		});
 
@@ -595,34 +703,50 @@ export default class PDFAnnotationPlugin extends Plugin {
 
 				const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
 
-				const promises: Promise<void>[] = []; // when all Promises will be resolved.
-
-				Vault.recurseChildren(folder, async (file) => {
-					// visit all Childern of parent folder of current active File
-					if (file instanceof TFile) {
-						if (file.extension === "pdf") {
-							promises.push(
-								this.app.vault
-									.readBinary(file)
-									.then((content) =>
-										loadPDFFile(
-											PDFFile.convertTFileToPDFFile(
-												file,
-												content
-											),
-											pdfjsLib,
-											file.parent.name,
-											grandtotal,
-											desiredAnnotations
-										)
-									)
-							);
-						}
+				// Gathered before any is read, so there is a number to count
+				// against. `recurseChildren` visits them all before it returns.
+				const pdfs: TFile[] = [];
+				Vault.recurseChildren(folder, (child) => {
+					if (child instanceof TFile && child.extension === "pdf") {
+						pdfs.push(child);
 					}
 				});
-				await Promise.all(promises);
-				this.sort(grandtotal);
-				await this.insertIntoNote(editor, view, grandtotal, false);
+
+				const progress = new ExtractionProgress();
+				try {
+					// All at once, as before. So what is counted is how many
+					// have been read rather than which one is being read —
+					// they are all being read.
+					let read = 0;
+					await Promise.all(
+						pdfs.map(async (pdf) => {
+							const content =
+								await this.app.vault.readBinary(pdf);
+							await loadPDFFile(
+								PDFFile.convertTFileToPDFFile(pdf, content),
+								pdfjsLib,
+								pdf.parent.name,
+								grandtotal,
+								desiredAnnotations
+							);
+							progress.reading(pdf.name, ++read, pdfs.length);
+						})
+					);
+
+					progress.writing();
+					this.sort(grandtotal);
+					await this.insertIntoNote(
+						editor,
+						view,
+						grandtotal,
+						false
+					);
+					progress.succeed(grandtotal.length);
+				} catch (error) {
+					progress.stop();
+					console.error(error);
+					new Notice(t.NOTICE_EXTRACTION_FAILED);
+				}
 			},
 		});
 	}

@@ -42,6 +42,13 @@ export class PDFFile implements FileMeta {
 	}
 }
 
+/**
+ * Told how far along a run of work is — `done` of `total` pieces of it. Kept a
+ * plain function so the extraction can say how it is getting on without
+ * knowing what is listening, or that anything is.
+ */
+export type ProgressReport = (done: number, total: number) => void;
+
 /** One PDF, read: everything writing the notes needs. */
 export interface LoadedAnnotations {
 	fileMeta: FileMeta;

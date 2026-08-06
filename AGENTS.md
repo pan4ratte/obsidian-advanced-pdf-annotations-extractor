@@ -256,6 +256,7 @@ src/
   advancedExtractionModal.ts  — the "advanced settings" modal
   extractionFilter.ts         — page expressions and the page/date/colour/type filter
   collapsible.ts              — the show/hide animation, shared by tab and modal
+  progress.ts                 — the notice an extraction runs behind
   types.ts                    — PDFFile, annotation and pdf.js boundary types
 lang/
   ru.ts               — every user-facing string; the original

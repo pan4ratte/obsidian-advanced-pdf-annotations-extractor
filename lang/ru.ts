@@ -63,6 +63,14 @@ export default {
     NOTICE_COPIED: "Скопировано в буфер обмена",
     NOTICE_COPY_FAILED: "Не удалось скопировать в буфер обмена",
 
+    // ─── Progress ────────────────────────────────────────────────────────────────
+    // The line above the bar. Whatever is being read is named after the first of
+    // these, so it ends without a full stop; the other two stand on their own.
+    PROGRESS_EXTRACTING: "Извлечение аннотаций…",
+    PROGRESS_READING: "Чтение",
+    PROGRESS_WRITING: "Запись заметок…",
+    PROGRESS_EXTRACTED: "Аннотаций извлечено",
+
     // ─── Written into exported notes ─────────────────────────────────────────────
     // The {{variables}} are names the formatter resolves; only the words around
     // them may be translated.

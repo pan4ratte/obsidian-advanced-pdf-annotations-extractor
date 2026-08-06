@@ -6,6 +6,7 @@
 ### New features
 
 * **Select colors for extraction.** A new toggle in the advanced extraction menu, under the dates, opens the list of annotation colors the PDF turns out to hold — a swatch and its hex value per checkbox — and the extraction keeps only the ones left ticked. The list is made from the file rather than from a palette: the PDF format defines no standard colors, so every reader app writes its own. The window now narrows in one direction — the annotation types rule the dates, and the two of them rule the colors. An entry the choices before it have left nothing in is greyed out, unticked and cannot be ticked, and comes back as it was when it fills again.
+* **A progress notice while an extraction runs, and a word at the end of it.** One notice for the whole run: a line saying what is being done — reading a named PDF, writing the notes — over a bar that fills as it goes. Reading fills it by the pages of the PDF, or by the PDFs of a folder; writing fills it by the notes, for the extraction that writes one per annotation. A step too short to measure animates instead. It finishes by saying how many annotations came out and takes itself off screen; a run that fails says so through the error it already reported, and the bar simply goes.
 * **A `{{color}}` template variable.** The color the annotation was marked with, as `#rrggbb`, so a template can write it out or branch on whether there is one at all. Empty for an annotation the PDF gives no color.
 
 

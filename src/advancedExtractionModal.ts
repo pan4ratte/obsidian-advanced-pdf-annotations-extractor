@@ -25,6 +25,7 @@ import {
 } from "src/extractionFilter";
 import { SUPPORTED_ANNOTS } from "src/settings";
 import { LoadedAnnotations, PDFAnnotation } from "src/types";
+import { ExtractionProgress } from "src/progress";
 
 /**
  * A place on the machine rather than in the vault. Only tells the two apart —
@@ -742,13 +743,31 @@ export class AdvancedExtractionModal extends Modal {
 
 		this.close();
 		const extraction = { ...loaded, annotations };
-		if (view) {
-			await this.plugin.insertLoadedAnnotations(extraction, view);
-		} else {
-			await this.plugin.writeLoadedAnnotations(
-				extraction,
-				this.target === "separate"
-			);
+		// The PDF was read when it was named, so what is left to wait for is
+		// the writing — which a note per annotation makes a great deal of.
+		const progress = new ExtractionProgress();
+		try {
+			progress.writing();
+			if (view) {
+				await this.plugin.insertLoadedAnnotations(extraction, view);
+			} else {
+				const written = await this.plugin.writeLoadedAnnotations(
+					extraction,
+					this.target === "separate",
+					true,
+					(note, notes) => progress.writing(note, notes)
+				);
+				// Nowhere to put the notes, and the write has said so.
+				if (!written) {
+					progress.stop();
+					return;
+				}
+			}
+			progress.succeed(annotations.length);
+		} catch (error) {
+			progress.stop();
+			console.error(error);
+			new Notice(t.NOTICE_EXTRACTION_FAILED);
 		}
 	}
 }

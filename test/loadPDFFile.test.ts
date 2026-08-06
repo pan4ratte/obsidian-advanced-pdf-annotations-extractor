@@ -170,6 +170,23 @@ describe('loadPDFFile', () => {
     expect(struck.colorHex).toBe('#000000');
   });
 
+  test('says how far through the pages the reading has got', async () => {
+    const seen: string[] = [];
+    const total: PDFAnnotation[] = [];
+    await loadPDFFile(
+      file,
+      pdfjsFor({pages: [[annotation({})], [], [annotation({})]]}),
+      'refs',
+      total,
+      ['Text'],
+      false,
+      (page, pages) => seen.push(`${page}/${pages}`)
+    );
+    // Every page, whether or not it held anything to extract — a page with no
+    // annotations is still a page the reading had to get through.
+    expect(seen).toEqual(['1/3', '2/3', '3/3']);
+  });
+
   test('reads no outline unless the sections are asked for', async () => {
     const [anno] = await extract([annotation({})]);
     expect(anno.section).toBeUndefined();

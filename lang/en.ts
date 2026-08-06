@@ -65,6 +65,14 @@ export default {
     NOTICE_COPIED: "Copied to the clipboard",
     NOTICE_COPY_FAILED: "Could not copy to the clipboard",
 
+    // ─── Progress ────────────────────────────────────────────────────────────────
+    // The line above the bar. Whatever is being read is named after the first of
+    // these, so it ends without a full stop; the other two stand on their own.
+    PROGRESS_EXTRACTING: "Extracting annotations…",
+    PROGRESS_READING: "Reading",
+    PROGRESS_WRITING: "Writing the notes…",
+    PROGRESS_EXTRACTED: "Annotations extracted",
+
     // ─── Written into exported notes ─────────────────────────────────────────────
     // The {{variables}} are names the formatter resolves; only the words around
     // them may be translated.
