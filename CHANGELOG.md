@@ -5,7 +5,7 @@
 
 ### New features
 
-* **Select colors for extraction.** A new toggle in the advanced extraction menu, under the dates, opens the list of annotation colors the PDF turns out to hold — a swatch and its hex value per checkbox — and the extraction keeps only the ones left ticked. The list is made from the file rather than from a palette: the PDF format defines no standard colors, so every reader app writes its own.
+* **Select colors for extraction.** A new toggle in the advanced extraction menu, under the dates, opens the list of annotation colors the PDF turns out to hold — a swatch and its hex value per checkbox — and the extraction keeps only the ones left ticked. The list is made from the file rather than from a palette: the PDF format defines no standard colors, so every reader app writes its own. The window now narrows in one direction — the annotation types rule the dates, and the two of them rule the colors. An entry the choices before it have left nothing in is greyed out, unticked and cannot be ticked, and comes back as it was when it fills again.
 * **A `{{color}}` template variable.** The color the annotation was marked with, as `#rrggbb`, so a template can write it out or branch on whether there is one at all. Empty for an annotation the PDF gives no color.
 
 

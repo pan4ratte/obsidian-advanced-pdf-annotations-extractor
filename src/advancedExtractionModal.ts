@@ -24,7 +24,7 @@ import {
 	PageSelection,
 } from "src/extractionFilter";
 import { SUPPORTED_ANNOTS } from "src/settings";
-import { LoadedAnnotations } from "src/types";
+import { LoadedAnnotations, PDFAnnotation } from "src/types";
 
 /**
  * A place on the machine rather than in the vault. Only tells the two apart —
@@ -98,6 +98,12 @@ function readableDay(day: string): string {
  * Both narrow the extraction down by something only the file can say, so both
  * are drawn the same way and opened by the same motion.
  */
+/** One checkbox in such a panel, kept so the list can be put right in place. */
+interface OptionRow {
+	row: HTMLElement;
+	box: HTMLInputElement;
+}
+
 interface FilterPanel {
 	/** Null only between the panel being built and its toggle being added. */
 	toggle: ToggleComponent | null;
@@ -141,14 +147,27 @@ export class AdvancedExtractionModal extends Modal {
 	private target: ExtractionTarget = "separate";
 
 	/**
-	 * The days still ticked. Null until the list is built and again whenever
-	 * the field names a different PDF; every day starts ticked, since the list
-	 * is there to leave days out.
+	 * The days the reader wants, which is not always the days they can have:
+	 * one the annotation types have emptied is shown unticked while it stands
+	 * empty, and is held here all the same so that taking the type back brings
+	 * the day back as they had it.
+	 *
+	 * Null until the list is built and again whenever the field names a
+	 * different PDF; every day starts ticked, since the list is there to leave
+	 * days out.
 	 */
 	private chosenDays: Set<string> | null = null;
 
-	/** The colours still ticked, on the same terms as the days. */
+	/** The colours the reader wants, on the same terms as the days. */
 	private chosenColors: Set<string> | null = null;
+
+	/**
+	 * The row each day and each colour is drawn in, so the ones the filters
+	 * before them have left nothing in can be put beyond reach without the list
+	 * being built again.
+	 */
+	private readonly dayRows = new Map<string, OptionRow>();
+	private readonly colorRows = new Map<string, OptionRow>();
 
 	/**
 	 * The types ticked for this extraction, starting as the settings have them.
@@ -237,6 +256,10 @@ export class AdvancedExtractionModal extends Modal {
 				} else {
 					this.chosenSubtypes.delete(subtype);
 				}
+				// Down the chain in order: the days are ruled by the types,
+				// and the colours by what the days are left saying.
+				this.muteUnmatchedDays();
+				this.muteUnmatchedColors();
 			});
 			option.createSpan({ text: description });
 		}
@@ -292,6 +315,9 @@ export class AdvancedExtractionModal extends Modal {
 			(value) => {
 				this.byDate = value;
 				this.refresh();
+				// Switched off, the days stop narrowing anything down, and a
+				// colour greyed out over one of them is a colour again.
+				this.muteUnmatchedColors();
 				if (value) void this.prepare();
 			}
 		);
@@ -400,6 +426,8 @@ export class AdvancedExtractionModal extends Modal {
 			this.chosenColors = null;
 			this.dates?.list.empty();
 			this.colors?.list.empty();
+			this.dayRows.clear();
+			this.colorRows.clear();
 		}
 
 		this.refresh();
@@ -488,12 +516,13 @@ export class AdvancedExtractionModal extends Modal {
 	private addOption(
 		list: HTMLElement,
 		chosen: Set<string>,
-		value: string
-	): HTMLElement {
-		const option = list.createEl("label", {
+		value: string,
+		onChange?: () => void
+	): OptionRow {
+		const row = list.createEl("label", {
 			cls: "pdf-annotations-filter-option",
 		});
-		const box = option.createEl("input", { type: "checkbox" });
+		const box = row.createEl("input", { type: "checkbox" });
 		box.checked = chosen.has(value);
 		box.addEventListener("change", () => {
 			if (box.checked) {
@@ -501,8 +530,9 @@ export class AdvancedExtractionModal extends Modal {
 			} else {
 				chosen.delete(value);
 			}
+			onChange?.();
 		});
-		return option;
+		return { row, box };
 	}
 
 	/**
@@ -529,12 +559,100 @@ export class AdvancedExtractionModal extends Modal {
 		const list = this.dates?.list;
 		if (!list) return;
 		list.empty();
+		this.dayRows.clear();
 		for (const day of days) {
-			const option = this.addOption(list, this.chosenDays, day);
+			const option = this.addOption(list, this.chosenDays, day, () =>
+				this.muteUnmatchedColors()
+			);
+			this.dayRows.set(day, option);
 			// The PDF dated it not at all, which is a thing a reader may want
 			// to leave out like any other day.
-			option.createSpan({ text: day ? readableDay(day) : t.NOTE_NO_DATE });
+			option.row.createSpan({
+				text: day ? readableDay(day) : t.NOTE_NO_DATE,
+			});
 		}
+
+		// The types may already have been narrowed before the file was named,
+		// so the list is greyed the moment it is drawn.
+		this.muteUnmatchedDays();
+	}
+
+	/**
+	 * The annotations still standing at one point along the window's chain: the
+	 * annotation types rule the days, and the types and the days together rule
+	 * the colours. `throughDays` says how far along it the question is asked
+	 * from — a list is ruled by what stands before it, never by itself or by
+	 * what comes after, or narrowing it would narrow the thing doing the
+	 * narrowing.
+	 *
+	 * Run through the extraction's own filter rather than a rule of its own, so
+	 * what a list greys out is exactly what the extraction would find nothing
+	 * for. The pages are left out of it: that field is free text, read only when
+	 * the extraction is asked for, and half a page expression is not an answer
+	 * to grey a row out over.
+	 */
+	private keptThrough(throughDays: boolean): PDFAnnotation[] {
+		const annotations = this.loaded?.result.annotations ?? [];
+		return filterAnnotations(annotations, {
+			pages: PageSelection.parse("").selection,
+			byPageLabel: this.byPageLabel,
+			days: throughDays && this.byDate ? this.chosenDays : null,
+			colors: null,
+			subtypes: this.chosenSubtypes,
+		});
+	}
+
+	/**
+	 * Puts the entries nothing is left to extract in beyond reach: greyed out,
+	 * unticked and not to be ticked. What stands before them in the chain has
+	 * emptied them, so they are not entries this extraction has to offer, and
+	 * offering one would be offering nothing.
+	 *
+	 * Greyed rather than dropped, because the choice that emptied it is a row or
+	 * two up in the same window: a list that lost rows as it was narrowed would
+	 * give the reader no way to see what taking a type back would bring back.
+	 *
+	 * `chosen` goes on holding what the reader ticked rather than what is left
+	 * to tick, so an entry that fills again comes back as they had it — and one
+	 * they unticked themselves stays unticked.
+	 */
+	private mute(
+		rows: Map<string, OptionRow>,
+		matching: Set<string>,
+		chosen: Set<string> | null
+	): void {
+		for (const [value, { row, box }] of rows) {
+			const matches = matching.has(value);
+			row.toggleClass("pdf-annotations-unmatched", !matches);
+			box.disabled = !matches;
+			// The rows exist, so the ticked set does too; the fallback is for
+			// the type, which cannot see that.
+			box.checked = matches && (chosen?.has(value) ?? false);
+		}
+	}
+
+	/** The days the annotation types have left something in. */
+	private muteUnmatchedDays(): void {
+		if (this.dayRows.size === 0) return;
+
+		const kept = this.keptThrough(false);
+		this.mute(
+			this.dayRows,
+			new Set(daysOfAnnotations(kept)),
+			this.chosenDays
+		);
+	}
+
+	/** The colours the annotation types and the days have left something in. */
+	private muteUnmatchedColors(): void {
+		if (this.colorRows.size === 0) return;
+
+		const kept = this.keptThrough(true);
+		this.mute(
+			this.colorRows,
+			new Set(colorsOfAnnotations(kept)),
+			this.chosenColors
+		);
 	}
 
 	/**
@@ -555,24 +673,34 @@ export class AdvancedExtractionModal extends Modal {
 		const list = this.colors?.list;
 		if (!list) return;
 		list.empty();
+		this.colorRows.clear();
 		for (const color of colors) {
 			const option = this.addOption(list, this.chosenColors, color);
+			this.colorRows.set(color, option);
 			if (color === NO_COLOR) {
 				// Nothing to show a swatch of, and a colour to leave out like
 				// any other.
-				option.createSpan({ text: t.MODAL_COLOR_NONE });
+				option.row.createSpan({ text: t.MODAL_COLOR_NONE });
 				continue;
 			}
 
 			// The one thing about a swatch that cannot be a class: the colour
 			// is read out of the PDF, so it is passed in as a custom property
 			// the stylesheet paints with.
-			const swatch = option.createSpan({
+			const swatch = option.row.createSpan({
 				cls: "pdf-annotations-color-swatch",
 			});
 			swatch.setCssProps({ "--pdf-annotations-swatch": color });
-			option.createSpan({ text: color });
+			// The block is the whole label — a reader picks the colour they
+			// marked with by eye, and a row of hex codes is not that. It is
+			// still what the colour is called, so it stays as the row's name
+			// for a hover and for anything reading the modal aloud.
+			option.row.setAttr("aria-label", color);
 		}
+
+		// The types and the days may already have been narrowed before the file
+		// was named, so the list is greyed the moment it is drawn.
+		this.muteUnmatchedColors();
 	}
 
 	private async extract(): Promise<void> {

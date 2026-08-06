@@ -646,10 +646,18 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 
 /* Obsidian's setting rows separate themselves with a rule and their own
    padding, which inside a card would draw a line across it and pad it twice.
-   The card's gap does that job. */
+   The card's gap does that job.
+
+   `align-items` answers the same rule of Obsidian's own that THE RESET does at
+   the top of this file — the base row aligns its control to the top, so a
+   toggle sits level with the first line of a description instead of beside the
+   middle of it. The reset cannot reach here: it is scoped to the settings tab's
+   render root, and a modal has none. A stacked setting overrules this from its
+   own rule, which is a class heavier, and goes on filling the width. */
 .pdf-annotations-modal-card .setting-item {
 	border-top: none;
 	padding: 0;
+	align-items: center;
 }
 
 /* The search field sits straight under its name with no description between
@@ -704,16 +712,29 @@ body.is-mobile .pdf-annotations-filter-option input[type="checkbox"] {
 	height: var(--checkbox-size, 16px);
 }
 
-/* The colour itself, which is the only thing in the row that names it — the
-   hex beside it is a label, not a swatch. The colour comes out of the PDF and
-   is passed in as a custom property, since a class cannot carry it.
+/* A colour the annotation types and the days have left nothing in. Faded and
+   not hidden: it is still one of the colours in the file, and the choice that
+   emptied it is one row up in the same window, to be taken back as easily as
+   it was made. Its checkbox is disabled from the script, so the label points at
+   nothing to click and says so — the pointer stays on the row rather than being
+   taken off it, which would take the colour's name in the tooltip with it. */
+.pdf-annotations-filter-option.pdf-annotations-unmatched {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* The colour itself, and the whole of what the row says: a reader picks the
+   colour they marked with by eye. So it is a block to recognise rather than a
+   swatch beside a name — wider than it is tall, with enough of it to tell two
+   near neighbours apart. The colour comes out of the PDF and is passed in as a
+   custom property, since a class cannot carry it.
 
    Bordered rather than bare: a highlight is chosen to sit on a white page, so
    a pale one has no edge of its own against the card it is drawn on here. */
 .pdf-annotations-color-swatch {
 	flex: 0 0 auto;
-	width: 1em;
-	height: 1em;
+	width: 3.5em;
+	height: 1.6em;
 	border-radius: var(--radius-s);
 	border: 1px solid var(--background-modifier-border);
 	background-color: var(--pdf-annotations-swatch, transparent);
