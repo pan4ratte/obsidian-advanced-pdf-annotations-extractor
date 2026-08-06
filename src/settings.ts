@@ -32,6 +32,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
 	author: t.VAR_AUTHOR,
 	body: t.VAR_BODY,
 	type: t.VAR_TYPE,
+	color: t.VAR_COLOR,
 	topic: t.VAR_TOPIC,
 	created: t.VAR_CREATED,
 	createdTime: t.VAR_CREATED_TIME,

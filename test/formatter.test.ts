@@ -58,6 +58,7 @@ describe('template variables', () => {
       created: '2024-01-15',
       createdTime: '14:30',
       highlightedText: 'marked words',
+      colorHex: '#ffd400',
     });
     const unresolved = Object.keys(TEMPLATE_VARIABLES).filter(
       (name) => formatterWith(`[{{${name}}}]`).format([anno], true) === '[]'
@@ -87,6 +88,18 @@ describe('template variables', () => {
     const formatter = formatterWith('[{{createdTime}}]');
     const anno = annotation({created: '2024-01-15', createdTime: undefined});
     expect(formatter.format([anno], false)).toBe('[]');
+  });
+
+  test('color is the colour the annotation was marked with', () => {
+    const formatter = formatterWith('{{color}}');
+    expect(formatter.format([annotation({colorHex: '#ffd400'})], false))
+      .toBe('#ffd400');
+  });
+
+  test('color renders empty when the PDF stored none', () => {
+    const formatter = formatterWith('[{{color}}]');
+    expect(formatter.format([annotation({colorHex: undefined})], false))
+      .toBe('[]');
   });
 
   test('filename is the PDF name without its extension', () => {

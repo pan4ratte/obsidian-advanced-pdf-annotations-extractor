@@ -141,25 +141,38 @@ function hexByte(value: number): string {
 	return bounded.toString(16).padStart(2, "0");
 }
 
+/** What pdf.js fills a missing `/C` in with, and what it means here. */
+const PDFJS_DEFAULT_COLOR = "#000000";
+
 /**
  * The colour of an annotation, as `#rrggbb`. pdf.js hands `/C` over already
  * converted to RGB — the PDF format lets it be written in grey, RGB or CMYK,
  * and none of that reaches here.
  *
- * Undefined for an annotation the file gives no usable colour: pdf.js reports
- * null for one explicitly transparent, and the whole entry is missing on a file
- * that was never coloured at all. What the format does not say is not a colour
- * to file the annotation under.
+ * Undefined for an annotation the file gives no colour to read: pdf.js reports
+ * null for one explicitly transparent, and nothing at all for a subtype that
+ * carries no colour entry.
+ *
+ * Black is the awkward one. pdf.js fills a *missing* `/C` in with it rather
+ * than leaving it out, so black and unset are the same answer, and which one it
+ * is has to be read from the kind of annotation asking. A reader picks black to
+ * underline or strike out with, so a markup annotation keeps it — while `/C` on
+ * a sticky note or a free text box is the icon or the border, routinely absent,
+ * and a black nobody chose would fill the colour list of every PDF with a
+ * bucket that means "the file said nothing".
  */
 export function annotationColor(
-	color?: ArrayLike<number> | null
+	color: ArrayLike<number> | null | undefined,
+	marksUpText: boolean
 ): string | undefined {
 	if (!color || color.length < 3) return undefined;
 
 	const channels = [color[0], color[1], color[2]];
 	if (!channels.every((channel) => Number.isFinite(channel))) return undefined;
 
-	return `#${channels.map(hexByte).join("")}`;
+	const hex = `#${channels.map(hexByte).join("")}`;
+	if (hex === PDFJS_DEFAULT_COLOR && !marksUpText) return undefined;
+	return hex;
 }
 
 /**
@@ -429,6 +442,10 @@ async function loadPage(
 	});
 
 	for (const raw of annotations) {
+		// Decides both what is read off the page under the annotation and how
+		// its colour is read, so it is settled once before either.
+		const marksUpText = ANNOTS_TREATED_AS_HIGHLIGHTS.includes(raw.subtype);
+
 		const anno: PDFAnnotation = {
 			...raw,
 			folder: containingFolder,
@@ -440,10 +457,10 @@ async function loadPage(
 			body: raw.contentsObj.str,
 			created: pdfDateToDay(raw.creationDate),
 			createdTime: pdfDateToTime(raw.creationDate),
-			colorHex: annotationColor(raw.color),
+			colorHex: annotationColor(raw.color, marksUpText),
 		};
 
-		if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {
+		if (marksUpText) {
 			anno.highlightedText = extractHighlight(anno, textItems);
 		}
 

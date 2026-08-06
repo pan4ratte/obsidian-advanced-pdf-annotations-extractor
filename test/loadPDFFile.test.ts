@@ -146,6 +146,30 @@ describe('loadPDFFile', () => {
     expect(await none({color: new Uint8ClampedArray([0, 0])})).toBeUndefined();
   });
 
+  // pdf.js fills a missing `/C` in with black rather than leaving it out, so
+  // black on a subtype that carries no colour of its own is the file saying
+  // nothing — and on one a reader colours by hand, it is a colour they picked.
+  test('black on an annotation that marks up no text is no colour at all', async () => {
+    const [note] = await extract([
+      annotation({color: new Uint8ClampedArray([0, 0, 0])}),
+    ]);
+    expect(note.colorHex).toBeUndefined();
+  });
+
+  test('black on a markup annotation is the colour it was marked with', async () => {
+    const [struck] = await extract(
+      [
+        annotation({
+          subtype: 'StrikeOut',
+          quadPoints: wholeWord,
+          color: new Uint8ClampedArray([0, 0, 0]),
+        }),
+      ],
+      ['StrikeOut']
+    );
+    expect(struck.colorHex).toBe('#000000');
+  });
+
   test('reads no outline unless the sections are asked for', async () => {
     const [anno] = await extract([annotation({})]);
     expect(anno.section).toBeUndefined();

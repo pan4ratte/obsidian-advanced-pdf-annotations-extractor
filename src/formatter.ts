@@ -160,6 +160,10 @@ export class PDFAnnotationPluginFormatter {
 			body: annotation.body,
 			// As pdf.js names it, which a {{#if}} can be written against.
 			type: annotation.subtype,
+			// `#rrggbb`, and empty for an annotation the PDF gives no colour,
+			// which `{{#if color}}` tells apart. What a colour means is the
+			// reader's own and no palette this plugin could ship.
+			color: annotation.colorHex,
 			topic: annotation.topic,
 			// The day and the time of day apart, so a template can write either
 			// without the other. The PDF's own timestamp, down to the second,

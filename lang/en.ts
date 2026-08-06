@@ -98,6 +98,7 @@ export default {
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Text of the comment, if there is one",
     VAR_TYPE: "Annotation type",
+    VAR_COLOR: "Color of the annotation, like #ffd400, when the PDF stores colors",
     VAR_TOPIC: "First line of the comment",
     VAR_CREATED: "Day the annotation was created, like 2024-01-15, when the PDF stores dates",
     VAR_CREATED_TIME: "Time the annotation was created, like 14:30, when the PDF stores times",
