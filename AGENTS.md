@@ -40,14 +40,28 @@
   - The same thing on a **whole uninstalled tree** — a CI job or review bot
     that lints without `npm ci` — is the full-blown version: `obsidian`,
     `pdfjs-dist` and `handlebars` all resolve to nothing and ESLint reports
-    **~815 warnings across eight files** (`settings.ts` 472,
-    `advancedExtractionModal.ts` 171, `main.ts` 124, `extractHighlight.ts` 30,
-    `types.ts` 6, `collapsible.ts` 5, `helpers.ts` 4, `formatter.ts` 3), in
-    six `no-unsafe-*` rules plus `no-redundant-type-constituents` and a single
-    `no-unnecessary-type-assertion` at `settings.ts:533`. That fingerprint —
-    especially the lone assertion warning — identifies the cause exactly. Not
-    one of them is a source defect. `.github/workflows/ci.yml` guards against
-    it with a dependency check that fails before the linter ever runs.
+    **~830 warnings across nine files** (`settings.ts` 432,
+    `advancedExtractionModal.ts` 184, `main.ts` 135, `extractHighlight.ts` 32,
+    `progress.ts` 29, `types.ts` 6, `collapsible.ts` 5, `helpers.ts` 4,
+    `formatter.ts` 3), in five `no-unsafe-*` rules — `no-unsafe-call` 374,
+    `no-unsafe-member-access` 297, `no-unsafe-assignment` 102,
+    `no-unsafe-argument` 33, `no-unsafe-return` 24 — **and 12 errors** on top:
+    ten `no-redundant-type-constituents` (every one of them naming an Obsidian
+    component as "an 'error' type that acts as 'any'") and two
+    `no-unnecessary-type-assertion`, at `settings.ts:558` and
+    `loadPDFFile.test.ts:50`. The errors are why lint exits non-zero here
+    whether or not `--max-warnings 0` was passed. Not one of them is a source
+    defect. `.github/workflows/ci.yml` guards against it with a dependency
+    check that fails before the linter ever runs.
+
+    **The counts move with the source — the shape is what identifies it.** Every
+    warning is a `no-unsafe-*` on a file that imports from one of those three
+    packages, and the errors all name a type that resolved to nothing. Read
+    them that way rather than diffing the totals. To check the numbers without
+    disturbing the tree, move `node_modules/{obsidian,pdfjs-dist,handlebars}`
+    aside, run `npx eslint . -f json`, and move them back — reinstalling to
+    reproduce this would rewrite `package-lock.json`, which on Windows is the
+    trap described below.
 - Both halves of the build target **ES2020** (`target` in `tsconfig.json` and in
   `esbuild.config.mjs`). The Electron behind `minAppVersion` 1.13.0 has all of
   it, so nothing is downlevelled.
