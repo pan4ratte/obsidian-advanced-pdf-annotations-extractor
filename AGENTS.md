@@ -205,10 +205,11 @@ a non-empty array of definitions renders the tab **instead of** it, and
 `minAppVersion` is 1.13.0, so nothing reaches it.
 
 The array is one group holding one definition per section of the tab —
-header, annotation types, templates, general rules, shared notes, separate
+header, annotation types, templates, general rules, separate notes, shared
 notes — and it never changes shape. The last three are the extraction's own
 settings, split by what they apply to: every extraction, the one writing a note
-per PDF, and the one writing a note per annotation.
+per annotation, and the one writing a note per PDF. The render methods are kept
+in the same order as the array, so the file reads in the order the tab does.
 
 Each grouping is drawn next to the heading it heads, by `renderGroupingPair`,
 which greys the heading out while the grouping is off and remembers the choice

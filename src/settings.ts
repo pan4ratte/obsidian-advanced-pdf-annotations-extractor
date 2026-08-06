@@ -963,12 +963,22 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						},
 						(root) => this.renderGeneralRules(root)
 					),
-					// The two kinds of extraction, in the order the commands
-					// offer them: the one note first, then the many.
+					// The two kinds of extraction, each holding the settings
+					// that only it obeys.
+					this.section(
+						{
+							name: t.SECTION_SEPARATE_NOTES,
+							aliases: [
+								t.SETTING_TOPIC_TO_NAME_NAME,
+								t.SETTING_ONE_NOTE_NAME_NAME,
+								t.SETTING_NOTE_SUBFOLDER_NAME,
+							],
+						},
+						(root) => this.renderSeparateNotes(root)
+					),
 					this.section(
 						{
 							name: t.SECTION_SHARED_NOTES,
-							desc: t.SECTION_SHARED_NOTES_DESC,
 							aliases: [
 								t.SETTING_GROUP_BY_FOLDER_NAME,
 								t.SETTING_FOLDER_HEADING_NAME,
@@ -980,18 +990,6 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 							],
 						},
 						(root) => this.renderSharedNotes(root)
-					),
-					this.section(
-						{
-							name: t.SECTION_SEPARATE_NOTES,
-							desc: t.SECTION_SEPARATE_NOTES_DESC,
-							aliases: [
-								t.SETTING_TOPIC_TO_NAME_NAME,
-								t.SETTING_ONE_NOTE_NAME_NAME,
-								t.SETTING_NOTE_SUBFOLDER_NAME,
-							],
-						},
-						(root) => this.renderSeparateNotes(root)
 					),
 				],
 			},
@@ -1408,6 +1406,64 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * The settings that apply to the extraction writing a note per annotation
+	 * and to no other, gathered where that is the one thing they have in
+	 * common: what the notes are named, and the folder that keeps that many of
+	 * them together under wherever the general rules send them.
+	 */
+	private renderSeparateNotes(root: HTMLElement): void {
+		new Setting(root)
+			.setName(t.SECTION_SEPARATE_NOTES)
+			.setHeading();
+
+		// The switch above the field it governs: once the topic names the
+		// notes, the name template has nothing left to name.
+		let showOneNoteName!: (shown: boolean, animate: boolean) => void;
+		const syncOneNoteName = (animate: boolean) => {
+			showOneNoteName(!this.plugin.settings.topicToNoteName, animate);
+		};
+
+		new Setting(root)
+			.setName(t.SETTING_TOPIC_TO_NAME_NAME)
+			.setDesc(t.SETTING_TOPIC_TO_NAME_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.topicToNoteName)
+					.onChange(async (value) => {
+						this.plugin.settings.topicToNoteName = value;
+						syncOneNoteName(true);
+						await this.plugin.saveSettings();
+					})
+			);
+
+		const oneNoteNamePanel = root.createDiv({
+			cls: "pdf-annotations-collapsible",
+		});
+		showOneNoteName = createCollapsible(oneNoteNamePanel);
+		const oneNoteNameSetting = new Setting(oneNoteNamePanel)
+			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
+			.addText((input) =>
+				this.buildValueInput(input, "oneNotePerAnnotationName")
+			);
+		oneNoteNameSetting.settingEl.addClass(
+			"pdf-annotations-stacked-setting"
+		);
+		syncOneNoteName(false);
+
+		const noteSubfolderSetting = new Setting(root)
+			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
+			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
+			.addText((input) => {
+				input.setPlaceholder(t.PLACEHOLDER_SUBFOLDER_EXAMPLE);
+				this.buildValueInput(input, "noteSubfolder");
+			});
+		noteSubfolderSetting.settingEl.addClass(
+			"pdf-annotations-stacked-setting"
+		);
+	}
+
+	/**
 	 * The extraction that gathers a whole PDF into one note, and the only one
 	 * these settings reach: a note holding a single annotation has nothing to
 	 * gather and nothing to head, which is why the formatter skips all three of
@@ -1418,13 +1474,9 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	 * headings take their levels in.
 	 */
 	private renderSharedNotes(root: HTMLElement): void {
-		const heading = new Setting(root)
+		new Setting(root)
 			.setName(t.SECTION_SHARED_NOTES)
-			.setDesc(t.SECTION_SHARED_NOTES_DESC)
 			.setHeading();
-		// A heading row is not meant to carry a description, so the stylesheet
-		// is told this one does.
-		heading.settingEl.addClass("pdf-annotations-section-heading");
 
 		this.renderGroupingPair(
 			root,
@@ -1479,65 +1531,5 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.setDesc(t.SETTING_NOTE_NAME_DESC)
 			.addText((input) => this.buildValueInput(input, "noteName"));
 		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
-	}
-
-	/**
-	 * The settings that apply to the extraction writing a note per annotation
-	 * and to no other, gathered where that is the one thing they have in
-	 * common: what the notes are named, and the folder that keeps that many of
-	 * them together under wherever the general rules send them.
-	 */
-	private renderSeparateNotes(root: HTMLElement): void {
-		const heading = new Setting(root)
-			.setName(t.SECTION_SEPARATE_NOTES)
-			.setDesc(t.SECTION_SEPARATE_NOTES_DESC)
-			.setHeading();
-		heading.settingEl.addClass("pdf-annotations-section-heading");
-
-		// The switch above the field it governs: once the topic names the
-		// notes, the name template has nothing left to name.
-		let showOneNoteName!: (shown: boolean, animate: boolean) => void;
-		const syncOneNoteName = (animate: boolean) => {
-			showOneNoteName(!this.plugin.settings.topicToNoteName, animate);
-		};
-
-		new Setting(root)
-			.setName(t.SETTING_TOPIC_TO_NAME_NAME)
-			.setDesc(t.SETTING_TOPIC_TO_NAME_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.topicToNoteName)
-					.onChange(async (value) => {
-						this.plugin.settings.topicToNoteName = value;
-						syncOneNoteName(true);
-						await this.plugin.saveSettings();
-					})
-			);
-
-		const oneNoteNamePanel = root.createDiv({
-			cls: "pdf-annotations-collapsible",
-		});
-		showOneNoteName = createCollapsible(oneNoteNamePanel);
-		const oneNoteNameSetting = new Setting(oneNoteNamePanel)
-			.setName(t.SETTING_ONE_NOTE_NAME_NAME)
-			.setDesc(t.SETTING_ONE_NOTE_NAME_DESC)
-			.addText((input) =>
-				this.buildValueInput(input, "oneNotePerAnnotationName")
-			);
-		oneNoteNameSetting.settingEl.addClass(
-			"pdf-annotations-stacked-setting"
-		);
-		syncOneNoteName(false);
-
-		const noteSubfolderSetting = new Setting(root)
-			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
-			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
-			.addText((input) => {
-				input.setPlaceholder(t.PLACEHOLDER_SUBFOLDER_EXAMPLE);
-				this.buildValueInput(input, "noteSubfolder");
-			});
-		noteSubfolderSetting.settingEl.addClass(
-			"pdf-annotations-stacked-setting"
-		);
 	}
 }

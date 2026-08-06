@@ -164,17 +164,8 @@ export default {
     SETTING_OVERWRITE_NAME: "Allow overwriting",
     SETTING_OVERWRITE_DESC: "If a note with the same name already exists, it is replaced rather than appended to.",
 
-    // ─── Settings: shared notes ──────────────────────────────────────────────────
-    // The descriptions of the two sections below are read as a pair: they say
-    // how many notes come out and where the name of each comes from.
-    SECTION_SHARED_NOTES: "Extraction to shared notes",
-    SECTION_SHARED_NOTES_DESC: "One note for all the annotations of a PDF, named by the pattern below.",
-    SETTING_NOTE_NAME_NAME: "Naming pattern for annotations imported into a shared note",
-    SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}}, or every PDF will write its annotations into the same note.",
-
     // ─── Settings: separate notes ────────────────────────────────────────────────
     SECTION_SEPARATE_NOTES: "Extraction to separate notes",
-    SECTION_SEPARATE_NOTES_DESC: "A note of its own for each annotation, named after the topic of its comment or by the pattern below.",
     SETTING_TOPIC_TO_NAME_NAME: "Use the topic of the comment as the note name",
     SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating separate notes, if your template has it.",
     SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported into separate notes",
@@ -184,5 +175,10 @@ export default {
     // Shows the shape of an answer the field expects: the description above it
     // already says that an empty field creates no subfolder.
     PLACEHOLDER_SUBFOLDER_EXAMPLE: "For example, {{filename}} or another variable with any prefix or suffix",
+
+    // ─── Settings: shared notes ──────────────────────────────────────────────────
+    SECTION_SHARED_NOTES: "Extraction to shared notes",
+    SETTING_NOTE_NAME_NAME: "Naming pattern for annotations imported into a shared note",
+    SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}}, or every PDF will write its annotations into the same note.",
 
 };
