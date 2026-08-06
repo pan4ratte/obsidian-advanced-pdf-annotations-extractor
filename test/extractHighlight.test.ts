@@ -247,6 +247,71 @@ describe('extractHighlight - the order the quads arrive in', () => {
   });
 });
 
+describe('extractHighlight - the line index', () => {
+  /** One quad, corner by corner: tL, tR, bL, bR. */
+  const quad = (x1: number, x2: number, top: number, bottom: number) =>
+    [x1, top, x2, top, x1, bottom, x2, bottom];
+
+  // Three lines of a page, sorted down it, as loadPage hands them over.
+  const items = [
+    {str: 'first line', transform: [12, 0, 0, 12, 70, 700], width: 55},
+    {str: 'second line', transform: [12, 0, 0, 12, 70, 680], width: 60},
+    {str: 'third line', transform: [12, 0, 0, 12, 70, 660], width: 55},
+  ];
+  /** What loadPage passes beside them: each baseline, in the items' order. */
+  const tops = new Float64Array(items.map((item) => item.transform[5]));
+
+  test('reads the lines a quad covers', () => {
+    expect(extractHighlight({quadPoints: quad(70, 130, 686, 678)}, items, tops))
+      .toBe('second line');
+    expect(
+      extractHighlight(
+        {quadPoints: [...quad(70, 125, 706, 698), ...quad(70, 130, 686, 678)]},
+        items,
+        tops
+      )
+    ).toBe('first line second line');
+  });
+
+  // The index only narrows which items are looked at, so every quad has to
+  // read exactly what walking the whole page reads — including the ones
+  // falling off either end of it, where the search runs out of items.
+  test('reads what walking every item of the page reads', () => {
+    const cases = [
+      quad(70, 125, 706, 698), // the first line alone
+      quad(70, 130, 686, 678), // one in the middle
+      quad(70, 125, 666, 658), // the last line alone
+      quad(70, 130, 706, 658), // one quad over all three
+      quad(70, 130, 706, 678), // the top two
+      quad(70, 130, 686, 658), // the bottom two
+      quad(70, 130, 640, 620), // below every line
+      quad(70, 130, 760, 740), // above every line
+      quad(70, 130, 700, 700), // no height at all, on a baseline
+      [...quad(70, 125, 666, 658), ...quad(70, 125, 706, 698)], // bottom first
+    ];
+    for (const quadPoints of cases) {
+      expect(extractHighlight({quadPoints}, items, tops))
+        .toBe(extractHighlight({quadPoints}, items));
+    }
+  });
+
+  test('reads a whole line split across several items', () => {
+    // What a page really looks like: one line written as a run of items, and
+    // another below it that the quad must not reach.
+    const split = [
+      {str: 'alpha ', transform: [12, 0, 0, 12, 70, 700], width: 30},
+      {str: 'beta ', transform: [12, 0, 0, 12, 100, 700], width: 25},
+      {str: 'gamma', transform: [12, 0, 0, 12, 125, 700], width: 30},
+      {str: 'below', transform: [12, 0, 0, 12, 70, 680], width: 30},
+    ];
+    const baselines = new Float64Array(split.map((item) => item.transform[5]));
+    const covering = {quadPoints: quad(70, 155, 706, 698)};
+    expect(extractHighlight(covering, split, baselines)).toBe('alpha beta gamma');
+    expect(extractHighlight(covering, split, baselines))
+      .toBe(extractHighlight(covering, split));
+  });
+});
+
 describe('extractHighlight - malformed annotations', () => {
   test('returns no text when pdf.js reports no usable quadPoints', () => {
     expect(extractHighlight({quadPoints: null}, [])).toBe('');

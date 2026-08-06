@@ -31,18 +31,20 @@ interface QuadBounds {
  * to left read the same as one dragged left to right.
  */
 function quadBounds(quadPoints: ArrayLike<number>, index: number): QuadBounds {
-	const xs: number[] = [];
-	const ys: number[] = [];
-	for (let corner = 0; corner < 8; corner += 2) {
-		xs.push(quadPoints[index * 8 + corner]);
-		ys.push(quadPoints[index * 8 + corner + 1]);
+	const at = index * 8;
+	let minx = quadPoints[at];
+	let maxx = minx;
+	let miny = quadPoints[at + 1];
+	let maxy = miny;
+	for (let corner = 2; corner < 8; corner += 2) {
+		const x = quadPoints[at + corner];
+		const y = quadPoints[at + corner + 1];
+		if (x < minx) minx = x;
+		else if (x > maxx) maxx = x;
+		if (y < miny) miny = y;
+		else if (y > maxy) maxy = y;
 	}
-	return {
-		minx: Math.min(...xs),
-		maxx: Math.max(...xs),
-		miny: Math.min(...ys),
-		maxy: Math.max(...ys),
-	};
+	return { minx, maxx, miny, maxy };
 }
 
 /**
@@ -63,7 +65,12 @@ function inReadingOrder(quads: QuadBounds[]): QuadBounds[] {
 	const down = [...quads].sort((a, b) => b.maxy - a.maxy);
 	// Half a line of the tallest quad: enough to keep the lines apart, loose
 	// enough that two quads on one line are not read as two.
-	const line = Math.max(...quads.map((quad) => quad.maxy - quad.miny)) / 2;
+	let tallest = 0;
+	for (const quad of quads) {
+		const height = quad.maxy - quad.miny;
+		if (height > tallest) tallest = height;
+	}
+	const line = tallest / 2;
 
 	const lines: QuadBounds[][] = [];
 	for (const quad of down) {
@@ -187,33 +194,70 @@ export interface PositionedText {
 	transform: number[];
 }
 
+/**
+ * Where `y` falls in `tops` — the baselines of one page's text items, largest
+ * first. `orEqual` says which side an item sitting exactly on `y` goes: the
+ * first item *at* `y` when true, the first one strictly *below* it when false.
+ * The two answers together bracket the items on the lines a quad covers.
+ */
+function baselineAt(tops: Float64Array, y: number, orEqual: boolean): number {
+	let low = 0;
+	let high = tops.length;
+	while (low < high) {
+		const mid = (low + high) >>> 1;
+		if (orEqual ? tops[mid] > y : tops[mid] >= y) low = mid + 1;
+		else high = mid;
+	}
+	return low;
+}
+
 /** The text falling inside one quad. */
 function searchQuad(
-	minx: number,
-	maxx: number,
-	miny: number,
-	maxy: number,
-	items: PositionedText[]
-) {
-	const mycontent = items.reduce(function (txt: string, x: PositionedText) {
-		if (x.width == 0) return txt; // eliminate empty stuff
-		if (!(miny <= x.transform[5] && x.transform[5] <= maxy)) return txt; // y coordinate not in box
-		if (x.transform[4] + x.width < minx) return txt; // end of txt before highlight starts
-		if (x.transform[4] > maxx) return txt; // start of text after highlight ends
+	quad: QuadBounds,
+	items: PositionedText[],
+	tops?: Float64Array
+): string {
+	const { minx, maxx, miny, maxy } = quad;
+
+	// Sorted down the page, the items on the lines a quad covers are one
+	// stretch of the page rather than a scattering of it — so it is found by
+	// halving, instead of walking every item of the page for every quad of
+	// every annotation standing on it. Without the baselines there is nothing
+	// saying the items are in that order, and the whole page is read.
+	const from = tops ? baselineAt(tops, maxy, true) : 0;
+	const to = tops ? baselineAt(tops, miny, false) : items.length;
+
+	let mycontent = "";
+	for (let at = from; at < to; at++) {
+		const item = items[at];
+		if (item.width == 0) continue; // eliminate empty stuff
+		const y = item.transform[5];
+		if (y < miny || y > maxy) continue; // y coordinate not in box
+		const x = item.transform[4];
+		if (x + item.width < minx) continue; // end of txt before highlight starts
+		if (x > maxx) continue; // start of text after highlight ends
 
 		// snap both edges to the nearest estimated glyph border
-		const borders = glyphBorders(x.str, x.transform[4], x.width);
+		const borders = glyphBorders(item.str, x, item.width);
 		const start = nearestBorder(borders, minx);
 		const end = nearestBorder(borders, maxx);
-		return txt + x.str.substring(start, end);
-	}, "");
+		mycontent += item.str.substring(start, end);
+	}
 	return mycontent.trim();
 }
 
-/** The marked up text, read quad by quad and joined line by line. */
+/**
+ * The marked up text, read quad by quad and joined line by line.
+ *
+ * `tops` is the baseline of every item of `items`, in the same order, which
+ * only a caller holding them sorted down the page can supply — see
+ * `readingOrderText`. It is what lets a quad find its lines without reading
+ * the page; given nothing, every item is considered, as before.
+ */
 export function extractHighlight(
 	annot: Pick<RawPDFAnnotation, "quadPoints">,
-	items: PositionedText[]
+	items: PositionedText[],
+	tops?: Float64Array
 ): string {
 	// No usable QuadPoints: only the comment is left to show, and one
 	// malformed annotation must not fail the whole file.
@@ -227,13 +271,7 @@ export function extractHighlight(
 	}
 
 	const highlight = inReadingOrder(quads).reduce((txt: string, quad) => {
-		const res = searchQuad(
-			quad.minx,
-			quad.maxx,
-			quad.miny,
-			quad.maxy,
-			items
-		);
+		const res = searchQuad(quad, items, tops);
 		// if the last character of txt (previous lines) is not a hyphen, we concatenate the lines, by adding a blank
 		if (txt != "" && txt.substring(txt.length - 1) != "-") {
 			return txt + " " + res;
@@ -339,6 +377,9 @@ function sectionName(title: string): string {
 		: "";
 }
 
+/** Bookmarks whose destinations are resolved at once. */
+const BOOKMARKS_AT_ONCE = 32;
+
 /**
  * The PDF's own outline, flattened into the sections it names and sorted into
  * document order: down the pages, and down each page.
@@ -356,25 +397,37 @@ export async function readSections(
 	const outline = (await pdf.getOutline()) as RawPDFOutlineItem[] | null;
 	if (!outline || outline.length === 0) return [];
 
-	const sections: PDFSection[] = [];
-
-	const visit = async (
-		items: RawPDFOutlineItem[],
-		ancestors: string[]
-	): Promise<void> => {
+	// The outline is flattened first and its destinations resolved after,
+	// rather than walked a bookmark at a time. Resolving one is a round trip to
+	// the pdf.js worker — two, for a named destination — and a document with a
+	// long outline makes a great many of them; waiting for each before asking
+	// for the next is most of what reading an outline costs. Bookmarks naming
+	// nothing to jump to are left out here: they only pass their title down.
+	const bookmarks: { dest: string | unknown[] | null; path: string[] }[] = [];
+	const visit = (items: RawPDFOutlineItem[], ancestors: string[]): void => {
 		for (const item of items) {
 			const name = sectionName(item.title);
 			const path = name ? [...ancestors, name] : ancestors;
 
-			const start = await startOfDestination(pdf, item.dest);
-			if (start && path.length > 0) {
-				sections.push({ ...start, path });
-			}
-
-			if (item.items?.length) await visit(item.items, path);
+			if (path.length > 0) bookmarks.push({ dest: item.dest, path });
+			if (item.items?.length) visit(item.items, path);
 		}
 	};
-	await visit(outline, []);
+	visit(outline, []);
+
+	// Asked for a batch at a time rather than all at once, so an outline of a
+	// few thousand bookmarks does not put that many messages on the worker in
+	// one go.
+	const sections: PDFSection[] = [];
+	for (let first = 0; first < bookmarks.length; first += BOOKMARKS_AT_ONCE) {
+		const batch = bookmarks.slice(first, first + BOOKMARKS_AT_ONCE);
+		const starts = await Promise.all(
+			batch.map((bookmark) => startOfDestination(pdf, bookmark.dest))
+		);
+		starts.forEach((start, at) => {
+			if (start) sections.push({ ...start, path: batch[at].path });
+		});
+	}
 
 	sections.sort((one, other) => {
 		if (one.pageNumber !== other.pageNumber) {
@@ -399,42 +452,45 @@ export function sectionAt(
 	pageNumber: number,
 	top: number
 ): string[] | undefined {
-	let found: PDFSection | undefined;
-	// In document order, so the first section past the annotation ends it.
-	for (const section of sections) {
-		if (section.pageNumber > pageNumber) break;
-		if (section.pageNumber === pageNumber && section.top < top) break;
-		found = section;
+	// In document order, so the sections beginning at or above the annotation
+	// are a run of them from the start and the first one past it ends that run.
+	// Where the run ends is found by halving: an annotated document asks this
+	// once per annotation, against every heading the document has.
+	let low = 0;
+	let high = sections.length;
+	while (low < high) {
+		const mid = (low + high) >>> 1;
+		const section = sections[mid];
+		const atOrAbove =
+			section.pageNumber < pageNumber ||
+			(section.pageNumber === pageNumber && section.top >= top);
+		if (atOrAbove) low = mid + 1;
+		else high = mid;
 	}
-	return found?.path;
+	return low > 0 ? sections[low - 1].path : undefined;
 }
 
-/** Reads one page's wanted annotations into `total`. */
-async function loadPage(
-	page: PDFPageProxy,
-	pagenum: number,
-	pageLabel: string,
-	file: PDFFile,
-	containingFolder: string,
-	total: PDFAnnotation[],
-	desiredAnnotations: string[],
-	sections: PDFSection[]
-) {
-	const rawAnnotations = (await page.getAnnotations()) as RawPDFAnnotation[];
+/** One page's text, ready for the quads standing on it to be read off. */
+interface PageText {
+	/** The items, down the page and left to right along each line. */
+	items: PositionedText[];
+	/** `transform[5]` of each item, in the same order — largest first. */
+	tops: Float64Array;
+}
 
-	const annotations = rawAnnotations.filter(
-		(anno) => desiredAnnotations.indexOf(anno.subtype) >= 0
-	);
-
-	// pdf.js normalizes whitespace by default since v3.
-	const content: TextContent = await page.getTextContent();
-
+/**
+ * The page's text in reading order, with the baselines lifted out beside it.
+ * The two are built together and nowhere else because they have to agree:
+ * finding the lines a quad covers is a search through `tops`, and an order
+ * those no longer describe would quietly read the wrong text.
+ */
+function readingOrderText(content: TextContent): PageText {
 	// TextContent also carries marked-content markers, which have no position.
-	const textItems = content.items.filter(
+	const items: PositionedText[] = content.items.filter(
 		(item): item is TextItem => "str" in item
 	);
 
-	textItems.sort(function (a1: TextItem, a2: TextItem) {
+	items.sort(function (a1: PositionedText, a2: PositionedText) {
 		if (a1.transform[5] > a2.transform[5]) return -1; // y coord. descending
 		if (a1.transform[5] < a2.transform[5]) return 1;
 		if (a1.transform[4] > a2.transform[4]) return 1; // x coord. ascending
@@ -442,6 +498,44 @@ async function loadPage(
 		return 0;
 	});
 
+	const tops = new Float64Array(items.length);
+	for (let at = 0; at < items.length; at++) tops[at] = items[at].transform[5];
+	return { items, tops };
+}
+
+/** One page's wanted annotations, in the order the page carries them. */
+async function loadPage(
+	page: PDFPageProxy,
+	pagenum: number,
+	pageLabel: string,
+	file: PDFFile,
+	containingFolder: string,
+	desiredAnnotations: Set<string>,
+	sections: PDFSection[]
+): Promise<PDFAnnotation[]> {
+	const rawAnnotations = (await page.getAnnotations()) as RawPDFAnnotation[];
+
+	const annotations = rawAnnotations.filter((anno) =>
+		desiredAnnotations.has(anno.subtype)
+	);
+	if (annotations.length === 0) return [];
+
+	// Reading a page's text means parsing its whole content stream, which is by
+	// far the most expensive thing done to a PDF here — and nothing that needs
+	// doing unless something on the page marks text up, which most pages of
+	// most documents do not. A markup annotation pdf.js found no usable
+	// QuadPoints on reads nothing either, so it does not ask for the page.
+	const marksUpSomething = annotations.some(
+		(anno) =>
+			ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype) &&
+			anno.quadPoints
+	);
+	// pdf.js normalizes whitespace by default since v3.
+	const text = marksUpSomething
+		? readingOrderText(await page.getTextContent())
+		: null;
+
+	const total: PDFAnnotation[] = [];
 	for (const raw of annotations) {
 		// Decides both what is read off the page under the annotation and how
 		// its colour is read, so it is settled once before either.
@@ -462,7 +556,10 @@ async function loadPage(
 		};
 
 		if (marksUpText) {
-			anno.highlightedText = extractHighlight(anno, textItems);
+			// No text was asked for only when nothing here could have read any.
+			anno.highlightedText = text
+				? extractHighlight(anno, text.items, text.tops)
+				: "";
 		}
 
 		if (sections.length > 0) {
@@ -481,7 +578,16 @@ async function loadPage(
 
 		total.push(anno);
 	}
+	return total;
 }
+
+/**
+ * Pages read at once. Every page costs at least two round trips to the pdf.js
+ * worker before anything can be made of it, and read one at a time the worker
+ * sits idle across each of them. Kept small deliberately: reading a folder
+ * already runs its PDFs side by side, and the two multiply.
+ */
+const PAGES_AT_ONCE = 4;
 
 /**
  * `withSections` reads the PDF's own outline and tells each annotation which
@@ -507,27 +613,41 @@ export async function loadPDFFile(
 		.promise;
 	const sections = withSections ? await readSections(pdf) : [];
 	const pageLabels = await pdf.getPageLabels();
-	for (let i = 1; i <= pdf.numPages; i++) {
-		const page = await pdf.getPage(i);
-		let pageLabel = '';
-		if (pageLabels && pageLabels[i - 1]) {
-			pageLabel = pageLabels[i - 1];
-		} else {
-			pageLabel = i.toString();
-		}
-		await loadPage(
+	// Asked once per annotation of every page, so not a list to search.
+	const desired = new Set(desiredAnnotations);
+
+	const readPage = async (pagenum: number): Promise<PDFAnnotation[]> => {
+		const page = await pdf.getPage(pagenum);
+		// The real page number, as the author labelled it, where there is one.
+		const pageLabel = pageLabels?.[pagenum - 1] || pagenum.toString();
+		return loadPage(
 			page,
-			i,
+			pagenum,
 			pageLabel,
 			file,
 			containingFolder,
-			total,
-			desiredAnnotations,
+			desired,
 			sections
 		);
-		// After the page rather than before it, so what is reported is what has
-		// been read and not what is about to be.
-		onPage?.(i, pdf.numPages);
+	};
+
+	for (let first = 1; first <= pdf.numPages; first += PAGES_AT_ONCE) {
+		const last = Math.min(first + PAGES_AT_ONCE - 1, pdf.numPages);
+		const reading: Promise<PDFAnnotation[]>[] = [];
+		for (let pagenum = first; pagenum <= last; pagenum++) {
+			reading.push(readPage(pagenum));
+		}
+		const read = await Promise.all(reading);
+
+		// Collected page by page rather than as each read finishes, so the
+		// annotations come out in the order of the document however the reads
+		// happened to interleave — and so does what `onPage` is told. After the
+		// page rather than before it, so what is reported is what has been read
+		// and not what is about to be.
+		for (let at = 0; at < read.length; at++) {
+			for (const anno of read[at]) total.push(anno);
+			onPage?.(first + at, pdf.numPages);
+		}
 	}
 }
 
@@ -540,10 +660,14 @@ const WIDE_LETTER_WEIGHT = 1.75;
 const SLIM_LETTER_WEIGHT = 0.6;
 const NORMAL_LETTER_WEIGHT = 1;
 
+// The two lists above, turned round: looked up once per character of every
+// text item under every quad, which is the innermost the reading gets.
+const LETTER_WEIGHTS = new Map<string, number>();
+for (const letter of WIDE_LETTERS) LETTER_WEIGHTS.set(letter, WIDE_LETTER_WEIGHT);
+for (const letter of SLIM_LETTERS) LETTER_WEIGHTS.set(letter, SLIM_LETTER_WEIGHT);
+
 function letterWeight(letter: string): number {
-	if (WIDE_LETTERS.includes(letter)) return WIDE_LETTER_WEIGHT;
-	if (SLIM_LETTERS.includes(letter)) return SLIM_LETTER_WEIGHT;
-	return NORMAL_LETTER_WEIGHT;
+	return LETTER_WEIGHTS.get(letter) ?? NORMAL_LETTER_WEIGHT;
 }
 
 // pdf.js reports one width per text item, not per glyph. borders[i] is where
@@ -554,14 +678,19 @@ function glyphBorders(
 	itemStartX: number,
 	itemWidth: number
 ): number[] {
-	const weights = str.split("").map(letterWeight);
-	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+	// Weighed in two passes over the string rather than into an array of its
+	// own: the same additions in the same order, and nothing allocated for a
+	// call made once per text item under every quad.
+	let totalWeight = 0;
+	for (let at = 0; at < str.length; at++) {
+		totalWeight += letterWeight(str[at]);
+	}
 	const borders = [itemStartX];
 	if (totalWeight === 0) return borders;
 
 	let position = itemStartX;
-	for (const weight of weights) {
-		position += (weight * itemWidth) / totalWeight;
+	for (let at = 0; at < str.length; at++) {
+		position += (letterWeight(str[at]) * itemWidth) / totalWeight;
 		borders.push(position);
 	}
 	return borders;
