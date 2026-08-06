@@ -38,17 +38,18 @@ import { AdvancedExtractionModal } from "src/advancedExtractionModal";
 import { PDFAnnotationPluginFormatter } from "./formatter";
 
 /**
- * The one thing this plugin asks of Node's `fs`: whether a path the reader
- * pasted names a file.
+ * The two things this plugin asks of Node's `fs`: what a path the reader pasted
+ * names, and — when it names a folder — what is in it.
  *
  * Described here rather than taken from `typeof import("fs")`, which is only a
  * type where `@types/node` is installed. It is a devDependency, so a checkout
  * that installs none — a reviewer's, a CI job that lints without building —
  * resolves it to `any`, and that `any` then spreads through every call made on
- * it. Naming the one method used costs four lines and depends on nothing.
+ * it. Naming the methods used costs four lines and depends on nothing.
  */
 interface NodeFileSystem {
-	statSync(path: string): { isFile(): boolean };
+	statSync(path: string): { isFile(): boolean; isDirectory(): boolean };
+	readdirSync(path: string): string[];
 }
 
 /**
@@ -62,6 +63,21 @@ declare const require: (id: string) => unknown;
 
 /** When a name template and the PDF's own name both render nothing usable. */
 const FALLBACK_NOTE_NAME = "Annotations";
+
+/** The quotes a path copied from a file manager arrives inside. */
+function unquotedPath(path: string): string {
+	return path.replace(/^["']|["']$/g, "");
+}
+
+/**
+ * A name onto the folder holding it, written with the separator the pasted path
+ * already uses — a Windows path stays a Windows path, and a trailing slash on
+ * the folder does not double up.
+ */
+function joinPath(folder: string, name: string): string {
+	const trimmed = folder.replace(/[\\/]+$/, "");
+	return `${trimmed}${trimmed.includes("\\") ? "\\" : "/"}${name}`;
+}
 
 export default class PDFAnnotationPlugin extends Plugin {
 	public settings: PDFAnnotationPluginSetting;
@@ -126,17 +142,23 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
-	/** Sorts and files what an extraction gathered, however it was gathered. */
+	/**
+	 * Sorts and files what an extraction gathered, however it was gathered.
+	 * `openIt` is what an extraction spanning several PDFs turns off: the note
+	 * of every one of them opening at once buries the vault.
+	 */
 	async writeLoadedAnnotations(
 		loaded: LoadedAnnotations,
-		onePerAnnotation = false
+		onePerAnnotation = false,
+		openIt = true
 	): Promise<void> {
 		this.sort(loaded.annotations);
 		await this.writeNotes(
 			loaded.fileMeta,
 			loaded.annotations,
 			loaded.isExternalFile,
-			onePerAnnotation
+			onePerAnnotation,
+			openIt
 		);
 	}
 
@@ -200,18 +222,10 @@ export default class PDFAnnotationPlugin extends Plugin {
 		fileMeta: FileMeta,
 		grandtotal: PDFAnnotation[],
 		isExternalFile: boolean,
-		onePerAnnotation = false
+		onePerAnnotation = false,
+		openIt = true
 	): Promise<void> {
-		// Notes following the current file need one to follow, and the
-		// clipboard commands need nothing open. Falling back to the vault root
-		// would quietly scatter notes nobody asked for.
-		if (
-			this.settings.noteLocation === "current" &&
-			!this.app.workspace.getActiveFile()
-		) {
-			new Notice(t.NOTICE_NO_CURRENT_FILE);
-			return;
-		}
+		if (!this.hasSomewhereToWriteNotes()) return;
 
 		const currentFolder = this.currentFolder();
 		const extractTags = this.settings.extractsTags(onePerAnnotation);
@@ -253,7 +267,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 								topic,
 								this.getResolvedNoTopicName(fileMeta, counter)
 							)) + ".md";
-				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder);
+				const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder, true);
 				// A note per annotation is a great many notes; opening each of
 				// them buries whatever the reader was looking at.
 				const written = await this.saveHighlightsToFile(filePathOfNote, note, this.settings.overwriteExistingNote, false);
@@ -266,12 +280,32 @@ export default class PDFAnnotationPlugin extends Plugin {
 			const finalMarkdown = this.formatter.format(grandtotal, isExternalFile);
 			const fileNameOfNote =
 				this.getResolvedNoteName(fileMeta, pdfFolder) + ".md";
-			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder);
-			const written = await this.saveHighlightsToFile(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote, true);
+			const filePathOfNote = this.getResolvedNotePath(fileMeta, currentFolder, fileNameOfNote, pdfFolder, false);
+			const written = await this.saveHighlightsToFile(filePathOfNote, finalMarkdown, this.settings.overwriteExistingNote, openIt);
 			if (written) {
 				await this.addTagsToNoteProperties(written, tags);
 			}
 		}
+	}
+
+	/**
+	 * Notes following the current file need one to follow, and the clipboard
+	 * commands need nothing open. Falling back to the vault root would quietly
+	 * scatter notes nobody asked for, so the extraction says so and stops.
+	 *
+	 * Asked once for an extraction spanning several PDFs, and again by each note
+	 * it writes: the answer is the same for all of them, and the reader should
+	 * hear it once.
+	 */
+	private hasSomewhereToWriteNotes(): boolean {
+		if (
+			this.settings.noteLocation === "current" &&
+			!this.app.workspace.getActiveFile()
+		) {
+			new Notice(t.NOTICE_NO_CURRENT_FILE);
+			return false;
+		}
+		return true;
 	}
 
 	/** Folder of the file being looked at; empty for the root or nothing open. */
@@ -279,76 +313,180 @@ export default class PDFAnnotationPlugin extends Plugin {
 		return this.app.workspace.getActiveFile()?.parent?.path ?? "";
 	}
 
-	private noticeClipboardPathIsDesktopOnly(): {
-		grandtotal: PDFAnnotation[];
-		pdfFile: PDFFile | null;
-	} {
+	/** Says why a path from outside the vault cannot be read, and reads none. */
+	private noticeLocalPathsAreDesktopOnly(): null {
 		new Notice(t.NOTICE_PATH_DESKTOP_ONLY);
-		return { grandtotal: [], pdfFile: null };
+		return null;
 	}
 
-	async loadAnnotationsFromSinglePDFFileFromClipboardPath(
+	/**
+	 * Node's fs, or nothing where there is none — and the reader told why.
+	 * `isDesktop` only means the UI is in desktop mode; the module exists solely
+	 * in the Electron app.
+	 *
+	 * The one place it is asked for. require() because esbuild leaves a bare
+	 * import() in the CJS bundle, which Obsidian's loader cannot always resolve,
+	 * and the guard opens this call because that is where the rule against Node
+	 * modules on mobile looks for it.
+	 */
+	private localFileSystem(): NodeFileSystem | null {
+		if (!Platform.isDesktop) return this.noticeLocalPathsAreDesktopOnly();
+		if (!Platform.isDesktopApp)
+			return this.noticeLocalPathsAreDesktopOnly();
+
+		return require("fs") as NodeFileSystem;
+	}
+
+	/**
+	 * Reads one PDF from outside the vault. The path is absolute and already
+	 * unquoted, and anything wrong with it is thrown rather than reported here:
+	 * a folder of PDFs is read one file at a time, and one unreadable file is
+	 * not the whole folder.
+	 */
+	private async readExternalPDF(
+		filePath: string,
+		desiredAnnotations: string[]
+	): Promise<LoadedAnnotations> {
+		const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
+		const binaryContent = await FileSystemAdapter.readLocalFile(filePath);
+		const filePathWithSlashs: string = filePath.replace(/\\/g, "/");
+		const filePathSplits: string[] = filePathWithSlashs.split("/");
+		const fileName = filePathSplits.last();
+		const extension = fileName.split(".").last();
+		const encodedFilePath = encodeURI("file://" + filePath);
+		const pdfFile = new PDFFile(
+			fileName,
+			binaryContent,
+			extension,
+			encodedFilePath
+		);
+		const containingFolder = filePathWithSlashs.slice(
+			0,
+			filePathWithSlashs.lastIndexOf("/")
+		);
+		const annotations: PDFAnnotation[] = [];
+		await loadPDFFile(
+			pdfFile,
+			pdfjsLib,
+			containingFolder,
+			annotations,
+			desiredAnnotations
+		);
+		return { fileMeta: pdfFile, annotations, isExternalFile: true };
+	}
+
+	/**
+	 * The one PDF a path names, for the callers that can only be asking about
+	 * one — the advanced extraction, which filters the pages and days of a
+	 * single file.
+	 */
+	async loadAnnotationsFromExternalFile(
 		filePathFromClipboard: string,
 		desiredAnnotations: string[] = this.settings.desiredAnnotations
-	): Promise<{ grandtotal: PDFAnnotation[]; pdfFile: PDFFile | null }> {
-		if (!Platform.isDesktop) {
-			return this.noticeClipboardPathIsDesktopOnly();
-		}
-		// isDesktop only means the UI is in desktop mode; Node's fs exists solely
-		// in the Electron app.
-		if (!Platform.isDesktopApp) {
-			return this.noticeClipboardPathIsDesktopOnly();
-		}
-		const grandtotal: PDFAnnotation[] = [];
-		let pdfFile: PDFFile | null = null;
+	): Promise<LoadedAnnotations | null> {
+		const fs = this.localFileSystem();
+		if (fs === null) return null;
+
 		try {
-			// Behind the desktop guard above, since mobile has no fs.
-			// require() because esbuild leaves a bare import() in the CJS
-			// bundle, which Obsidian's loader cannot always resolve.
-			const fs = require("fs") as NodeFileSystem;
-			const filePathWithoutBeginningAndEndQuotes = filePathFromClipboard.replace(
-				/^["']|["']$/g,
-				""
-			);
-			const stats = fs.statSync(filePathWithoutBeginningAndEndQuotes);
-			if (stats.isFile()) {
-				const pdfjsLib = (await loadPdfJs()) as PDFJsLib;
-				const binaryContent = await FileSystemAdapter.readLocalFile(
-					filePathWithoutBeginningAndEndQuotes
-				);
-				const filePathWithSlashs: string =
-					filePathWithoutBeginningAndEndQuotes.replace(/\\/g, "/");
-				const filePathSplits: string[] = filePathWithSlashs.split("/");
-				const fileName = filePathSplits.last();
-				const extension = fileName.split(".").last();
-				const encodedFilePath = encodeURI(
-					"file://" + filePathWithoutBeginningAndEndQuotes
-				);
-				pdfFile = new PDFFile(
-					fileName,
-					binaryContent,
-					extension,
-					encodedFilePath
-				);
-				const containingFolder = filePathWithSlashs.slice(
-					0,
-					filePathWithSlashs.lastIndexOf("/")
-				);
-				await loadPDFFile(
-					pdfFile,
-					pdfjsLib,
-					containingFolder,
-					grandtotal,
-					desiredAnnotations
-				);
-			} else {
+			const filePath = unquotedPath(filePathFromClipboard);
+			if (!fs.statSync(filePath).isFile()) {
 				new Notice(t.NOTICE_PATH_NOT_A_FILE);
+				return null;
 			}
+			return await this.readExternalPDF(filePath, desiredAnnotations);
 		} catch (error) {
 			new Notice(t.NOTICE_PATH_UNREADABLE);
 			console.error(error);
+			return null;
 		}
-		return { grandtotal, pdfFile };
+	}
+
+	/**
+	 * Every PDF a path in the clipboard named: the one file, or the PDFs the
+	 * folder holds — the folder itself and not the folders under it, since what
+	 * was pasted is what is read.
+	 *
+	 * They come back one entry per file rather than gathered into a single list:
+	 * a note name is a template over the file it was read from, so a folder
+	 * writes a note per PDF.
+	 */
+	async loadAnnotationsFromClipboardPath(
+		pathFromClipboard: string,
+		desiredAnnotations: string[] = this.settings.desiredAnnotations
+	): Promise<LoadedAnnotations[]> {
+		const fs = this.localFileSystem();
+		if (fs === null) return [];
+
+		let names: string[];
+		let folder: string;
+		try {
+			const path = unquotedPath(pathFromClipboard);
+			const stats = fs.statSync(path);
+			if (stats.isFile()) {
+				return [await this.readExternalPDF(path, desiredAnnotations)];
+			}
+			if (!stats.isDirectory()) {
+				new Notice(t.NOTICE_PATH_NOT_A_FILE_OR_FOLDER);
+				return [];
+			}
+			folder = path;
+			names = fs
+				.readdirSync(path)
+				.filter((name) => name.toLowerCase().endsWith(".pdf"))
+				.sort();
+		} catch (error) {
+			new Notice(t.NOTICE_PATH_UNREADABLE);
+			console.error(error);
+			return [];
+		}
+
+		if (names.length === 0) {
+			new Notice(t.NOTICE_FOLDER_HAS_NO_PDFS);
+			return [];
+		}
+
+		// One after another rather than all at once: a folder holds as many PDFs
+		// as it holds, and every one of them is read into memory whole.
+		const loaded: LoadedAnnotations[] = [];
+		for (const name of names) {
+			try {
+				loaded.push(
+					await this.readExternalPDF(
+						joinPath(folder, name),
+						desiredAnnotations
+					)
+				);
+			} catch (error) {
+				// The rest of the folder is still worth reading, so the file
+				// that would not open is named and left out.
+				new Notice(`${t.NOTICE_FILE_SKIPPED}: ${name}`);
+				console.error(error);
+			}
+		}
+		return loaded;
+	}
+
+	/**
+	 * Notes for every PDF a path in the clipboard named. Nothing is opened when
+	 * a folder wrote more than one note — a folder's worth of notes opening at
+	 * once buries whatever the reader was looking at.
+	 */
+	private async writeAnnotationsFromClipboardPath(
+		onePerAnnotation: boolean
+	): Promise<void> {
+		// Before the reading rather than after it: a folder of PDFs is a long
+		// wait for notes that have nowhere to go.
+		if (!this.hasSomewhereToWriteNotes()) return;
+
+		const clipText = await navigator.clipboard.readText();
+		const loaded = await this.loadAnnotationsFromClipboardPath(clipText);
+		for (const one of loaded) {
+			await this.writeLoadedAnnotations(
+				one,
+				onePerAnnotation,
+				loaded.length === 1
+			);
+		}
 	}
 
 	async onload() {
@@ -413,16 +551,15 @@ export default class PDFAnnotationPlugin extends Plugin {
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH,
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const clipText = await navigator.clipboard.readText();
-				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
-				if (result.pdfFile) {
-					this.sort(result.grandtotal);
-					await this.insertIntoNote(
-						editor,
-						view,
-						result.grandtotal,
-						true
-					);
-				}
+				const loaded =
+					await this.loadAnnotationsFromClipboardPath(clipText);
+				if (loaded.length === 0) return;
+
+				// One insertion however many PDFs were read: the note being
+				// edited is the one place all of it goes.
+				const grandtotal = loaded.flatMap((one) => one.annotations);
+				this.sort(grandtotal);
+				await this.insertIntoNote(editor, view, grandtotal, true);
 			},
 		});
 
@@ -432,12 +569,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			id: "extract-annotations-single-from-clipboard-path-to-note",
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE,
 			callback: async () => {
-				const clipText = await navigator.clipboard.readText();
-				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
-				if (result.pdfFile) {
-					this.sort(result.grandtotal);
-					await this.writeNotes(result.pdfFile, result.grandtotal, true);
-				}
+				await this.writeAnnotationsFromClipboardPath(false);
 			},
 		});
 
@@ -445,12 +577,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 			id: "extract-annotations-single-from-clipboard-path-per-annotation",
 			name: t.COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION,
 			callback: async () => {
-				const clipText = await navigator.clipboard.readText();
-				const result = await this.loadAnnotationsFromSinglePDFFileFromClipboardPath(clipText);
-				if (result.pdfFile) {
-					this.sort(result.grandtotal);
-					await this.writeNotes(result.pdfFile, result.grandtotal, true, true);
-				}
+				await this.writeAnnotationsFromClipboardPath(true);
 			},
 		});
 
@@ -662,17 +789,24 @@ export default class PDFAnnotationPlugin extends Plugin {
 		);
 	}
 
+	/**
+	 * `separateNotes` is the extraction that writes a note per annotation, and
+	 * the only one the subfolder applies to: a subfolder is what keeps that
+	 * many notes together, and an extraction writing the one note has nothing
+	 * to keep together.
+	 */
 	getResolvedNotePath(
 		pdfFile: FileMeta,
 		currentFolder: string,
 		fileNameOfNote: string,
-		folder = ""
+		folder = "",
+		separateNotes = false
 	): string {
 		return resolveNotePath(
 			this.settings,
 			currentFolder,
 			fileNameOfNote,
-			this.getResolvedNoteSubfolder(pdfFile, folder)
+			separateNotes ? this.getResolvedNoteSubfolder(pdfFile, folder) : ""
 		);
 	}
 

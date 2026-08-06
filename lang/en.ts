@@ -11,8 +11,8 @@ export default {
     COMMAND_EXTRACT_CURRENT_FILE: "Extract annotations from the current file",
     COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION: "Extract annotations from the current file into separate notes",
     COMMAND_EXTRACT_CLIPBOARD_PATH: "Extract annotations from the clipboard path into the current note",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract annotations from the file in the clipboard into a new note",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Extract annotations from the file in the clipboard into separate notes",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Extract annotations from the clipboard path into a new note",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Extract annotations from the clipboard path into separate notes",
     COMMAND_EXTRACT_CURRENT_FOLDER: "Extract annotations from every PDF in the current folder",
     COMMAND_EXTRACT_ADVANCED: "Extract annotations with advanced settings",
 
@@ -46,7 +46,10 @@ export default {
     // own field alike, so neither says where it came from.
     NOTICE_PATH_DESKTOP_ONLY: "Reading a PDF from outside the vault is only available in the desktop app.",
     NOTICE_PATH_NOT_A_FILE: "The path that was given is not a file.",
-    NOTICE_PATH_UNREADABLE: "The path that was given could not be read as a file.",
+    NOTICE_PATH_NOT_A_FILE_OR_FOLDER: "The path that was given is neither a file nor a folder.",
+    NOTICE_PATH_UNREADABLE: "The path that was given could not be read.",
+    NOTICE_FOLDER_HAS_NO_PDFS: "There are no PDF files in the folder that was given.",
+    NOTICE_FILE_SKIPPED: "This PDF could not be read, so it was skipped",
     NOTICE_EXTRACTION_FAILED: "Could not extract the annotations from this PDF.",
     NOTICE_NOTE_PATH_INVALID: "Could not create the note with the annotations: the vault will not take that path. Check the folder, the subfolder and the note name in the settings.",
     NOTICE_NO_CURRENT_FILE: "Could not create the note with the annotations: no file is open for it to be put beside. Open one, or set a vault folder for the notes.",
@@ -151,14 +154,7 @@ export default {
     OPTION_NOTE_LOCATION_VAULT: "A specified folder in the vault",
     SETTING_NOTE_FOLDER_NAME: "Specify a folder in the vault",
     SETTING_NOTE_FOLDER_DESC: "Start typing to see suggestions, or leave it empty to place them in the vault root.",
-    SETTING_NOTE_SUBFOLDER_NAME: "Subfolder (optional)",
-    SETTING_NOTE_SUBFOLDER_DESC: "When filled, this naming template is used to create a subfolder for the notes.",
     PLACEHOLDER_VAULT_ROOT: "For example, {{filename}} or another variable with any prefix or suffix",
-    PLACEHOLDER_NO_SUBFOLDER: "If empty, no subfolder is created",
-    SETTING_TOPIC_TO_NAME_NAME: "Use the topic of the comment as the note name",
-    SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating individual notes, if your template has it.",
-    SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported into separate notes",
-    SETTING_ONE_NOTE_NAME_DESC: "Use unique variables, such as {{counter}}, or all annotations will end up in the same note.",
     SETTING_EXTRACT_TAGS_NAME: "Extract tags from annotations into the note properties",
     SETTING_EXTRACT_TAGS_DESC: "Tags found in the annotations are moved automatically into the note properties.",
     OPTION_EXTRACT_TAGS_NEVER: "Never",
@@ -169,5 +165,16 @@ export default {
     SETTING_NOTE_NAME_DESC: "Use unique variables, such as {{filename}}, or every PDF will write its annotations into the same note.",
     SETTING_OVERWRITE_NAME: "Allow overwriting",
     SETTING_OVERWRITE_DESC: "If a note with the same name already exists, it is replaced rather than appended to.",
+
+    // ─── Settings: separate notes ────────────────────────────────────────────────
+    // Applies only to an extraction into separate notes — one per annotation.
+    SECTION_SEPARATE_NOTES: "Extraction to separate notes",
+    SETTING_TOPIC_TO_NAME_NAME: "Use the topic of the comment as the note name",
+    SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating individual notes, if your template has it.",
+    SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported into separate notes",
+    SETTING_ONE_NOTE_NAME_DESC: "Use unique variables, such as {{counter}}, or all annotations will end up in the same note.",
+    SETTING_NOTE_SUBFOLDER_NAME: "Subfolder (optional)",
+    SETTING_NOTE_SUBFOLDER_DESC: "When filled, this naming template creates a subfolder for the separate notes inside the destination that was chosen.",
+    PLACEHOLDER_NO_SUBFOLDER: "If empty, no subfolder is created",
 
 };

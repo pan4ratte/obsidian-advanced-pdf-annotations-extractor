@@ -381,18 +381,13 @@ export class AdvancedExtractionModal extends Modal {
 			);
 		}
 
-		const { grandtotal, pdfFile } =
-			await this.plugin.loadAnnotationsFromSinglePDFFileFromClipboardPath(
-				source.path,
-				everyType
-			);
-		// The loader has told the reader what was wrong with the path already.
-		if (!pdfFile) return null;
-		return {
-			fileMeta: pdfFile,
-			annotations: grandtotal,
-			isExternalFile: true,
-		};
+		// One file: the pages and the days this window filters by are a single
+		// PDF's, so a path naming a folder is a path it cannot use. The loader
+		// has told the reader what was wrong with it already.
+		return this.plugin.loadAnnotationsFromExternalFile(
+			source.path,
+			everyType
+		);
 	}
 
 	/** Read on first ask and kept; the dates and the extraction both want them. */

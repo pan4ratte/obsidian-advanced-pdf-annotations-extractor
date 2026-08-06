@@ -205,8 +205,8 @@ a non-empty array of definitions renders the tab **instead of** it, and
 `minAppVersion` is 1.13.0, so nothing reaches it.
 
 The array is one group holding one definition per section of the tab —
-header, annotation types, templates, grouping, headings, notes — and it never
-changes shape. Five rules keep it working; each one is a silent failure if
+header, annotation types, templates, grouping, headings, notes, separate
+notes — and it never changes shape. Five rules keep it working; each one is a silent failure if
 broken:
 
 - **No `control`.** Nothing in this tab is a control the API describes, so every

@@ -290,9 +290,16 @@ describe('resolveNotePath', () => {
       .toBe('Annotations for Paper.md');
   });
 
-  test('the note folder and subfolder are ignored beside the current file', () => {
-    expect(resolve({noteLocation: 'current', noteFolder: 'Notes'}, 'Paper'))
+  test('the note folder is ignored beside the current file', () => {
+    expect(resolve({noteLocation: 'current', noteFolder: 'Notes'}))
       .toBe('Papers/2024/Annotations for Paper.md');
+  });
+
+  test('a subfolder goes under the current file wherever it is', () => {
+    // The subfolder belongs to the extraction into separate notes, which
+    // writes as many notes beside the current file as into a vault folder.
+    expect(resolve({noteLocation: 'current', noteFolder: 'Notes'}, 'Paper'))
+      .toBe('Papers/2024/Paper/Annotations for Paper.md');
   });
 
   test('an empty vault folder is the vault root', () => {

@@ -8,6 +8,16 @@ package.json. -->
 
 ## Unreleased
 
+### A clipboard path may name a folder
+
+* **A folder in the clipboard extracts every PDF in it.** All three clipboard commands take a folder path as well as a file path: into the current note they arrive as one insertion, and into new notes as a note per PDF — the note name is a template over the file it was read from. The folder itself is read, not the folders under it, and a PDF that will not open is named and skipped rather than taking the rest of the folder with it.
+* **Nothing is opened when a folder wrote more than one note**, which would otherwise bury whatever you were looking at.
+
+### Extraction to separate notes is its own section
+
+* **A new settings section** gathers the settings that apply to an extraction into separate notes and to no other: naming a note after its comment's topic, the naming pattern that stands in when it does not, and the subfolder.
+* **The subfolder now applies to an extraction into separate notes only** — that is the extraction whose notes it keeps together — and it applies under either destination, the folder of the open file as well as a folder of the vault. An extraction into one note ignores it.
+
 ### Grouping reads from the outside in
 
 * **Grouping by file.** A new setting gathers every annotation of the same PDF together, on by default. Switched off, annotations from several PDFs are read page by page across all of them.

@@ -13,7 +13,7 @@ This plugin extracts all types of annotations from PDFs and writes them into the
 
 ### 1. Extract annotations from PDFs inside and outside the vault
 
-Extract highlighted, underlined and struck out text and squiggly underlines, as well as sticky note comments and free text on the page, from your PDFs. Import sources: the file you are reading, every PDF in the current folder, and a path in the clipboard — for those PDFs you would rather not copy into the vault.
+Extract highlighted, underlined and struck out text and squiggly underlines, as well as sticky note comments and free text on the page, from your PDFs. Import sources: the file you are reading, every PDF in the current folder, and a path in the clipboard — for those PDFs you would rather not copy into the vault. A clipboard path may name a folder as well: every PDF in it is then read, each into its own note.
 
 ### 2. Advanced extraction menu for fine-tuned import
 
@@ -25,7 +25,7 @@ Set up the default template that will format all annotation types, or create sep
 
 ### 4. Grouping, headings and note naming rules
 
-Group the annotations by folder, by file, by the day they were created and by topic (the first line of each comment) — the groupings nest in that order. Grouping by folder and by file applies only when the annotations come from several folders or files. Group headings can optionally be added to the notes automatically. Notes can be named from a template (or after the annotation's own topic) and placed into subfolders, which are also created from a template.
+Group the annotations by folder, by file, by the day they were created and by topic (the first line of each comment) — the groupings nest in that order. Grouping by folder and by file applies only when the annotations come from several folders or files. Group headings can optionally be added to the notes automatically. Notes can be named from a template — and, on an extraction into separate notes, after the annotation's own topic; the subfolder for those notes is set in the same place and is also created from a template.
 
 
 ## Installation

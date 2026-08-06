@@ -249,7 +249,14 @@ export function cleanNoteName(value: string): string {
 
 /**
  * Where one note is written. `currentFolder` is the folder of the file being
- * looked at; `subfolder` arrives already rendered.
+ * looked at; `subfolder` arrives already rendered, and empty from every
+ * extraction the subfolder does not apply to — which the caller decides, not
+ * this.
+ *
+ * The subfolder goes under whichever of the two folders the notes are written
+ * to: it is a setting of the extraction into separate notes, and that
+ * extraction writes as many notes beside the current file as it does into a
+ * folder of the vault.
  */
 export function resolveNotePath(
 	settings: PDFAnnotationPluginSetting,
@@ -257,13 +264,15 @@ export function resolveNotePath(
 	fileNameOfNote: string,
 	subfolder = ""
 ): string {
-	const folder =
+	const base =
 		settings.noteLocation === "current"
-			? cleanFolderPath(currentFolder)
-			: [settings.noteFolder, subfolder]
-					.map(cleanFolderPath)
-					.filter((part) => part.length > 0)
-					.join("/");
+			? currentFolder
+			: settings.noteFolder;
+
+	const folder = [base, subfolder]
+		.map(cleanFolderPath)
+		.filter((part) => part.length > 0)
+		.join("/");
 
 	return folder ? `${folder}/${fileNameOfNote}` : fileNameOfNote;
 }
@@ -301,8 +310,9 @@ export class PDFAnnotationPluginSetting {
 	/** Vault-relative folder the notes go in, empty for the vault root. */
 	public noteFolder: string;
 	/**
-	 * Template for a folder under `noteFolder` to put the notes in. Empty to
-	 * put them straight into it.
+	 * Template for a folder under the notes' destination to put them in. Empty
+	 * to put them straight into it. Applies to the extraction into separate
+	 * notes only — see `resolveNotePath`.
 	 */
 	public noteSubfolder: string;
 	public noteName: string;
@@ -968,15 +978,23 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 							aliases: [
 								t.SETTING_NOTE_LOCATION_NAME,
 								t.SETTING_NOTE_FOLDER_NAME,
-								t.SETTING_NOTE_SUBFOLDER_NAME,
-								t.SETTING_TOPIC_TO_NAME_NAME,
-								t.SETTING_ONE_NOTE_NAME_NAME,
 								t.SETTING_EXTRACT_TAGS_NAME,
 								t.SETTING_NOTE_NAME_NAME,
 								t.SETTING_OVERWRITE_NAME,
 							],
 						},
 						(root) => this.renderNotes(root)
+					),
+					this.section(
+						{
+							name: t.SECTION_SEPARATE_NOTES,
+							aliases: [
+								t.SETTING_TOPIC_TO_NAME_NAME,
+								t.SETTING_ONE_NOTE_NAME_NAME,
+								t.SETTING_NOTE_SUBFOLDER_NAME,
+							],
+						},
+						(root) => this.renderSeparateNotes(root)
 					),
 				],
 			},
@@ -1422,8 +1440,8 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		new Setting(root)
 			.setName(t.SECTION_NOTES)
 			.setHeading();
-		// A note beside its PDF has no vault folder to go in and no subfolder
-		// under it, so both fields open and close from the one panel.
+		// A note following the file being looked at has no vault folder to go
+		// in, so the field opens and closes with the choice above it.
 		let showNoteTarget!: (shown: boolean, animate: boolean) => void;
 		const syncNoteTarget = (animate: boolean) => {
 			showNoteTarget(
@@ -1472,17 +1490,49 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 				});
 			});
 		noteFolderSetting.settingEl.addClass("pdf-annotations-stacked-setting");
-		const noteSubfolderSetting = new Setting(noteTargetPanel)
-			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
-			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
-			.addText((input) => {
-				input.setPlaceholder(t.PLACEHOLDER_NO_SUBFOLDER);
-				this.buildValueInput(input, "noteSubfolder");
-			});
-		noteSubfolderSetting.settingEl.addClass(
-			"pdf-annotations-stacked-setting"
-		);
 		syncNoteTarget(false);
+
+		new Setting(root)
+			.setName(t.SETTING_EXTRACT_TAGS_NAME)
+			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(TAG_EXTRACTION_MODES)
+					.setValue(this.plugin.settings.extractTags)
+					.onChange(async (value) => {
+						this.plugin.settings.extractTags =
+							value as TagExtraction;
+						await this.plugin.saveSettings();
+					})
+			);
+		const noteNameSetting = new Setting(root)
+			.setName(t.SETTING_NOTE_NAME_NAME)
+			.setDesc(t.SETTING_NOTE_NAME_DESC)
+			.addText((input) => this.buildValueInput(input, "noteName"));
+		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
+		new Setting(root)
+			.setName(t.SETTING_OVERWRITE_NAME)
+			.setDesc(t.SETTING_OVERWRITE_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.overwriteExistingNote)
+					.onChange(async (value) => {
+						this.plugin.settings.overwriteExistingNote = value;
+						await this.plugin.saveSettings();
+					})
+			);
+	}
+
+	/**
+	 * The settings that apply to the extraction writing a note per annotation
+	 * and to no other, gathered where that is the one thing they have in
+	 * common: what the notes are named, and the folder that keeps that many of
+	 * them together under wherever the section above sends them.
+	 */
+	private renderSeparateNotes(root: HTMLElement): void {
+		new Setting(root)
+			.setName(t.SECTION_SEPARATE_NOTES)
+			.setHeading();
 
 		// The switch above the field it governs: once the topic names the
 		// notes, the name template has nothing left to name.
@@ -1519,34 +1569,15 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 		);
 		syncOneNoteName(false);
 
-		new Setting(root)
-			.setName(t.SETTING_EXTRACT_TAGS_NAME)
-			.setDesc(t.SETTING_EXTRACT_TAGS_DESC)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(TAG_EXTRACTION_MODES)
-					.setValue(this.plugin.settings.extractTags)
-					.onChange(async (value) => {
-						this.plugin.settings.extractTags =
-							value as TagExtraction;
-						await this.plugin.saveSettings();
-					})
-			);
-		const noteNameSetting = new Setting(root)
-			.setName(t.SETTING_NOTE_NAME_NAME)
-			.setDesc(t.SETTING_NOTE_NAME_DESC)
-			.addText((input) => this.buildValueInput(input, "noteName"));
-		noteNameSetting.settingEl.addClass("pdf-annotations-stacked-setting");
-		new Setting(root)
-			.setName(t.SETTING_OVERWRITE_NAME)
-			.setDesc(t.SETTING_OVERWRITE_DESC)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.overwriteExistingNote)
-					.onChange(async (value) => {
-						this.plugin.settings.overwriteExistingNote = value;
-						await this.plugin.saveSettings();
-					})
-			);
+		const noteSubfolderSetting = new Setting(root)
+			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
+			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
+			.addText((input) => {
+				input.setPlaceholder(t.PLACEHOLDER_NO_SUBFOLDER);
+				this.buildValueInput(input, "noteSubfolder");
+			});
+		noteSubfolderSetting.settingEl.addClass(
+			"pdf-annotations-stacked-setting"
+		);
 	}
 }

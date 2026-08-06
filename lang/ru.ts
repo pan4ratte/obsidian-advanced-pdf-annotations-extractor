@@ -9,8 +9,8 @@ export default {
     COMMAND_EXTRACT_CURRENT_FILE: "Извлечь аннотации из текущего файла",
     COMMAND_EXTRACT_CURRENT_FILE_PER_ANNOTATION: "Извлечь аннотации из текущего файла в отдельные заметки",
     COMMAND_EXTRACT_CLIPBOARD_PATH: "Извлечь аннотации по пути из буфера обмена в текущую заметку",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Извлечь аннотации из файла в буфере обмена в новую заметку",
-    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Извлечь аннотации из файла в буфере обмена в отдельные заметки",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_TO_NOTE: "Извлечь аннотации по пути из буфера обмена в новую заметку",
+    COMMAND_EXTRACT_CLIPBOARD_PATH_PER_ANNOTATION: "Извлечь аннотации по пути из буфера обмена в отдельные заметки",
     COMMAND_EXTRACT_CURRENT_FOLDER: "Извлечь аннотации из всех PDF в текущей папке",
     COMMAND_EXTRACT_ADVANCED: "Извлечь аннотации с расширенными настройками",
 
@@ -44,7 +44,10 @@ export default {
     // own field alike, so neither says where it came from.
     NOTICE_PATH_DESKTOP_ONLY: "Чтение PDF вне хранилища доступно только в десктопном приложении.",
     NOTICE_PATH_NOT_A_FILE: "Указанный путь не является файлом.",
-    NOTICE_PATH_UNREADABLE: "Указанный путь не удалось прочитать как файл.",
+    NOTICE_PATH_NOT_A_FILE_OR_FOLDER: "Указанный путь не является ни файлом, ни папкой.",
+    NOTICE_PATH_UNREADABLE: "Указанный путь не удалось прочитать.",
+    NOTICE_FOLDER_HAS_NO_PDFS: "В указанной папке нет PDF-файлов.",
+    NOTICE_FILE_SKIPPED: "Этот PDF не удалось прочитать, он пропущен",
     NOTICE_EXTRACTION_FAILED: "Не удалось извлечь аннотации из этого PDF.",
     NOTICE_NOTE_PATH_INVALID: "Не удалось создать заметку с аннотациями: хранилище не принимает такой путь. Проверьте папку, подпапку и имя заметки в настройках.",
     NOTICE_NO_CURRENT_FILE: "Не удалось создать заметку с аннотациями: нет открытого файла, рядом с которым её положить. Откройте файл или назначьте папку хранилища для заметок.",
@@ -149,14 +152,7 @@ export default {
     OPTION_NOTE_LOCATION_VAULT: "В указанную папку в хранилище",
     SETTING_NOTE_FOLDER_NAME: "Укажите папку в хранилище",
     SETTING_NOTE_FOLDER_DESC: "Начните вводить, чтобы увидеть подсказки, или оставьте пустым для размещения в корне хранилища.",
-    SETTING_NOTE_SUBFOLDER_NAME: "Подпапка (необязательно)",
-    SETTING_NOTE_SUBFOLDER_DESC: "Если заполнено, этот шаблон имени будет использован для создания подпапки для заметок.",
     PLACEHOLDER_VAULT_ROOT: "Например, {{filename}} или другая переменная с любым префиксом или суффиксом",
-    PLACEHOLDER_NO_SUBFOLDER: "Если пусто, подпапка не создаётся",
-    SETTING_TOPIC_TO_NAME_NAME: "Использовать тему комментария для названия заметки",
-    SETTING_TOPIC_TO_NAME_DESC: "Включите, чтобы избежать дублирования {{topic}} при создании индивидуальных заметок, если он есть в вашем шаблоне.",
-    SETTING_ONE_NOTE_NAME_NAME: "Шаблон имени для аннотаций, импортируемых в отдельные заметки",
-    SETTING_ONE_NOTE_NAME_DESC: "Используйте уникальные переменные, например {{counter}}, иначе все аннотации попадут в одну заметку.",
     SETTING_EXTRACT_TAGS_NAME: "Извлекать теги из аннотаций в свойства заметок",
     SETTING_EXTRACT_TAGS_DESC: "Найденные в аннотациях теги автоматически переносятся в свойства заметок.",
     OPTION_EXTRACT_TAGS_NEVER: "Никогда",
@@ -167,5 +163,17 @@ export default {
     SETTING_NOTE_NAME_DESC: "Используйте уникальные переменные, например {{filename}}, иначе все PDF будут писать аннотации в одну заметку.",
     SETTING_OVERWRITE_NAME: "Разрешить перезапись",
     SETTING_OVERWRITE_DESC: "Если заметка с таким именем уже есть, она будет заменена, а не дополнена.",
+
+    // ─── Settings: separate notes ────────────────────────────────────────────────
+    // Действует только при извлечении в отдельные заметки — по одной на каждую
+    // аннотацию.
+    SECTION_SEPARATE_NOTES: "Извлечение в отдельные заметки",
+    SETTING_TOPIC_TO_NAME_NAME: "Использовать тему комментария для названия заметки",
+    SETTING_TOPIC_TO_NAME_DESC: "Включите, чтобы избежать дублирования {{topic}} при создании индивидуальных заметок, если он есть в вашем шаблоне.",
+    SETTING_ONE_NOTE_NAME_NAME: "Шаблон имени для аннотаций, импортируемых в отдельные заметки",
+    SETTING_ONE_NOTE_NAME_DESC: "Используйте уникальные переменные, например {{counter}}, иначе все аннотации попадут в одну заметку.",
+    SETTING_NOTE_SUBFOLDER_NAME: "Подпапка (необязательно)",
+    SETTING_NOTE_SUBFOLDER_DESC: "Если заполнено, по этому шаблону имени создаётся подпапка для отдельных заметок внутри выбранного расположения.",
+    PLACEHOLDER_NO_SUBFOLDER: "Если пусто, подпапка не создаётся",
 
 };
