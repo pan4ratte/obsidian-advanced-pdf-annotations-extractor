@@ -1,6 +1,13 @@
 # Changelog
 
 
+## Unreleased
+
+### New features
+
+* **Select colors for extraction.** A new toggle in the advanced extraction menu, under the dates, opens the list of annotation colors the PDF turns out to hold — a swatch and its hex value per checkbox — and the extraction keeps only the ones left ticked. The list is made from the file rather than from a palette: the PDF format defines no standard colors, so every reader app writes its own.
+
+
 ## 1.2.0
 
 ### New features

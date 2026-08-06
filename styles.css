@@ -658,16 +658,18 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 	margin-top: 4px;
 }
 
-/* The dates toggle has the list under it, which the card's gap already holds
-   off. Named twice to outweigh Obsidian's own padding for a toggle row. */
-.pdf-annotations-modal-card.pdf-annotations-dates-card .setting-item.mod-toggle {
+/* A filter toggle — the dates, the colours — has the list under it, which the
+   card's gap already holds off. Named twice to outweigh Obsidian's own padding
+   for a toggle row. */
+.pdf-annotations-modal-card.pdf-annotations-filter-card
+	.setting-item.mod-toggle {
 	padding-bottom: 0;
 }
 
 /* The scrolling column lives here rather than on the collapsible panel around
    it, which must carry no `display`. A PDF read over a year has more dates than
    a row would hold, so the list scrolls instead of pushing the button off. */
-.pdf-annotations-date-list {
+.pdf-annotations-filter-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
@@ -679,7 +681,7 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 
 /* The same row as the annotation type checkboxes above. */
 /* A day reads from the left, for the reason the annotation types do. */
-.pdf-annotations-date-option {
+.pdf-annotations-filter-option {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -690,20 +692,35 @@ body.is-mobile .pdf-annotations-annotation-option input[type="checkbox"] {
 	color: var(--text-normal);
 }
 
-.pdf-annotations-date-option input[type="checkbox"] {
+.pdf-annotations-filter-option input[type="checkbox"] {
 	margin: 0;
 	flex-shrink: 0;
 }
 
 /* Held to its size for the reason the annotation types are. */
-body.is-mobile .pdf-annotations-date-option input[type="checkbox"] {
+body.is-mobile .pdf-annotations-filter-option input[type="checkbox"] {
 	flex: 0 0 auto;
 	width: var(--checkbox-size, 16px);
 	height: var(--checkbox-size, 16px);
 }
 
+/* The colour itself, which is the only thing in the row that names it — the
+   hex beside it is a label, not a swatch. The colour comes out of the PDF and
+   is passed in as a custom property, since a class cannot carry it.
+
+   Bordered rather than bare: a highlight is chosen to sit on a white page, so
+   a pale one has no edge of its own against the card it is drawn on here. */
+.pdf-annotations-color-swatch {
+	flex: 0 0 auto;
+	width: 1em;
+	height: 1em;
+	border-radius: var(--radius-s);
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--pdf-annotations-swatch, transparent);
+}
+
 /* Stands in the list while the PDF is read, and for one with nothing to list. */
-.pdf-annotations-date-message {
+.pdf-annotations-filter-message {
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
 }

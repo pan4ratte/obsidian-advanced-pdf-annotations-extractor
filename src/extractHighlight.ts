@@ -135,6 +135,33 @@ export function pdfDateToTime(
 	return `${hour}:${minute}`;
 }
 
+/** One channel of a colour, as the two hex digits it is written with. */
+function hexByte(value: number): string {
+	const bounded = Math.min(255, Math.max(0, Math.round(value)));
+	return bounded.toString(16).padStart(2, "0");
+}
+
+/**
+ * The colour of an annotation, as `#rrggbb`. pdf.js hands `/C` over already
+ * converted to RGB — the PDF format lets it be written in grey, RGB or CMYK,
+ * and none of that reaches here.
+ *
+ * Undefined for an annotation the file gives no usable colour: pdf.js reports
+ * null for one explicitly transparent, and the whole entry is missing on a file
+ * that was never coloured at all. What the format does not say is not a colour
+ * to file the annotation under.
+ */
+export function annotationColor(
+	color?: ArrayLike<number> | null
+): string | undefined {
+	if (!color || color.length < 3) return undefined;
+
+	const channels = [color[0], color[1], color[2]];
+	if (!channels.every((channel) => Number.isFinite(channel))) return undefined;
+
+	return `#${channels.map(hexByte).join("")}`;
+}
+
 /**
  * What the extraction reads off a pdf.js text item. A `TextItem` satisfies it;
  * the matrix is restated because pdf.js types `transform` as `any[]`.
@@ -413,6 +440,7 @@ async function loadPage(
 			body: raw.contentsObj.str,
 			created: pdfDateToDay(raw.creationDate),
 			createdTime: pdfDateToTime(raw.creationDate),
+			colorHex: annotationColor(raw.color),
 		};
 
 		if (ANNOTS_TREATED_AS_HIGHLIGHTS.includes(anno.subtype)) {

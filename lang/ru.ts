@@ -26,6 +26,12 @@ export default {
     MODAL_DATES_NAME: "Выбрать даты для извлечения",
     MODAL_DATES_DESC: "Показывает все дни, когда были созданы аннотации внутри файла.",
     MODAL_DATES_NONE: "В этом файле нечего извлекать.",
+    MODAL_COLORS_NAME: "Выбрать цвета для извлечения",
+    // Every reader has a palette of its own — the PDF format defines none — so
+    // the list can only be made of the colours this file turns out to hold.
+    MODAL_COLORS_DESC: "Показывает все цвета аннотаций, найденные внутри файла.",
+    MODAL_COLORS_NONE: "В этом файле нечего извлекать.",
+    MODAL_COLOR_NONE: "Без цвета",
     MODAL_READING: "Чтение файла…",
     MODAL_TARGET_NAME: "Тип извлечения",
     MODAL_TARGET_CURRENT: "В текущую заметку",

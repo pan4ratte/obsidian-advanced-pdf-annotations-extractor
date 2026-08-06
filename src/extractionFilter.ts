@@ -7,6 +7,8 @@ export interface ExtractionFilter {
 	byPageLabel: boolean;
 	/** Days to keep, as `created` spells them; null for every day. */
 	days: Set<string> | null;
+	/** Colours to keep, as `colorHex` spells them; null for every colour. */
+	colors: Set<string> | null;
 	/**
 	 * Subtypes to keep; null for all. Filtered here rather than while reading,
 	 * so ticking a type off needs no second read of the PDF.
@@ -16,6 +18,9 @@ export interface ExtractionFilter {
 
 /** Key for an undated annotation; `created` is `YYYY-MM-DD` or absent. */
 export const NO_DATE = "";
+
+/** Key for an annotation the PDF gives no colour; `colorHex` is absent. */
+export const NO_COLOR = "";
 
 /** A range separator. Readers and PDFs spell one several ways. */
 const RANGE_SEPARATOR = /[-–—]/;
@@ -185,6 +190,21 @@ export function daysOfAnnotations(annotations: PDFAnnotation[]): string[] {
 }
 
 /**
+ * Every colour the annotations were marked with, in the order the document
+ * first uses each — the days are sorted because a calendar has an order of its
+ * own, and colours have none. Sorted by their hex they would read as an
+ * arbitrary shuffle; met as the reader met them, the first colour in the list
+ * is the one they started the PDF with. Colourless last, as undated is.
+ */
+export function colorsOfAnnotations(annotations: PDFAnnotation[]): string[] {
+	const colors = new Set(
+		annotations.map((annotation) => annotation.colorHex ?? NO_COLOR)
+	);
+	const colored = [...colors].filter((color) => color !== NO_COLOR);
+	return colors.has(NO_COLOR) ? [...colored, NO_COLOR] : colored;
+}
+
+/**
  * The annotations the filter keeps, copied: sorting and naming a note both take
  * the topic out of the body, and the extraction they came from has to stay
  * whole for a second run from the same modal.
@@ -204,7 +224,9 @@ export function filterAnnotations(
 					filter.byPageLabel
 				) &&
 				(filter.days === null ||
-					filter.days.has(annotation.created ?? NO_DATE))
+					filter.days.has(annotation.created ?? NO_DATE)) &&
+				(filter.colors === null ||
+					filter.colors.has(annotation.colorHex ?? NO_COLOR))
 		)
 		.map((annotation) => ({ ...annotation }));
 }

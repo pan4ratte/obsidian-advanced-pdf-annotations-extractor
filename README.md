@@ -17,7 +17,7 @@ Extract highlighted, underlined and struck out text and squiggly underlines, as 
 
 ### 2. Advanced extraction menu for fine-tuned import
 
-Already extracted the annotations from a PDF, then made new ones and want to import only those? Open the advanced menu and narrow the extraction down to certain pages (`25-50`, `25, 26, 30`, `i-viii`) — and even to certain days on which the annotations were created.
+Already extracted the annotations from a PDF, then made new ones and want to import only those? Open the advanced menu and narrow the extraction down to certain pages (`25-50`, `25, 26, 30`, `i-viii`), to certain days on which the annotations were created — and to the colors they were marked with. The list of colors is made from the file itself: the PDF format defines no palette, and every reader app uses its own.
 
 ### 3. Formatting templates for every annotation type
 

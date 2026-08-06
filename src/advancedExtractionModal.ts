@@ -17,8 +17,10 @@ import { t } from "lang/helpers";
 import PDFAnnotationPlugin from "src/main";
 import { createCollapsible } from "src/collapsible";
 import {
+	colorsOfAnnotations,
 	daysOfAnnotations,
 	filterAnnotations,
+	NO_COLOR,
 	PageSelection,
 } from "src/extractionFilter";
 import { SUPPORTED_ANNOTS } from "src/settings";
@@ -90,6 +92,20 @@ function readableDay(day: string): string {
 	return date.isValid() ? date.format(t.DATE_FORMAT) : day;
 }
 
+/**
+ * A toggle over a panel of checkboxes, asked of the PDF once it has been read:
+ * the days its annotations were made on, and the colours they were marked with.
+ * Both narrow the extraction down by something only the file can say, so both
+ * are drawn the same way and opened by the same motion.
+ */
+interface FilterPanel {
+	/** Null only between the panel being built and its toggle being added. */
+	toggle: ToggleComponent | null;
+	/** Where the checkboxes go; the panel around it carries the motion. */
+	list: HTMLElement;
+	show: (shown: boolean, animate: boolean) => void;
+}
+
 /** Type-ahead over the PDFs in the vault, for the field that names one. */
 class PDFFileSuggest extends AbstractInputSuggest<TFile> {
 	getSuggestions(query: string): TFile[] {
@@ -121,6 +137,7 @@ export class AdvancedExtractionModal extends Modal {
 	private pages = "";
 	private byPageLabel = false;
 	private byDate = false;
+	private byColor = false;
 	private target: ExtractionTarget = "separate";
 
 	/**
@@ -129,6 +146,9 @@ export class AdvancedExtractionModal extends Modal {
 	 * is there to leave days out.
 	 */
 	private chosenDays: Set<string> | null = null;
+
+	/** The colours still ticked, on the same terms as the days. */
+	private chosenColors: Set<string> | null = null;
 
 	/**
 	 * The types ticked for this extraction, starting as the settings have them.
@@ -142,12 +162,10 @@ export class AdvancedExtractionModal extends Modal {
 	private reading = false;
 
 	private fileInput: SearchComponent | null = null;
-	private dateToggle: ToggleComponent | null = null;
 	private extractButton: ButtonComponent | null = null;
-	private dateListEl: HTMLElement | null = null;
-	/** Puts the list of dates one way or the other, with the motion. */
-	private showDateList: ((shown: boolean, animate: boolean) => void) | null =
-		null;
+	/** Null until `onOpen` has drawn them. */
+	private dates: FilterPanel | null = null;
+	private colors: FilterPanel | null = null;
 
 	constructor(app: App, plugin: PDFAnnotationPlugin) {
 		super(app);
@@ -157,6 +175,41 @@ export class AdvancedExtractionModal extends Modal {
 	/** One card, in the bordered style the settings tab groups its own into. */
 	private card(): HTMLElement {
 		return this.contentEl.createDiv({ cls: "pdf-annotations-modal-card" });
+	}
+
+	/**
+	 * One card holding a toggle and the list it opens. The toggle is added after
+	 * the panel is built so the handle exists to hand back — Obsidian draws the
+	 * control into the setting row above either way.
+	 */
+	private addFilterPanel(
+		name: string,
+		desc: string,
+		onChange: (value: boolean) => void
+	): FilterPanel {
+		const card = this.card();
+		card.addClass("pdf-annotations-filter-card");
+		const setting = new Setting(card).setName(name).setDesc(desc);
+
+		// The panel opens and closes and carries no layout of its own: a
+		// `display` on it would outrank `pdf-annotations-collapsed` and keep a
+		// closed panel on screen. The column lives on the list inside.
+		const panel = card.createDiv({
+			cls: "pdf-annotations-collapsible pdf-annotations-collapsed",
+		});
+		const filter: FilterPanel = {
+			toggle: null,
+			list: panel.createDiv({ cls: "pdf-annotations-filter-list" }),
+			show: createCollapsible(panel),
+		};
+
+		setting.addToggle((toggle) => {
+			filter.toggle = toggle;
+			// Off to begin with, and set before the handler is registered so
+			// that saying so does not count as the reader having asked for it.
+			toggle.setValue(false).onChange(onChange);
+		});
+		return filter;
 	}
 
 	/** The settings tab's grid, answering the same question for this run. */
@@ -233,30 +286,25 @@ export class AdvancedExtractionModal extends Modal {
 				})
 			);
 
-		const datesCard = this.card();
-		datesCard.addClass("pdf-annotations-dates-card");
-		new Setting(datesCard)
-			.setName(t.MODAL_DATES_NAME)
-			.setDesc(t.MODAL_DATES_DESC)
-			.addToggle((toggle) => {
-				this.dateToggle = toggle;
-				toggle.setValue(this.byDate).onChange((value) => {
-					this.byDate = value;
-					this.refresh();
-					if (value) void this.prepare();
-				});
-			});
+		this.dates = this.addFilterPanel(
+			t.MODAL_DATES_NAME,
+			t.MODAL_DATES_DESC,
+			(value) => {
+				this.byDate = value;
+				this.refresh();
+				if (value) void this.prepare();
+			}
+		);
 
-		// The panel opens and closes and carries no layout of its own: a
-		// `display` on it would outrank `pdf-annotations-collapsed` and keep a
-		// closed panel on screen. The column lives on the list inside.
-		const datePanel = datesCard.createDiv({
-			cls: "pdf-annotations-collapsible pdf-annotations-collapsed",
-		});
-		this.dateListEl = datePanel.createDiv({
-			cls: "pdf-annotations-date-list",
-		});
-		this.showDateList = createCollapsible(datePanel);
+		this.colors = this.addFilterPanel(
+			t.MODAL_COLORS_NAME,
+			t.MODAL_COLORS_DESC,
+			(value) => {
+				this.byColor = value;
+				this.refresh();
+				if (value) void this.prepare();
+			}
+		);
 
 		new Setting(this.card())
 			.setName(t.MODAL_TARGET_NAME)
@@ -345,11 +393,13 @@ export class AdvancedExtractionModal extends Modal {
 		const source = this.resolveSource();
 
 		// What was read belongs to the PDF it was read from: pointed elsewhere,
-		// or cleared, the annotations and the ticked days both go.
+		// or cleared, the annotations and everything ticked off them go.
 		if (!source || (this.loaded && sourceKey(source) !== this.loaded.key)) {
 			this.loaded = null;
 			this.chosenDays = null;
-			this.dateListEl?.empty();
+			this.chosenColors = null;
+			this.dates?.list.empty();
+			this.colors?.list.empty();
 		}
 
 		this.refresh();
@@ -362,9 +412,11 @@ export class AdvancedExtractionModal extends Modal {
 	private refresh(animate = true): void {
 		const ready = this.resolveSource() !== null;
 
-		this.dateToggle?.setDisabled(!ready);
+		this.dates?.toggle?.setDisabled(!ready);
+		this.colors?.toggle?.setDisabled(!ready);
 		this.extractButton?.setDisabled(!ready || this.reading);
-		this.showDateList?.(this.byDate && ready, animate);
+		this.dates?.show(this.byDate && ready, animate);
+		this.colors?.show(this.byColor && ready, animate);
 	}
 
 	private async load(
@@ -400,7 +452,8 @@ export class AdvancedExtractionModal extends Modal {
 
 		this.reading = true;
 		this.refresh();
-		this.showMessage(t.MODAL_READING);
+		this.showMessage(this.dates, t.MODAL_READING);
+		this.showMessage(this.colors, t.MODAL_READING);
 		try {
 			const result = await this.load(source);
 			if (!result) return null;
@@ -422,21 +475,46 @@ export class AdvancedExtractionModal extends Modal {
 		}
 	}
 
-	private showMessage(message: string): void {
-		this.dateListEl?.empty();
-		this.dateListEl?.createDiv({
-			cls: "pdf-annotations-date-message",
+	/** Stands in a list in place of the checkboxes it has none to draw. */
+	private showMessage(panel: FilterPanel | null, message: string): void {
+		panel?.list.empty();
+		panel?.list.createDiv({
+			cls: "pdf-annotations-filter-message",
 			text: message,
 		});
 	}
 
+	/** One ticked row: the checkbox, and whatever is to be shown beside it. */
+	private addOption(
+		list: HTMLElement,
+		chosen: Set<string>,
+		value: string
+	): HTMLElement {
+		const option = list.createEl("label", {
+			cls: "pdf-annotations-filter-option",
+		});
+		const box = option.createEl("input", { type: "checkbox" });
+		box.checked = chosen.has(value);
+		box.addEventListener("change", () => {
+			if (box.checked) {
+				chosen.add(value);
+			} else {
+				chosen.delete(value);
+			}
+		});
+		return option;
+	}
+
 	/**
-	 * Reads the PDF and fills the list of days. Started as soon as one is named
-	 * rather than when the list opens, into a panel still closed until then.
+	 * Reads the PDF and fills both lists. Started as soon as one is named rather
+	 * than when a list opens, into panels still closed until then.
 	 */
 	private async prepare(): Promise<void> {
 		const loaded = await this.ensureLoaded();
-		if (loaded) this.showDays(loaded);
+		if (!loaded) return;
+
+		this.showDays(loaded);
+		this.showColors(loaded);
 	}
 
 	private showDays(loaded: LoadedAnnotations): void {
@@ -444,29 +522,56 @@ export class AdvancedExtractionModal extends Modal {
 		this.chosenDays ??= new Set(days);
 
 		if (days.length === 0) {
-			this.showMessage(t.MODAL_DATES_NONE);
+			this.showMessage(this.dates, t.MODAL_DATES_NONE);
 			return;
 		}
 
-		const list = this.dateListEl;
+		const list = this.dates?.list;
 		if (!list) return;
 		list.empty();
 		for (const day of days) {
-			const option = list.createEl("label", {
-				cls: "pdf-annotations-date-option",
-			});
-			const box = option.createEl("input", { type: "checkbox" });
-			box.checked = this.chosenDays.has(day);
-			box.addEventListener("change", () => {
-				if (box.checked) {
-					this.chosenDays?.add(day);
-				} else {
-					this.chosenDays?.delete(day);
-				}
-			});
+			const option = this.addOption(list, this.chosenDays, day);
 			// The PDF dated it not at all, which is a thing a reader may want
 			// to leave out like any other day.
 			option.createSpan({ text: day ? readableDay(day) : t.NOTE_NO_DATE });
+		}
+	}
+
+	/**
+	 * The colours this PDF turns out to hold, each shown as itself. There is no
+	 * palette to list them from: what a colour is called and which ones a reader
+	 * has to pick between are their app's, not the PDF format's, so the list can
+	 * only be made from the file in hand.
+	 */
+	private showColors(loaded: LoadedAnnotations): void {
+		const colors = colorsOfAnnotations(loaded.annotations);
+		this.chosenColors ??= new Set(colors);
+
+		if (colors.length === 0) {
+			this.showMessage(this.colors, t.MODAL_COLORS_NONE);
+			return;
+		}
+
+		const list = this.colors?.list;
+		if (!list) return;
+		list.empty();
+		for (const color of colors) {
+			const option = this.addOption(list, this.chosenColors, color);
+			if (color === NO_COLOR) {
+				// Nothing to show a swatch of, and a colour to leave out like
+				// any other.
+				option.createSpan({ text: t.MODAL_COLOR_NONE });
+				continue;
+			}
+
+			// The one thing about a swatch that cannot be a class: the colour
+			// is read out of the PDF, so it is passed in as a custom property
+			// the stylesheet paints with.
+			const swatch = option.createSpan({
+				cls: "pdf-annotations-color-swatch",
+			});
+			swatch.setCssProps({ "--pdf-annotations-swatch": color });
+			option.createSpan({ text: color });
 		}
 	}
 
@@ -486,6 +591,7 @@ export class AdvancedExtractionModal extends Modal {
 			pages: selection,
 			byPageLabel: this.byPageLabel,
 			days: this.byDate ? this.chosenDays : null,
+			colors: this.byColor ? this.chosenColors : null,
 			subtypes: this.chosenSubtypes,
 		});
 		// Here an empty note would mean the filters were narrowed too far,

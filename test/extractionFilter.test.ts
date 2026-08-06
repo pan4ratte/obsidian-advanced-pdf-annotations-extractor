@@ -1,7 +1,9 @@
 import {describe, expect, test} from '@jest/globals';
 import {
+	colorsOfAnnotations,
 	daysOfAnnotations,
 	filterAnnotations,
+	NO_COLOR,
 	NO_DATE,
 	PageSelection,
 	romanToArabic,
@@ -13,7 +15,8 @@ function annotation(
 	pageNumber: number,
 	pageLabel: string,
 	created?: string,
-	subtype = 'Highlight'
+	subtype = 'Highlight',
+	colorHex?: string
 ): PDFAnnotation {
 	return {
 		subtype,
@@ -28,6 +31,7 @@ function annotation(
 		author: '',
 		body: 'body',
 		created,
+		colorHex,
 	};
 }
 
@@ -185,10 +189,26 @@ describe('daysOfAnnotations', () => {
 	});
 });
 
+describe('colorsOfAnnotations', () => {
+	test('lists each colour once, first met first, colourless last', () => {
+		const annotations = [
+			annotation(1, '1', undefined, 'Highlight', '#ffd400'),
+			annotation(2, '2', undefined, 'Text'),
+			annotation(3, '3', undefined, 'Highlight', '#2ea8e5'),
+			annotation(4, '4', undefined, 'Highlight', '#ffd400'),
+		];
+		expect(colorsOfAnnotations(annotations)).toEqual([
+			'#ffd400',
+			'#2ea8e5',
+			NO_COLOR,
+		]);
+	});
+});
+
 describe('filterAnnotations', () => {
 	const annotations = [
-		annotation(1, 'i', '2024-01-15'),
-		annotation(25, '25', '2024-03-02'),
+		annotation(1, 'i', '2024-01-15', 'Highlight', '#ffd400'),
+		annotation(25, '25', '2024-03-02', 'Highlight', '#2ea8e5'),
 		annotation(88, '88', undefined, 'Text'),
 	];
 	const everyPage = PageSelection.parse('').selection;
@@ -197,6 +217,7 @@ describe('filterAnnotations', () => {
 		pages: everyPage,
 		byPageLabel: false,
 		days: null,
+		colors: null,
 		subtypes: null,
 	};
 
@@ -222,6 +243,14 @@ describe('filterAnnotations', () => {
 			subtypes: new Set(['Text']),
 		});
 		expect(kept.map((a) => a.pageNumber)).toEqual([88]);
+	});
+
+	test('keeps only the colours that were ticked', () => {
+		const kept = filterAnnotations(annotations, {
+			...everything,
+			colors: new Set(['#ffd400', NO_COLOR]),
+		});
+		expect(kept.map((a) => a.pageNumber)).toEqual([1, 88]);
 	});
 
 	test('pages and days both have to match', () => {

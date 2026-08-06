@@ -128,6 +128,24 @@ describe('loadPDFFile', () => {
     expect(anno.highlightedText).toBe('');
   });
 
+  test('reads the colour pdf.js normalized the annotation to', async () => {
+    // As pdf.js reports one: three channels over 0-255, whatever colour space
+    // the file wrote `/C` in.
+    const [anno] = await extract([
+      annotation({color: new Uint8ClampedArray([255, 212, 0])}),
+    ]);
+    expect(anno.colorHex).toBe('#ffd400');
+  });
+
+  test('an annotation with no usable colour is filed under none', async () => {
+    const none = async (over: Record<string, unknown>) =>
+      (await extract([annotation(over)]))[0].colorHex;
+    expect(await none({})).toBeUndefined();
+    // Explicitly transparent, which pdf.js reports as null.
+    expect(await none({color: null})).toBeUndefined();
+    expect(await none({color: new Uint8ClampedArray([0, 0])})).toBeUndefined();
+  });
+
   test('reads no outline unless the sections are asked for', async () => {
     const [anno] = await extract([annotation({})]);
     expect(anno.section).toBeUndefined();

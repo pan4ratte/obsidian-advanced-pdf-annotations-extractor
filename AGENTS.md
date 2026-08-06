@@ -254,7 +254,7 @@ src/
   formatter.ts                — Handlebars template rendering
   settings.ts                 — Settings class + settings tab UI
   advancedExtractionModal.ts  — the "advanced settings" modal
-  extractionFilter.ts         — page expressions and the page/date/type filter
+  extractionFilter.ts         — page expressions and the page/date/colour/type filter
   collapsible.ts              — the show/hide animation, shared by tab and modal
   types.ts                    — PDFFile, annotation and pdf.js boundary types
 lang/

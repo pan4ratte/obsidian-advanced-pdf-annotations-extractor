@@ -28,6 +28,12 @@ export default {
     MODAL_DATES_NAME: "Select dates for extraction",
     MODAL_DATES_DESC: "Shows every day on which the annotations inside the file were created.",
     MODAL_DATES_NONE: "There is nothing to extract from this file.",
+    MODAL_COLORS_NAME: "Select colors for extraction",
+    // Every reader has a palette of its own — the PDF format defines none — so
+    // the list can only be made of the colours this file turns out to hold.
+    MODAL_COLORS_DESC: "Shows every annotation color found inside the file.",
+    MODAL_COLORS_NONE: "There is nothing to extract from this file.",
+    MODAL_COLOR_NONE: "No color",
     MODAL_READING: "Reading the file…",
     MODAL_TARGET_NAME: "Extraction type",
     MODAL_TARGET_CURRENT: "To the current note",

@@ -123,6 +123,13 @@ export interface RawPDFAnnotation {
 	quadPoints?: ArrayLike<number> | null;
 	/** `D:YYYYMMDDHHmmSS` and an optional zone; null when the PDF omits it. */
 	creationDate?: string | null;
+	/**
+	 * The annotation's colour, as pdf.js normalizes it: `[r, g, b]` over 0–255,
+	 * whichever colour space the writer wrote `/C` in. Null for one explicitly
+	 * set to transparent, and black for an annotation carrying no `/C` at all —
+	 * pdf.js fills a missing entry in rather than leaving it out.
+	 */
+	color?: ArrayLike<number> | null;
 }
 
 /** A pdf.js annotation once the extraction has filled in the note's fields. */
@@ -151,4 +158,9 @@ export interface PDFAnnotation extends RawPDFAnnotation {
 	created?: string;
 	/** The time `creationDate` names, as `HH:mm`; absent when it carries none. */
 	createdTime?: string;
+	/**
+	 * The colour the reader marked with, as `#rrggbb`. Absent when the PDF names
+	 * none, which is a colour to leave out like any other.
+	 */
+	colorHex?: string;
 }
