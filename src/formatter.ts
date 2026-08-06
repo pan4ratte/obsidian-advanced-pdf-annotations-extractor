@@ -3,6 +3,7 @@ import {
 	TemplateDelegate as Template,
 } from "handlebars";
 import { t } from "../lang/helpers";
+import { groupsByFile, groupsByFolder } from "./ordering";
 import {
 	PDFAnnotationPluginSetting,
 	templateForAnnotation,
@@ -47,7 +48,7 @@ export class PDFAnnotationPluginFormatter {
 
 		let date = "";
 
-		// A new group restarts the headings under it, so a topic reading from
+		// A new group restarts the headings under it, so a day read from
 		// several files says which each annotation came from. A heading with
 		// only one thing to say is not restarted, or it would repeat down the
 		// whole note.
@@ -58,6 +59,7 @@ export class PDFAnnotationPluginFormatter {
 		};
 		const dateFor = (anno: PDFAnnotation) => anno.created || t.NOTE_NO_DATE;
 		const labelVaries = new Set(grandtotal.map(labelFor)).size > 1;
+		const dateVaries = new Set(grandtotal.map(dateFor)).size > 1;
 		const topicVaries = new Set(grandtotal.map((a) => a.topic)).size > 1;
 
 		// Nothing to head a topic or day with unless they were grouped by one.
@@ -72,26 +74,42 @@ export class PDFAnnotationPluginFormatter {
 
 		// One unchanging label heads the note instead of marking a place in it.
 		const headsTheNote = !labelVaries && headingFiles;
+		// Marking places takes the grouping that gathered them: unsorted, the
+		// files interleave and a heading naming one repeats down the note.
+		const labelGroups =
+			headingFiles &&
+			(this.settings.fileHeading === "folder"
+				? groupsByFolder(this.settings, grandtotal)
+				: groupsByFile(this.settings, grandtotal));
 
-		// Whichever heading encloses the others takes the first level.
-		const [noteLevel, dateLevel, topicLevel, fileLevel] = headingLevels([
+		// Whichever heading encloses the others takes the first level, and the
+		// rest follow the order the annotations were grouped in.
+		const [noteLevel, fileLevel, dateLevel, topicLevel] = headingLevels([
 			headsTheNote,
+			labelGroups,
 			headingDates,
 			headingTopics,
-			!headsTheNote && headingFiles,
 		]);
 
 		if (headsTheNote && grandtotal.length > 0) {
-			currentLabel = labelFor(grandtotal[0]);
-			text += `${noteLevel} ${currentLabel}\n\n`;
+			text += `${noteLevel} ${labelFor(grandtotal[0])}\n\n`;
 		}
 
 		grandtotal.forEach((anno) => {
+			if (labelGroups) {
+				const label = labelFor(anno);
+				if (currentLabel != label) {
+					currentLabel = label;
+					if (dateVaries) date = "";
+					if (topicVaries) topic = "";
+					text += `${fileLevel} ${label}\n\n`;
+				}
+			}
+
 			if (headingDates) {
 				if (date != dateFor(anno)) {
 					date = dateFor(anno);
 					if (topicVaries) topic = "";
-					if (labelVaries) currentLabel = "";
 					text += `${dateLevel} ${date}\n\n`;
 				}
 			}
@@ -99,16 +117,7 @@ export class PDFAnnotationPluginFormatter {
 			if (headingTopics) {
 				if (topic != anno.topic) {
 					topic = anno.topic;
-					if (labelVaries) currentLabel = "";
 					text += `${topicLevel} ${topic}\n\n`;
-				}
-			}
-
-			if (headingFiles) {
-				const label = labelFor(anno);
-				if (currentLabel != label) {
-					currentLabel = label;
-					text += `${fileLevel} ${label}\n\n`;
 				}
 			}
 

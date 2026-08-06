@@ -193,8 +193,10 @@ export const TAG_EXTRACTION_MODES = {
 export type TagExtraction = keyof typeof TAG_EXTRACTION_MODES;
 
 /**
- * What the heading above each group of annotations shows. Only what is written:
- * the order is `sortByTopic` and `groupByFolder`.
+ * What the heading above each group of annotations shows. It marks the groups
+ * the matching setting made — `groupByFolder` for the folder name,
+ * `groupByFile` for the file name — and heads the whole note when the name it
+ * shows is the same from end to end.
  */
 export const FILE_HEADINGS = ["folder", "file", "none"] as const;
 export type FileHeading = (typeof FILE_HEADINGS)[number];
@@ -288,7 +290,13 @@ export class PDFAnnotationPluginSetting {
 	public topicHeading: boolean;
 	public dateHeading: boolean;
 	public fileHeading: FileHeading;
+	/**
+	 * The groupings, widest first: a folder holds the files, a file holds the
+	 * days it was read on, a day holds the topics. `ordering.ts` applies them
+	 * in this order and the headings nest in it.
+	 */
 	public groupByFolder: boolean;
+	public groupByFile: boolean;
 	public groupByDate: boolean;
 	public sortByTopic: boolean;
 	public noteLocation: NoteLocation;
@@ -325,6 +333,10 @@ export class PDFAnnotationPluginSetting {
 		// not already know.
 		this.fileHeading = "none";
 		this.groupByFolder = false;
+		// On: annotations from several PDFs read as one note per PDF, not as
+		// every page four of them and then every page five. It costs nothing
+		// on the single-file extraction, which has no second file to gather.
+		this.groupByFile = true;
 		// Off, so an upgrade does not reorder notes nobody asked to reorder.
 		this.groupByDate = false;
 		this.sortByTopic = true;
@@ -938,9 +950,10 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 						{
 							name: t.SECTION_GROUPING,
 							aliases: [
-								t.SETTING_SORT_BY_TOPIC_NAME,
-								t.SETTING_GROUP_BY_DATE_NAME,
 								t.SETTING_GROUP_BY_FOLDER_NAME,
+								t.SETTING_GROUP_BY_FILE_NAME,
+								t.SETTING_GROUP_BY_DATE_NAME,
+								t.SETTING_SORT_BY_TOPIC_NAME,
 							],
 						},
 						(root) => this.renderGrouping(root)
@@ -1259,20 +1272,32 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 	}
 
 	// Two sections, in the order they take effect: where an annotation lands,
-	// then what is written above it.
+	// then what is written above it. The rows inside this one are in the order
+	// the groupings nest, widest first, which is the order they are applied in.
 	private renderGrouping(root: HTMLElement): void {
 		new Setting(root)
 			.setName(t.SECTION_GROUPING)
 			.setHeading();
 		new Setting(root)
-			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
-			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
+			.setName(t.SETTING_GROUP_BY_FOLDER_NAME)
+			.setDesc(t.SETTING_GROUP_BY_FOLDER_DESC)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.sortByTopic)
+					.setValue(this.plugin.settings.groupByFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.sortByTopic = value;
-						this.syncTopicHeading();
+						this.plugin.settings.groupByFolder = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(root)
+			.setName(t.SETTING_GROUP_BY_FILE_NAME)
+			.setDesc(t.SETTING_GROUP_BY_FILE_DESC)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.groupByFile)
+					.onChange(async (value) => {
+						this.plugin.settings.groupByFile = value;
 						await this.plugin.saveSettings();
 					})
 			);
@@ -1291,13 +1316,14 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(root)
-			.setName(t.SETTING_GROUP_BY_FOLDER_NAME)
-			.setDesc(t.SETTING_GROUP_BY_FOLDER_DESC)
+			.setName(t.SETTING_SORT_BY_TOPIC_NAME)
+			.setDesc(t.SETTING_SORT_BY_TOPIC_DESC)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.groupByFolder)
+					.setValue(this.plugin.settings.sortByTopic)
 					.onChange(async (value) => {
-						this.plugin.settings.groupByFolder = value;
+						this.plugin.settings.sortByTopic = value;
+						this.syncTopicHeading();
 						await this.plugin.saveSettings();
 					})
 			);

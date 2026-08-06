@@ -6,7 +6,7 @@
   English | <a href="https://github.com/pan4ratte/obsidian-classy-pdf-extractor/blob/main/README_RU.md">Русский</a>
 </p>
 
-This plugin extracts all types of annotations from PDFs and writes them into the notes of your vault with automated formatting. The import offers a choice of annotation types, page ranges and the days the comments were created on, while templates let you format every type separately. Group the annotations by topic, date, folder and file, and send them to the current note, to a new one, or every annotation into a note of its own.
+This plugin extracts all types of annotations from PDFs and writes them into the notes of your vault with automated formatting. The import offers a choice of annotation types, page ranges and the days the comments were created on, while templates let you format every type separately. Group the annotations by folder, file, date and topic, and send them to the current note, to a new one, or every annotation into a note of its own.
 
 
 ## Features
@@ -25,7 +25,7 @@ Set up the default template that will format all annotation types, or create sep
 
 ### 4. Grouping, headings and note naming rules
 
-Group the annotations by topic (the first line of each comment), by the day they were created, by folder and file. Group headings can optionally be added to the notes automatically. Notes can be named from a template (or after the annotation's own topic) and placed into subfolders, which are also created from a template.
+Group the annotations by folder, by file, by the day they were created and by topic (the first line of each comment) — the groupings nest in that order. Grouping by folder and by file applies only when the annotations come from several folders or files. Group headings can optionally be added to the notes automatically. Notes can be named from a template (or after the annotation's own topic) and placed into subfolders, which are also created from a template.
 
 
 ## Installation

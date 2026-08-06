@@ -1,5 +1,5 @@
 import {describe, expect, test} from '@jest/globals';
-import {compareAnnotations} from '../src/ordering';
+import {compareAnnotations, groupsByFile, groupsByFolder} from '../src/ordering';
 import {PDFAnnotationPluginSetting} from '../src/settings';
 import {PDFAnnotation} from '../src/types';
 
@@ -24,11 +24,12 @@ const annotation = (over: Partial<PDFAnnotation>): PDFAnnotation =>
 const topicsInOrder = (
   topics: string[],
   over: Partial<PDFAnnotationPluginSetting> = {}
-) =>
-  topics
-    .map((topic) => annotation({topic}))
-    .sort(compareAnnotations(settings({sortByTopic: true, ...over})))
+) => {
+  const annotations = topics.map((topic) => annotation({topic}));
+  return annotations
+    .sort(compareAnnotations(settings({sortByTopic: true, ...over}), annotations))
     .map((a) => a.topic);
+};
 
 describe('ordering by topic', () => {
   test('Russian is read in the Russian alphabet, not in code points', () => {
@@ -68,9 +69,9 @@ describe('ordering by everything else', () => {
   const sorted = (
     annotations: PDFAnnotation[],
     over: Partial<PDFAnnotationPluginSetting> = {}
-  ) => [...annotations].sort(compareAnnotations(settings(over)));
+  ) => [...annotations].sort(compareAnnotations(settings(over), annotations));
 
-  test('the day comes before every other grouping, undated last', () => {
+  test('the day comes before the topic, undated last', () => {
     const [first, second, third] = sorted(
       [
         annotation({created: undefined, topic: 'a'}),
@@ -94,6 +95,54 @@ describe('ordering by everything else', () => {
     expect([first.folder, second.folder]).toEqual(['апория', 'Ясность']);
   });
 
+  // Where the PDF sits encloses everything read out of it: a folder holds the
+  // files, a file holds the days it was read on, a day holds the topics.
+  test('the folder comes before the day, whichever files it holds', () => {
+    const [first, second] = sorted(
+      [
+        annotation({
+          folder: 'b',
+          file: {name: 'Z.pdf'},
+          created: '2024-01-15',
+        } as never),
+        annotation({
+          folder: 'a',
+          file: {name: 'A.pdf'},
+          created: '2024-03-01',
+        } as never),
+      ],
+      {groupByFolder: true, groupByDate: true}
+    );
+    expect([first.folder, second.folder]).toEqual(['a', 'b']);
+  });
+
+  test('the file comes before the day it was read on', () => {
+    const [first, second] = sorted(
+      [
+        annotation({file: {name: 'Z.pdf'}, created: '2024-01-15'} as never),
+        annotation({file: {name: 'A.pdf'}, created: '2024-03-01'} as never),
+      ],
+      {groupByDate: true}
+    );
+    expect([first.file.name, second.file.name]).toEqual(['A.pdf', 'Z.pdf']);
+  });
+
+  test('files are read page by page when nothing groups by them', () => {
+    const [first, second, third] = sorted(
+      [
+        annotation({file: {name: 'A.pdf'}, pageNumber: 9} as never),
+        annotation({file: {name: 'Z.pdf'}, pageNumber: 2} as never),
+        annotation({file: {name: 'A.pdf'}, pageNumber: 2} as never),
+      ],
+      {groupByFile: false}
+    );
+    expect([first.pageNumber, second.pageNumber, third.pageNumber])
+      .toEqual([2, 2, 9]);
+    // The two on page two still come out in a settled order, not in the one
+    // they happened to be read in.
+    expect([first.file.name, second.file.name]).toEqual(['A.pdf', 'Z.pdf']);
+  });
+
   test('within a file the page comes first and the page top after it', () => {
     const [first, second, third] = sorted([
       annotation({pageNumber: 2, rect: [0, 700, 0, 0]}),
@@ -114,5 +163,37 @@ describe('ordering by everything else', () => {
     ]);
     expect([first.file.name, second.file.name])
       .toEqual(['Chapter 2.pdf', 'Chapter 10.pdf']);
+  });
+});
+
+// The ordinary extraction reads one PDF, and a grouping with one group is a
+// heading saying what the whole note already says.
+describe('grouping by where the PDF sits', () => {
+  const inFolders = (folders: string[]) =>
+    folders.map((folder) => annotation({folder}));
+  const inFiles = (names: string[]) =>
+    names.map((name) => annotation({file: {name}} as never));
+
+  test('the folder groups only what came from several of them', () => {
+    const on = settings({groupByFolder: true});
+    expect(groupsByFolder(on, inFolders(['a', 'b']))).toBe(true);
+    expect(groupsByFolder(on, inFolders(['a', 'a']))).toBe(false);
+    expect(groupsByFolder(on, inFolders(['a']))).toBe(false);
+    expect(groupsByFolder(on, [])).toBe(false);
+  });
+
+  test('the file groups only what came from several of them', () => {
+    const on = settings({groupByFile: true});
+    expect(groupsByFile(on, inFiles(['A.pdf', 'Z.pdf']))).toBe(true);
+    expect(groupsByFile(on, inFiles(['A.pdf', 'A.pdf']))).toBe(false);
+    expect(groupsByFile(on, inFiles(['A.pdf']))).toBe(false);
+    expect(groupsByFile(on, [])).toBe(false);
+  });
+
+  test('neither groups anything with its setting off', () => {
+    expect(groupsByFolder(settings({groupByFolder: false}), inFolders(['a', 'b'])))
+      .toBe(false);
+    expect(groupsByFile(settings({groupByFile: false}), inFiles(['A.pdf', 'Z.pdf'])))
+      .toBe(false);
   });
 });

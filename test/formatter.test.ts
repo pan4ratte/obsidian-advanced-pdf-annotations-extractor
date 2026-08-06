@@ -161,8 +161,33 @@ describe('headings', () => {
 
   test('the file name gives each PDF its own heading, extension included', () => {
     expect(headingsFor({fileHeading: 'file'})).toBe(
-      '# Method\n\n## Paper.pdf\n\n-\n## Other.pdf\n\n-\n'
+      '# Paper.pdf\n\n## Method\n\n-\n# Other.pdf\n\n-\n'
     );
+  });
+
+  test('the one file they all came from heads the note, not each group', () => {
+    expect(
+      format({fileHeading: 'file'}, [
+        annotation({topic: 'A'}),
+        annotation({topic: 'B'}),
+      ])
+    ).toBe('# Paper.pdf\n\n## A\n\n-\n## B\n\n-\n');
+  });
+
+  test('no file heading marks the groups when nothing groups by the file', () => {
+    // Ungrouped, the two files interleave, and a heading naming one of them
+    // would land above annotations belonging to the other.
+    expect(headingsFor({fileHeading: 'file', groupByFile: false}))
+      .toBe('# Method\n\n-\n-\n');
+  });
+
+  test('no folder heading marks the groups when nothing groups by the folder', () => {
+    expect(
+      format({fileHeading: 'folder', groupByFolder: false}, [
+        annotation({topic: 'A'}),
+        annotation({topic: 'B', folder: 'papers'}),
+      ])
+    ).toBe('# A\n\n-\n# B\n\n-\n');
   });
 
   test('no heading leaves the topic heading standing on its own', () => {
@@ -191,16 +216,16 @@ describe('headings', () => {
     ).toBe('# refs\n\n## A\n\n-\n## B\n\n-\n## C\n\n-\n');
   });
 
-  test('a file heading that varies still opens each topic, one level down', () => {
-    // Here it says which of the two the topic is reading from, so each topic
-    // gets its own copy, nested under the topic rather than over it.
+  test('a file heading that varies opens each file, the topics inside it', () => {
+    // The file encloses what was read out of it, so a topic spanning both is
+    // named under each rather than the file being named under each topic.
     expect(
       format({fileHeading: 'file'}, [
         annotation({topic: 'A'}),
-        annotation({topic: 'A', file: OTHER}),
         annotation({topic: 'B'}),
+        annotation({topic: 'A', file: OTHER}),
       ])
-    ).toBe('# A\n\n## Paper.pdf\n\n-\n## Other.pdf\n\n-\n# B\n\n## Paper.pdf\n\n-\n');
+    ).toBe('# Paper.pdf\n\n## A\n\n-\n## B\n\n-\n# Other.pdf\n\n## A\n\n-\n');
   });
 
   test('without topic headings a file heading only marks where the file changes', () => {
@@ -236,12 +261,27 @@ describe('headings', () => {
     expect(
       format({groupByDate: true, fileHeading: 'file'}, [
         annotation({topic: 'A', created: '2024-01-15'}),
-        annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
         annotation({topic: 'B', created: '2024-03-02'}),
+        annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
       ])
     ).toBe(
-      '# 2024-01-15\n\n## A\n\n### Paper.pdf\n\n-\n### Other.pdf\n\n-\n' +
-        '# 2024-03-02\n\n## B\n\n### Paper.pdf\n\n-\n'
+      '# Paper.pdf\n\n## 2024-01-15\n\n### A\n\n-\n## 2024-03-02\n\n### B\n\n-\n' +
+        '# Other.pdf\n\n## 2024-01-15\n\n### A\n\n-\n'
+    );
+  });
+
+  test('a new file starts the days and the topics under it over', () => {
+    // The second file was read on a day the first one already headed, and
+    // that heading belongs to the first file's annotations only.
+    expect(
+      format({groupByDate: true, fileHeading: 'file'}, [
+        annotation({topic: 'A', created: '2024-01-15'}),
+        annotation({topic: 'A', created: '2024-01-15', file: OTHER}),
+        annotation({topic: 'B', created: '2024-03-02', file: OTHER}),
+      ])
+    ).toBe(
+      '# Paper.pdf\n\n## 2024-01-15\n\n### A\n\n-\n' +
+        '# Other.pdf\n\n## 2024-01-15\n\n### A\n\n-\n## 2024-03-02\n\n### B\n\n-\n'
     );
   });
 

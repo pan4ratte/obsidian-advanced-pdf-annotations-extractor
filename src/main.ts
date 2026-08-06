@@ -79,7 +79,7 @@ export default class PDFAnnotationPlugin extends Plugin {
 		// in the body, not whether it is read.
 		assignTopics(grandtotal, settings.sortByTopic);
 
-		grandtotal.sort(compareAnnotations(settings));
+		grandtotal.sort(compareAnnotations(settings, grandtotal));
 	}
 
 	/**

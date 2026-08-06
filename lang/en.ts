@@ -123,12 +123,14 @@ export default {
 
     // ─── Settings: grouping ──────────────────────────────────────────────────────
     SECTION_GROUPING: "Annotations grouping",
-    SETTING_SORT_BY_TOPIC_NAME: "Group by topic",
-    SETTING_SORT_BY_TOPIC_DESC: "Reads the first line of each comment as its topic and groups by it first of all.",
+    SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
+    SETTING_GROUP_BY_FOLDER_DESC: "Collects every PDF from the same folder together, and applies only when the annotations come from several folders.",
+    SETTING_GROUP_BY_FILE_NAME: "Group by file",
+    SETTING_GROUP_BY_FILE_DESC: "Collects every annotation from the same PDF together, and applies only when the annotations come from several files.",
     SETTING_GROUP_BY_DATE_NAME: "Group by creation date",
     SETTING_GROUP_BY_DATE_DESC: "Groups annotations by the day of creation — annotations without a date come last.",
-    SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
-    SETTING_GROUP_BY_FOLDER_DESC: "Collects every PDF from the same folder together, before the annotations are ordered file by file.",
+    SETTING_SORT_BY_TOPIC_NAME: "Group by topic",
+    SETTING_SORT_BY_TOPIC_DESC: "Reads the first line of each comment as its topic and groups by it inside every other grouping.",
 
     // ─── Settings: headings ──────────────────────────────────────────────────────
     SECTION_HEADINGS: "Headings",
@@ -137,7 +139,7 @@ export default {
     SETTING_TOPIC_HEADING_NAME: "Collect notes with the same topic under a shared heading",
     SETTING_TOPIC_HEADING_DESC: "Adds a heading for each topic and collects the matching notes under it.",
     SETTING_FILE_HEADING_NAME: "Add file headings",
-    SETTING_FILE_HEADING_DESC: "Adds a heading before each file's annotations start.",
+    SETTING_FILE_HEADING_DESC: "Adds a heading with the folder or file name, which marks each group when the matching grouping is on and heads the whole note when the name is the same throughout.",
     OPTION_FILE_HEADING_FOLDER: "Add folder name",
     OPTION_FILE_HEADING_FILE: "Add file name",
     OPTION_FILE_HEADING_NONE: "Add nothing",
