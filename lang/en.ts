@@ -19,7 +19,7 @@ export default {
     // ─── Advanced extraction modal ───────────────────────────────────────────────
     MODAL_ADVANCED_TITLE: "Extraction with advanced settings",
     MODAL_FILE_NAME: "Search for a PDF or paste the path",
-    MODAL_FILE_PLACEHOLDER: "Search the vault, or the full path if the file is outside it",
+    MODAL_FILE_PLACEHOLDER: "Search the vault, or paste the full path if the file is outside it",
     MODAL_PAGES_NAME: "Specify pages for extraction",
     // The field carries no description, so the example is where the shape of an
     // answer is shown: single pages, ranges, roman numerals, all at once.
@@ -32,7 +32,7 @@ export default {
     MODAL_TARGET_NAME: "Extraction type",
     MODAL_TARGET_CURRENT: "To the current note",
     MODAL_TARGET_SINGLE: "To a new note",
-    MODAL_TARGET_SEPARATE: "To individual notes",
+    MODAL_TARGET_SEPARATE: "To separate notes",
     MODAL_EXTRACT: "Extract annotations",
     /**
      * A moment format. `LL` is moment's own long date for the locale, which is
@@ -87,8 +87,8 @@ export default {
     VAR_FILENAME: "File name of the PDF (without the extension)",
     VAR_FILEPATH: "Path to the PDF file",
     VAR_FILELINK: "A [[wikilink]] for PDFs inside the vault and a file:// path for external ones",
-    VAR_PAGE_NUMBER: "Number of the page with the annotation (relative to the number of physical pages)",
-    VAR_PAGE_LABEL: "Label of the page with the annotation (relative to the page labels the author assigned)",
+    VAR_PAGE_NUMBER: "Number of the page with the annotation (counted among the physical pages)",
+    VAR_PAGE_LABEL: "Label of the page with the annotation (as the author of the document numbered that page)",
     VAR_AUTHOR: "Author of the annotation",
     VAR_BODY: "Text of the comment, if there is one",
     VAR_TYPE: "Annotation type",
@@ -125,7 +125,7 @@ export default {
     WARNING_VARIABLE_UNFILLED: "{{variable}} is left empty: “{{type}}” marks up no text in the PDF.",
 
     // ─── Settings: grouping ──────────────────────────────────────────────────────
-    SECTION_GROUPING: "Annotations grouping",
+    SECTION_GROUPING: "Annotation grouping",
     SETTING_GROUP_BY_FOLDER_NAME: "Group by folder",
     SETTING_GROUP_BY_FOLDER_DESC: "Collects every PDF from the same folder together, and applies only when the annotations come from several folders.",
     SETTING_GROUP_BY_FILE_NAME: "Group by file",
@@ -147,14 +147,14 @@ export default {
     SETTING_TOPIC_HEADING_DESC: "Adds a heading for each topic and collects the matching notes under it.",
 
     // ─── Settings: notes ─────────────────────────────────────────────────────────
-    SECTION_NOTES: "Notes creation",
-    SETTING_NOTE_LOCATION_NAME: "Created notes destination",
+    SECTION_NOTES: "Note creation",
+    SETTING_NOTE_LOCATION_NAME: "Destination for created notes",
     SETTING_NOTE_LOCATION_DESC: "Choose where the created notes will be placed.",
-    OPTION_NOTE_LOCATION_CURRENT: "Same folder as the open file",
+    OPTION_NOTE_LOCATION_CURRENT: "Same folder as the current file",
     OPTION_NOTE_LOCATION_VAULT: "A specified folder in the vault",
     SETTING_NOTE_FOLDER_NAME: "Specify a folder in the vault",
     SETTING_NOTE_FOLDER_DESC: "Start typing to see suggestions, or leave it empty to place them in the vault root.",
-    PLACEHOLDER_VAULT_ROOT: "For example, {{filename}} or another variable with any prefix or suffix",
+    PLACEHOLDER_VAULT_ROOT: "If empty, the notes go to the vault root",
     SETTING_EXTRACT_TAGS_NAME: "Extract tags from annotations into the note properties",
     SETTING_EXTRACT_TAGS_DESC: "Tags found in the annotations are moved automatically into the note properties.",
     OPTION_EXTRACT_TAGS_NEVER: "Never",
@@ -170,11 +170,13 @@ export default {
     // Applies only to an extraction into separate notes — one per annotation.
     SECTION_SEPARATE_NOTES: "Extraction to separate notes",
     SETTING_TOPIC_TO_NAME_NAME: "Use the topic of the comment as the note name",
-    SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating individual notes, if your template has it.",
+    SETTING_TOPIC_TO_NAME_DESC: "Enable to avoid duplicating {{topic}} when creating separate notes, if your template has it.",
     SETTING_ONE_NOTE_NAME_NAME: "Naming pattern for annotations imported into separate notes",
     SETTING_ONE_NOTE_NAME_DESC: "Use unique variables, such as {{counter}}, or all annotations will end up in the same note.",
     SETTING_NOTE_SUBFOLDER_NAME: "Subfolder (optional)",
     SETTING_NOTE_SUBFOLDER_DESC: "When filled, this naming template creates a subfolder for the separate notes inside the destination that was chosen.",
-    PLACEHOLDER_NO_SUBFOLDER: "If empty, no subfolder is created",
+    // Shows the shape of an answer the field expects: the description above it
+    // already says that an empty field creates no subfolder.
+    PLACEHOLDER_SUBFOLDER_EXAMPLE: "For example, {{filename}} or another variable with any prefix or suffix",
 
 };

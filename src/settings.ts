@@ -1573,7 +1573,7 @@ export class PDFAnnotationPluginSettingTab extends PluginSettingTab {
 			.setName(t.SETTING_NOTE_SUBFOLDER_NAME)
 			.setDesc(t.SETTING_NOTE_SUBFOLDER_DESC)
 			.addText((input) => {
-				input.setPlaceholder(t.PLACEHOLDER_NO_SUBFOLDER);
+				input.setPlaceholder(t.PLACEHOLDER_SUBFOLDER_EXAMPLE);
 				this.buildValueInput(input, "noteSubfolder");
 			});
 		noteSubfolderSetting.settingEl.addClass(
